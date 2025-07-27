@@ -401,8 +401,14 @@
             historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
             deviceId: 'ESP32-Ventilation-01',
             refreshInterval: 30000, // 30 seconds
-            apiSecret: null // Set your Azure Function key here manually
+            apiSecret: getApiKeyFromUrl() || null // Get from URL parameter or environment
         };
+
+        // Helper function to get API key from URL parameter
+        function getApiKeyFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('apikey') || urlParams.get('key');
+        }
 
         let temperatureChart = null;
         let refreshTimer = null;
