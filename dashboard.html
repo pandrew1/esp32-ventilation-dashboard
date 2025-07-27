@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Ventilation Control Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Authentication check - redirect to login if not authenticated
+        window.addEventListener('load', function() {
+            const token = localStorage.getItem('ventilation_auth_token');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-indicator.online {
+            background: #28a745;
+        }
+
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .sensor-reading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .sensor-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .temperature {
+            color: #e74c3c;
+        }
+
+        .humidity {
+            color: #3498db;
+        }
+
+        .pressure {
+            color: #9b59b6;
+        }
+
+        .system-status {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .fan-status {
+            font-size: 3em;
+            margin: 20px 0;
+        }
+
+        .fan-on {
+            color: #28a745;
+        }
+
+        .fan-off {
+            color: #dc3545;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+
+        .time-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .time-btn {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .time-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .time-btn:hover {
+            background: #e9ecef;
+        }
+
+        .time-btn.active:hover {
+            background: #0056b3;
+        }
+
+        .alert-section {
+            margin-top: 30px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+        }
+
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .time-controls {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌀 ESP32 Ventilation Control</h1>
+            <p class="subtitle">Real-time Environmental Monitoring & Control Dashboard</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="connectionStatus"></div>
+                <span id="connectionText">Connecting...</span>
+            </div>
+            <div class="status-item">
+                <span>Last Update: <span id="lastUpdate">-</span></span>
+            </div>
+            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh</button>
+        </div>
+
+        <div class="main-content">
+            <div id="loadingSection" class="loading">
+                <h3>Loading ventilation data...</h3>
+                <p>Please wait while we fetch the latest information.</p>
+            </div>
+
+            <div id="errorSection" class="error" style="display: none;">
+                <h3>⚠️ Connection Error</h3>
+                <p>Unable to connect to the ventilation system. Please check your API endpoints.</p>
+                <button class="refresh-btn" onclick="refreshData()">Try Again</button>
+            </div>
+
+            <div id="dashboardContent" style="display: none;">
+                <!-- Current Status Grid -->
+                <div class="grid">
+                    <!-- Indoor Sensors -->
+                    <div class="card">
+                        <h3>🏠 Indoor Environment</h3>
+                        <div class="sensor-reading">
+                            <span>Temperature</span>
+                            <span class="sensor-value temperature" id="indoorTemp">-°F</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Humidity</span>
+                            <span class="sensor-value humidity" id="indoorHumidity">-%</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Pressure</span>
+                            <span class="sensor-value pressure" id="indoorPressure">- inHg</span>
+                        </div>
+                    </div>
+
+                    <!-- Outdoor Sensors -->
+                    <div class="card">
+                        <h3>🌤️ Outdoor Environment</h3>
+                        <div class="sensor-reading">
+                            <span>Temperature</span>
+                            <span class="sensor-value temperature" id="outdoorTemp">-°F</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Humidity</span>
+                            <span class="sensor-value humidity" id="outdoorHumidity">-%</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Pressure</span>
+                            <span class="sensor-value pressure" id="outdoorPressure">- inHg</span>
+                        </div>
+                    </div>
+
+                    <!-- System Status -->
+                    <div class="card">
+                        <h3>⚙️ System Status</h3>
+                        <div class="system-status">
+                            <div class="fan-status" id="fanStatus">🌀</div>
+                            <div><strong id="fanStatusText">System Status</strong></div>
+                            <div style="margin-top: 15px;">
+                                <div>Mode: <strong id="ventilationMode">-</strong></div>
+                                <div>Runtime Today: <strong id="fanMinutes">0</strong> minutes</div>
+                                <div>Fresh Air: <strong id="freshAirStatus">-</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Weather & Forecast -->
+                    <div class="card">
+                        <h3>📊 Weather & Forecast</h3>
+                        <div class="sensor-reading">
+                            <span>Forecast High</span>
+                            <span class="sensor-value temperature" id="forecastHigh">-°F</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Storm Risk</span>
+                            <span class="sensor-value" id="stormRisk">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>System Uptime</span>
+                            <span class="sensor-value" id="uptime">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historical Charts -->
+                <div class="card">
+                    <h3>📈 Historical Data</h3>
+                    <div class="time-controls">
+                        <button class="time-btn active" onclick="loadChart(6)">6 Hours</button>
+                        <button class="time-btn" onclick="loadChart(24)">24 Hours</button>
+                        <button class="time-btn" onclick="loadChart(72)">3 Days</button>
+                        <button class="time-btn" onclick="loadChart(168)">1 Week</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Door Status -->
+                <div class="card" id="doorSection" style="display: none;">
+                    <h3>🚪 Door Status</h3>
+                    <div id="doorList"></div>
+                </div>
+
+                <!-- Alerts -->
+                <div class="alert-section" id="alertSection" style="display: none;">
+                    <div class="card">
+                        <h3>⚠️ System Alerts</h3>
+                        <div id="alertList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your actual Azure Function URLs
+        const CONFIG = {
+            statusApiUrl: 'https://my-webhook-func.azurewebsites.net/api/GetVentilationStatus',
+            historyApiUrl: 'https://my-webhook-func.azurewebsites.net/api/GetVentilationHistory',
+            deviceId: 'ESP32-Ventilation-01',
+            refreshInterval: 30000, // 30 seconds
+            apiSecret: 'YOUR_SHARED_SECRET_HERE' // Replace with your actual shared secret
+        };
+
+        let temperatureChart = null;
+        let refreshTimer = null;
+
+        // Authentication and API helper functions
+        function getAuthHeaders() {
+            const token = localStorage.getItem('ventilation_auth_token');
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-API-Secret': CONFIG.apiSecret
+            };
+        }
+
+        function logout() {
+            localStorage.removeItem('ventilation_auth_token');
+            localStorage.removeItem('ventilation_user_email');
+            window.location.href = 'login.html';
+        }
+
+        // Add logout button to header
+        document.addEventListener('DOMContentLoaded', function() {
+            const header = document.querySelector('.header');
+            const userEmail = localStorage.getItem('ventilation_user_email') || 'User';
+            
+            const userSection = document.createElement('div');
+            userSection.style.cssText = 'position: absolute; top: 15px; right: 20px; font-size: 0.9em;';
+            userSection.innerHTML = `
+                <span style="margin-right: 15px;">Welcome, ${userEmail}</span>
+                <button onclick="logout()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Logout</button>
+            `;
+            
+            header.style.position = 'relative';
+            header.appendChild(userSection);
+            
+            initializeDashboard();
+        });
+
+        // Initialize dashboard
+        async function initializeDashboard() {
+            await refreshData();
+            await loadChart(6); // Load 6-hour chart by default
+            
+            // Start auto-refresh
+            startAutoRefresh();
+        }
+
+        async function refreshData() {
+            try {
+                updateConnectionStatus('connecting');
+                
+                const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (response.status === 401) {
+                    // Authentication failed, redirect to login
+                    logout();
+                    return;
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                updateDashboard(data);
+                updateConnectionStatus('connected');
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                updateConnectionStatus('error');
+                showError();
+            }
+        }
+
+        function updateDashboard(data) {
+            // Hide loading, show content
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+
+            // Update sensors
+            const sensors = data.sensors || {};
+            const indoor = sensors.indoor || {};
+            const outdoor = sensors.outdoor || {};
+            
+            document.getElementById('indoorTemp').textContent = `${(indoor.temp || 0).toFixed(1)}°F`;
+            document.getElementById('indoorHumidity').textContent = `${(indoor.humidity || 0).toFixed(0)}%`;
+            document.getElementById('indoorPressure').textContent = `${(indoor.pressure || 0).toFixed(2)} inHg`;
+            
+            document.getElementById('outdoorTemp').textContent = `${(outdoor.temp || 0).toFixed(1)}°F`;
+            document.getElementById('outdoorHumidity').textContent = `${(outdoor.humidity || 0).toFixed(0)}%`;
+            document.getElementById('outdoorPressure').textContent = `${(outdoor.pressure || 0).toFixed(2)} inHg`;
+
+            // Update system status
+            const system = data.system || {};
+            const fanOn = system.fanOn || false;
+            
+            document.getElementById('fanStatus').textContent = fanOn ? '🌀' : '⏸️';
+            document.getElementById('fanStatus').className = `fan-status ${fanOn ? 'fan-on' : 'fan-off'}`;
+            document.getElementById('fanStatusText').textContent = fanOn ? 'RUNNING' : 'STOPPED';
+            document.getElementById('ventilationMode').textContent = system.ventilationMode || 'UNKNOWN';
+            document.getElementById('fanMinutes').textContent = system.fanMinutesToday || 0;
+            document.getElementById('freshAirStatus').textContent = system.freshAirActive ? 'Active' : 'Inactive';
+
+            // Update weather
+            const weather = data.weather || {};
+            document.getElementById('forecastHigh').textContent = `${(weather.forecastHigh || 0).toFixed(0)}°F`;
+            document.getElementById('stormRisk').textContent = weather.stormRisk || 'NONE';
+            
+            // Update system info
+            const uptimeHours = Math.floor((system.uptime || 0) / 3600);
+            document.getElementById('uptime').textContent = `${uptimeHours}h`;
+
+            // Update doors if available
+            if (data.doors && data.doors.length > 0) {
+                updateDoorStatus(data.doors);
+            }
+
+            // Check for alerts
+            checkAlerts(data);
+
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        function updateDoorStatus(doors) {
+            const doorSection = document.getElementById('doorSection');
+            const doorList = document.getElementById('doorList');
+            
+            if (doors.length === 0) {
+                doorSection.style.display = 'none';
+                return;
+            }
+
+            doorSection.style.display = 'block';
+            doorList.innerHTML = '';
+
+            doors.forEach(door => {
+                const doorItem = document.createElement('div');
+                doorItem.className = 'sensor-reading';
+                doorItem.innerHTML = `
+                    <span>${door.name || `Door ${door.id}`}</span>
+                    <span class="sensor-value ${door.open ? 'fan-on' : 'fan-off'}">
+                        ${door.open ? '🔓 Open' : '🔒 Closed'}
+                        ${door.open && door.minutesOpen ? ` (${door.minutesOpen}m)` : ''}
+                    </span>
+                `;
+                doorList.appendChild(doorItem);
+            });
+        }
+
+        function checkAlerts(data) {
+            const alerts = [];
+            const sensors = data.sensors || {};
+            const system = data.system || {};
+            const weather = data.weather || {};
+
+            // Temperature alerts
+            const indoorTemp = sensors.indoor?.temp || 0;
+            if (indoorTemp > 85) {
+                alerts.push({type: 'danger', message: `High indoor temperature: ${indoorTemp.toFixed(1)}°F`});
+            } else if (indoorTemp < 60) {
+                alerts.push({type: 'warning', message: `Low indoor temperature: ${indoorTemp.toFixed(1)}°F`});
+            }
+
+            // System alerts
+            const freeHeap = system.freeHeap || 0;
+            if (freeHeap < 50000) {
+                alerts.push({type: 'warning', message: `Low memory: ${Math.round(freeHeap/1024)}KB available`});
+            }
+
+            // Storm alerts
+            const stormRisk = weather.stormRisk || 'NONE';
+            if (stormRisk === 'STORM_LIKELY' || stormRisk === 'STORM_IMMINENT') {
+                alerts.push({type: 'warning', message: `Weather alert: ${stormRisk.replace('_', ' ')}`});
+            }
+
+            // Door alerts
+            if (data.doors) {
+                data.doors.forEach(door => {
+                    if (door.open && door.minutesOpen > 240) { // 4 hours
+                        alerts.push({type: 'warning', message: `${door.name || 'Door'} open for ${door.minutesOpen} minutes`});
+                    }
+                });
+            }
+
+            updateAlerts(alerts);
+        }
+
+        function updateAlerts(alerts) {
+            const alertSection = document.getElementById('alertSection');
+            const alertList = document.getElementById('alertList');
+
+            if (alerts.length === 0) {
+                alertSection.style.display = 'none';
+                return;
+            }
+
+            alertSection.style.display = 'block';
+            alertList.innerHTML = '';
+
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${alert.type}`;
+                alertDiv.textContent = alert.message;
+                alertList.appendChild(alertDiv);
+            });
+        }
+
+        async function loadChart(hours) {
+            // Update active button
+            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (response.status === 401) {
+                    // Authentication failed, redirect to login
+                    logout();
+                    return;
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                updateChart(data.data || []);
+                
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+            }
+        }
+
+        function updateChart(data) {
+            const ctx = document.getElementById('temperatureChart').getContext('2d');
+            
+            // Prepare data
+            const labels = data.map(item => {
+                const date = new Date(item.timestamp);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            }).reverse();
+
+            const indoorTemps = data.map(item => item.sensors?.indoor?.temp || 0).reverse();
+            const outdoorTemps = data.map(item => item.sensors?.outdoor?.temp || 0).reverse();
+            const fanStatus = data.map(item => item.system?.fanOn ? 1 : 0).reverse();
+
+            // Destroy existing chart
+            if (temperatureChart) {
+                temperatureChart.destroy();
+            }
+
+            // Create new chart
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Indoor Temperature (°F)',
+                            data: indoorTemps,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'temp'
+                        },
+                        {
+                            label: 'Outdoor Temperature (°F)',
+                            data: outdoorTemps,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'temp'
+                        },
+                        {
+                            label: 'Fan Status',
+                            data: fanStatus,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                            type: 'bar',
+                            yAxisID: 'fan'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        temp: {
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°F)'
+                            }
+                        },
+                        fan: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: 'Fan Status'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 1 ? 'ON' : 'OFF';
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 10
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateConnectionStatus(status) {
+            const indicator = document.getElementById('connectionStatus');
+            const text = document.getElementById('connectionText');
+
+            switch(status) {
+                case 'connected':
+                    indicator.className = 'status-indicator online';
+                    text.textContent = 'Connected';
+                    break;
+                case 'connecting':
+                    indicator.className = 'status-indicator';
+                    text.textContent = 'Connecting...';
+                    break;
+                case 'error':
+                    indicator.className = 'status-indicator';
+                    text.textContent = 'Connection Error';
+                    break;
+            }
+        }
+
+        function showError() {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'block';
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+            
+            refreshTimer = setInterval(async () => {
+                await refreshData();
+            }, CONFIG.refreshInterval);
+        }
+
+        // Manual refresh function
+        window.refreshData = refreshData;
+    </script>
+</body>
+</html>
