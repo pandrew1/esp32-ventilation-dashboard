@@ -397,11 +397,11 @@
     <script>
         // Configuration - Replace with your actual Azure Function URLs
         const CONFIG = {
-            statusApiUrl: 'https://my-webhook-func.azurewebsites.net/api/GetVentilationStatus',
-            historyApiUrl: 'https://my-webhook-func.azurewebsites.net/api/GetVentilationHistory',
+            statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
+            historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
             deviceId: 'ESP32-Ventilation-01',
             refreshInterval: 30000, // 30 seconds
-            apiSecret: 'YOUR_SHARED_SECRET_HERE' // Replace with your actual shared secret
+            apiSecret: null // Set your Azure Function key here manually
         };
 
         let temperatureChart = null;
