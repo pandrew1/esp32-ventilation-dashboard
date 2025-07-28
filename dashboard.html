@@ -1085,35 +1085,48 @@
             // We need to reverse it to show oldest to newest (left to right)
             let sortedData = [...data].reverse();
             
-            // Debug: Log API data span info
-            if (sortedData.length > 0) {
-                console.log('Sample timestamps from API data:', {
-                    first: sortedData[0].timestamp,
-                    middle: sortedData[Math.floor(sortedData.length/2)]?.timestamp,
-                    last: sortedData[sortedData.length - 1].timestamp,
-                    timestampType: typeof sortedData[0].timestamp
-                });
-                
-                const firstDate = new Date(sortedData[0].timestamp);
-                const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
-                const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
-                console.log(`API returned ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
-            }
-            
-            // Prepare labels with smart time formatting but avoid old dates for axis labels
-            const labels = sortedData.map((item, index) => {
-                let date = new Date(item.timestamp);
-                
-                // If timestamp is invalid, create a fallback
-                if (isNaN(date.getTime())) {
-                    // Try parsing as string or number
-                    const timestampValue = typeof item.timestamp === 'string' ? parseInt(item.timestamp) : item.timestamp;
-                    date = new Date(timestampValue);
+                // Debug: Log API data span info
+                if (sortedData.length > 0) {
+                    console.log('Sample timestamps from API data:', {
+                        first: sortedData[0].timestamp,
+                        middle: sortedData[Math.floor(sortedData.length/2)]?.timestamp,
+                        last: sortedData[sortedData.length - 1].timestamp,
+                        timestampType: typeof sortedData[0].timestamp
+                    });
                     
-                    if (isNaN(date.getTime())) {
-                        console.warn(`Could not parse timestamp at index ${index}: ${item.timestamp}`);
-                        return `Point ${index + 1}`;
-                    }
+                    // Parse timestamps correctly (Unix seconds to milliseconds)
+                    const firstTimestamp = typeof sortedData[0].timestamp === 'string' ? 
+                        parseInt(sortedData[0].timestamp) * 1000 : 
+                        (sortedData[0].timestamp < 10000000000 ? sortedData[0].timestamp * 1000 : sortedData[0].timestamp);
+                    const lastTimestamp = typeof sortedData[sortedData.length - 1].timestamp === 'string' ? 
+                        parseInt(sortedData[sortedData.length - 1].timestamp) * 1000 : 
+                        (sortedData[sortedData.length - 1].timestamp < 10000000000 ? sortedData[sortedData.length - 1].timestamp * 1000 : sortedData[sortedData.length - 1].timestamp);
+                    
+                    const firstDate = new Date(firstTimestamp);
+                    const lastDate = new Date(lastTimestamp);
+                    const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
+                    console.log(`API returned ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
+                }            // Prepare labels with smart time formatting but avoid old dates for axis labels
+            const labels = sortedData.map((item, index) => {
+                let date;
+                
+                // Handle Unix timestamps (seconds) - convert to milliseconds
+                if (typeof item.timestamp === 'string') {
+                    const unixSeconds = parseInt(item.timestamp);
+                    date = new Date(unixSeconds * 1000); // Convert seconds to milliseconds
+                } else if (typeof item.timestamp === 'number') {
+                    // If it's already a number, check if it needs conversion
+                    const timestamp = item.timestamp;
+                    // If timestamp is in seconds (10 digits), convert to milliseconds
+                    date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+                } else {
+                    date = new Date(item.timestamp);
+                }
+                
+                // If timestamp is still invalid, create a fallback
+                if (isNaN(date.getTime())) {
+                    console.warn(`Could not parse timestamp at index ${index}: ${item.timestamp}`);
+                    return `Point ${index + 1}`;
                 }
                 
                 // Check if this data point is within the requested time range for label filtering
@@ -1318,7 +1331,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1600-fix-timestamp-parsing</span>
+        Build: <span id="buildInfo">2025.07.28-1605-unix-timestamp-fix</span>
     </div>
 </body>
 </html>
