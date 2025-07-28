@@ -379,6 +379,27 @@
                             <span class="sensor-value" id="uptime">-</span>
                         </div>
                     </div>
+
+                    <!-- System Reliability -->
+                    <div class="card">
+                        <h3>🔧 System Reliability</h3>
+                        <div class="sensor-reading">
+                            <span>Total Reboots</span>
+                            <span class="sensor-value" id="rebootCount">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>WiFi Outages</span>
+                            <span class="sensor-value" id="wifiOutageCount">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>WiFi Uptime</span>
+                            <span class="sensor-value" id="wifiUptime">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Longest Outage</span>
+                            <span class="sensor-value" id="longestOutage">-</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Historical Charts -->
@@ -659,6 +680,12 @@
 
             // Set system info to no data
             document.getElementById('uptime').textContent = 'No data';
+            
+            // Set reliability info to no data
+            document.getElementById('rebootCount').textContent = 'No data';
+            document.getElementById('wifiOutageCount').textContent = 'No data';
+            document.getElementById('wifiUptime').textContent = 'No data';
+            document.getElementById('longestOutage').textContent = 'No data';
 
             // Hide door section since no data
             document.getElementById('doorSection').style.display = 'none';
@@ -712,6 +739,26 @@
             // Update system info with proper null/undefined handling
             const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
             document.getElementById('uptime').textContent = uptimeHours != null ? `${uptimeHours}h` : 'No data';
+
+            // Update reliability statistics with proper null/undefined handling
+            const reliability = data.reliability || {};
+            document.getElementById('rebootCount').textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
+            document.getElementById('wifiOutageCount').textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
+            document.getElementById('wifiUptime').textContent = reliability.wifiUptimePercentage != null ? `${reliability.wifiUptimePercentage}%` : 'No data';
+            
+            // Format longest outage duration nicely
+            if (reliability.longestWifiOutageMinutes != null) {
+                const minutes = reliability.longestWifiOutageMinutes;
+                if (minutes >= 60) {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    document.getElementById('longestOutage').textContent = remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+                } else {
+                    document.getElementById('longestOutage').textContent = `${minutes}m`;
+                }
+            } else {
+                document.getElementById('longestOutage').textContent = 'No data';
+            }
 
             // Update doors if available
             if (data.doors && data.doors.length > 0) {
