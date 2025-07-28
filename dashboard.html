@@ -955,7 +955,7 @@
                 // If no authentication method is available, show empty chart
                 if (!token && !CONFIG.apiSecret) {
                     console.log('No authentication available, showing empty chart');
-                    updateChart([]);
+                    updateChart([], hours);
                     return;
                 }
 
@@ -976,7 +976,7 @@
                         // Using Bearer token but got 401 - functions may not support it yet
                         console.log('Bearer token chart authentication failed, showing empty chart');
                         showApiFailureNotice('History API returned 401 Unauthorized. Chart data is currently unavailable.', 'warning');
-                        updateChart([]);
+                        updateChart([], hours);
                         return;
                     }
                 }
@@ -985,28 +985,42 @@
                     // Show empty chart if API fails
                     console.log('Chart API call failed, showing empty chart');
                     showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart data is currently unavailable.`, 'warning');
-                    updateChart([]);
+                    updateChart([], hours);
                     return;
                 }
                 
                 const data = await response.json();
-                updateChart(data.data || []);
+                updateChart(data.data || [], hours);
                 
             } catch (error) {
                 console.error('Error loading chart data:', error);
                 // Show empty chart instead of mock data
                 console.log('Chart network error, showing empty chart');
                 showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
-                updateChart([]);
+                updateChart([], hours);
             }
         }
 
-        function updateChart(data) {
+        function updateChart(data, requestedHours = 6) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
             
             // Data comes from API in reverse chronological order (newest first)
             // We need to reverse it to show oldest to newest (left to right)
-            const sortedData = [...data].reverse();
+            let sortedData = [...data].reverse();
+            
+            // Client-side filtering to ensure we only show the requested time span
+            if (sortedData.length > 0 && requestedHours) {
+                const now = new Date();
+                const cutoffTime = new Date(now.getTime() - (requestedHours * 60 * 60 * 1000));
+                
+                // Filter out data older than the requested hours
+                sortedData = sortedData.filter(item => {
+                    const itemDate = new Date(item.timestamp);
+                    return itemDate >= cutoffTime;
+                });
+                
+                console.log(`Filtered to ${requestedHours} hours: ${sortedData.length} points remaining`);
+            }
             
             // Debug: Log data span info
             if (sortedData.length > 0) {
@@ -1040,8 +1054,8 @@
                     // Determine if we're looking at recent data (within 24 hours)
                     const isRecent = (now.getTime() - date.getTime()) < (24 * 60 * 60 * 1000);
                     
-                    // Get time without AM/PM for customization
-                    const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+                    // Get time without minutes for cleaner display
+                    const timeOptions = { hour: 'numeric', hour12: true };
                     let timeStr = date.toLocaleTimeString([], timeOptions);
                     
                     // Replace " AM" with "A" and " PM" with "P"
@@ -1214,7 +1228,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1440-storm-thresholds-detailed</span>
+        Build: <span id="buildInfo">2025.07.28-1450-chart-time-filtering-fix</span>
     </div>
 </body>
 </html>
