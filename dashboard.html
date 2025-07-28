@@ -469,11 +469,12 @@
                     }
                 });
                 
-                if (response.status === 401) {
-                    // Authentication failed, redirect to login
-                    logout();
-                    return;
-                }
+                // TEMPORARILY DISABLED - Skip 401 auth check for dev mode
+                // if (response.status === 401) {
+                //     // Authentication failed, redirect to login
+                //     logout();
+                //     return;
+                // }
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -641,11 +642,12 @@
                     }
                 });
                 
-                if (response.status === 401) {
-                    // Authentication failed, redirect to login
-                    logout();
-                    return;
-                }
+                // TEMPORARILY DISABLED - Skip 401 auth check for dev mode
+                // if (response.status === 401) {
+                //     // Authentication failed, redirect to login
+                //     logout();
+                //     return;
+                // }
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
