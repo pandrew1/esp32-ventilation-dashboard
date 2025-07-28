@@ -442,6 +442,67 @@
             window.location.href = 'login.html';
         }
 
+        // Function to show API failure notifications
+        function showApiFailureNotice(message, type = 'warning') {
+            // Remove any existing notices
+            const existingNotice = document.querySelector('.api-failure-notice');
+            if (existingNotice) {
+                existingNotice.remove();
+            }
+
+            const header = document.querySelector('.header');
+            const notice = document.createElement('div');
+            notice.className = 'api-failure-notice';
+            notice.style.cssText = `
+                background: ${type === 'error' ? 'rgba(220,53,69,0.9)' : 'rgba(255,193,7,0.9)'};
+                color: ${type === 'error' ? 'white' : '#212529'};
+                padding: 12px 15px;
+                text-align: center;
+                font-size: 0.9em;
+                border-radius: 5px;
+                margin-top: 15px;
+                border: 1px solid ${type === 'error' ? 'rgba(220,53,69,0.5)' : 'rgba(255,193,7,0.5)'};
+                animation: slideDown 0.3s ease-out;
+            `;
+            notice.innerHTML = `
+                <strong>${type === 'error' ? '⚠️ API Error:' : '📊 Using Mock Data:'}</strong> ${message}
+                <button onclick="this.parentElement.remove()" style="
+                    float: right;
+                    background: transparent;
+                    border: none;
+                    color: inherit;
+                    font-size: 16px;
+                    cursor: pointer;
+                    padding: 0 5px;
+                    margin-left: 10px;
+                ">×</button>
+            `;
+            
+            // Add CSS animation if not already present
+            if (!document.querySelector('#api-notice-styles')) {
+                const style = document.createElement('style');
+                style.id = 'api-notice-styles';
+                style.textContent = `
+                    @keyframes slideDown {
+                        from { opacity: 0; transform: translateY(-10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            header.appendChild(notice);
+            
+            // Auto-remove after 10 seconds for warnings (not errors)
+            if (type === 'warning') {
+                setTimeout(() => {
+                    if (notice.parentElement) {
+                        notice.remove();
+                    }
+                }, 10000);
+            }
+        }
+
         // Add logout button to header
         document.addEventListener('DOMContentLoaded', function() {
             const header = document.querySelector('.header');
@@ -457,8 +518,9 @@
             header.style.position = 'relative';
             header.appendChild(userSection);
             
-            // Add mock data notice if no API secret is provided
-            if (!CONFIG.apiSecret) {
+            // Add demo mode notice if no authentication is provided
+            const token = localStorage.getItem('ventilation_auth_token');
+            if (!CONFIG.apiSecret && !token) {
                 const mockNotice = document.createElement('div');
                 mockNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
                 mockNotice.innerHTML = '📊 <strong>Demo Mode:</strong> Using simulated data. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
@@ -498,9 +560,22 @@
                 });
                 
                 if (response.status === 401) {
-                    // Authentication failed, redirect to login
-                    logout();
-                    return;
+                    // Only logout if using API key authentication
+                    // For Bearer token, fall back to mock data until functions are updated
+                    const token = localStorage.getItem('ventilation_auth_token');
+                    if (!token && CONFIG.apiSecret) {
+                        // Using API key and got 401 - logout
+                        logout();
+                        return;
+                    } else if (token) {
+                        // Using Bearer token but got 401 - functions may not support it yet
+                        console.log('Bearer token authentication failed, using mock data until functions are updated');
+                        showApiFailureNotice('Status API returned 401 Unauthorized. Azure Functions may not support Bearer token authentication yet. Displaying simulated data until functions are updated.', 'error');
+                        const mockData = generateMockData();
+                        updateDashboard(mockData);
+                        updateConnectionStatus('connected');
+                        return;
+                    }
                 }
                 
                 if (!response.ok) {
@@ -512,12 +587,17 @@
                     // If unauthorized and no API secret, fall back to mock data
                     if (response.status === 401 || response.status === 404) {
                         console.log('API call failed, falling back to mock data');
+                        showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Using simulated data until the issue is resolved.`, 'error');
                         const mockData = generateMockData();
                         updateDashboard(mockData);
                         updateConnectionStatus('connected');
                         return;
                     }
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Using simulated data until the issue is resolved.`, 'error');
+                    const mockData = generateMockData();
+                    updateDashboard(mockData);
+                    updateConnectionStatus('connected');
+                    return;
                 }
                 
                 const data = await response.json();
@@ -535,6 +615,7 @@
                 
                 // Fall back to mock data instead of showing error
                 console.log('Network error, using mock data');
+                showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Using simulated data until connection is restored.`, 'error');
                 const mockData = generateMockData();
                 updateDashboard(mockData);
                 updateConnectionStatus('connected');
@@ -700,14 +781,27 @@
                 });
                 
                 if (response.status === 401) {
-                    // Authentication failed, redirect to login
-                    logout();
-                    return;
+                    // Only logout if using API key authentication
+                    // For Bearer token, fall back to mock data until functions are updated
+                    const token = localStorage.getItem('ventilation_auth_token');
+                    if (!token && CONFIG.apiSecret) {
+                        // Using API key and got 401 - logout
+                        logout();
+                        return;
+                    } else if (token) {
+                        // Using Bearer token but got 401 - functions may not support it yet
+                        console.log('Bearer token chart authentication failed, using mock data until functions are updated');
+                        showApiFailureNotice('History API returned 401 Unauthorized. Chart data will be simulated until Azure Functions support Bearer token authentication.', 'warning');
+                        const mockChartData = generateMockChartData(hours);
+                        updateChart(mockChartData);
+                        return;
+                    }
                 }
                 
                 if (!response.ok) {
                     // Fall back to mock data if API fails
                     console.log('Chart API call failed, using mock data');
+                    showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart will display simulated data until the issue is resolved.`, 'warning');
                     const mockChartData = generateMockChartData(hours);
                     updateChart(mockChartData);
                     return;
@@ -720,6 +814,7 @@
                 console.error('Error loading chart data:', error);
                 // Fall back to mock data instead of failing
                 console.log('Chart network error, using mock data');
+                showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart will display simulated data until connection is restored.`, 'warning');
                 const mockChartData = generateMockChartData(hours);
                 updateChart(mockChartData);
             }
@@ -926,7 +1021,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0600-real-data</span>
+        Build: <span id="buildInfo">2025.07.28-0800-api-failure-notifications</span>
     </div>
 </body>
 </html>
