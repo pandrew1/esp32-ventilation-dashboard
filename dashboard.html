@@ -462,7 +462,10 @@
                 
                 const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
                     method: 'GET',
-                    headers: getAuthHeaders()
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Secret': CONFIG.apiSecret
+                    }
                 });
                 
                 if (response.status === 401) {
@@ -631,7 +634,10 @@
             try {
                 const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
                     method: 'GET',
-                    headers: getAuthHeaders()
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Secret': CONFIG.apiSecret
+                    }
                 });
                 
                 if (response.status === 401) {
