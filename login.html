@@ -195,11 +195,6 @@
         <div class="logo">🌀</div>
         <h1>Ventilation System</h1>
         <p class="subtitle">Secure access to your home monitoring dashboard</p>
-        
-        <!-- Dev Mode Quick Access -->
-        <div style="margin-bottom: 20px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; font-size: 12px; color: #856404;">
-            <strong>Dev Mode:</strong> Click <a href="#" onclick="devModeLogin()" style="color: #856404; text-decoration: underline;">here</a> to bypass authentication
-        </div>
 
         <!-- Step 1: Email Entry -->
         <div id="step1" class="step active">
@@ -237,7 +232,7 @@
     </div>
 
     <script>
-        const API_BASE_URL = 'https://esp32-ventilation-api.azurewebsites.net'; // Updated to correct function app URL
+        const API_BASE_URL = 'https://my-webhook-func.azurewebsites.net'; // Update with your function app URL
         let currentEmail = '';
 
         // Auto-focus and format code input
@@ -283,7 +278,7 @@
                     },
                     body: JSON.stringify({
                         email: email,
-                        action: 'send_code'
+                        action: 'request_code'
                     })
                 });
 
@@ -385,16 +380,6 @@
             document.getElementById('message').style.display = 'none';
         }
 
-        // Dev mode bypass function
-        function devModeLogin() {
-            localStorage.setItem('ventilation_auth_token', 'dev-mode-token-' + Date.now());
-            localStorage.setItem('ventilation_user_email', 'dev@example.com');
-            showMessage('Dev mode activated! Redirecting...', 'success');
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1000);
-        }
-
         // Check if user is already logged in
         window.addEventListener('load', function() {
             const token = localStorage.getItem('ventilation_auth_token');
@@ -407,7 +392,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0220-devmode</span>
+        Build: <span id="buildInfo">2025.07.28-0225-loginfix</span>
     </div>
 </body>
 </html>
