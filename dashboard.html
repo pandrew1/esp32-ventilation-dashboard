@@ -1139,10 +1139,22 @@
                 const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                 const isYesterday = date.toDateString() === yesterday.toDateString();
                 
-                // Get time without minutes for cleaner display
-                const timeOptions = { hour: 'numeric', hour12: true };
-                let timeStr = date.toLocaleTimeString([], timeOptions);
-                timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
+                // Check if we're on desktop (more space available) vs mobile
+                const isDesktop = window.innerWidth > 768;
+                
+                // Get time formatting - include minutes on desktop if there's space
+                let timeStr;
+                if (isDesktop && requestedHours <= 24) {
+                    // Desktop with 24 hours or less - show minutes for better precision
+                    const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+                    timeStr = date.toLocaleTimeString([], timeOptions);
+                    timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
+                } else {
+                    // Mobile or longer time spans - keep it simple with just hours
+                    const timeOptions = { hour: 'numeric', hour12: true };
+                    timeStr = date.toLocaleTimeString([], timeOptions);
+                    timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
+                }
                 
                 // For recent data that fits our time range, use appropriate labels
                 if (isRecentEnough) {
@@ -1331,7 +1343,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1605-unix-timestamp-fix</span>
+        Build: <span id="buildInfo">2025.07.28-1610-responsive-time-labels</span>
     </div>
 </body>
 </html>
