@@ -942,7 +942,15 @@
             // We need to reverse it to show oldest to newest (left to right)
             const sortedData = [...data].reverse();
             
-            // Prepare labels with shorter, more readable format
+            // Debug: Log data span info
+            if (sortedData.length > 0) {
+                const firstDate = new Date(sortedData[0].timestamp);
+                const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
+                const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
+                console.log(`Chart data: ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
+            }
+            
+            // Prepare labels with smart, context-aware formatting
             const labels = sortedData.map((item, index) => {
                 // Try to parse the timestamp
                 let date = new Date(item.timestamp);
@@ -956,20 +964,34 @@
                     date = new Date(startTime.getTime() + (index * 30 * 60 * 1000)); // 30 minutes apart
                 }
                 
-                // Format with shorter, more readable format
+                // Smart formatting based on data span and context
                 try {
                     const now = new Date();
                     const isToday = date.toDateString() === now.toDateString();
+                    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    const isYesterday = date.toDateString() === yesterday.toDateString();
                     
-                    if (isToday) {
-                        // For today, just show time
-                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    // Determine if we're looking at recent data (within 24 hours)
+                    const isRecent = (now.getTime() - date.getTime()) < (24 * 60 * 60 * 1000);
+                    
+                    // Get time without AM/PM for customization
+                    const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+                    let timeStr = date.toLocaleTimeString([], timeOptions);
+                    
+                    // Replace " AM" with "A" and " PM" with "P"
+                    timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
+                    
+                    if (isToday && isRecent) {
+                        // For today's recent data, just show time
+                        return timeStr;
+                    } else if (isYesterday) {
+                        // For yesterday, show "Yesterday HH:MMP"
+                        return `Yesterday ${timeStr}`;
                     } else {
-                        // For other days, show short date + time
-                        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                        const day = date.getDate().toString().padStart(2, '0');
-                        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        return `${month}/${day} ${time}`;
+                        // For other days, show "M/D HH:MMP" (no leading zeros)
+                        const month = date.getMonth() + 1; // No leading zero
+                        const day = date.getDate(); // No leading zero
+                        return `${month}/${day} ${timeStr}`;
                     }
                 } catch (e) {
                     return `Point ${index + 1}`;
@@ -979,6 +1001,22 @@
             const indoorTemps = sortedData.map(item => item.sensors?.indoor?.temp || null);
             const outdoorTemps = sortedData.map(item => item.sensors?.outdoor?.temp || null);
             const fanStatus = sortedData.map(item => item.system?.fanOn ? 1 : 0);
+
+            // Determine optimal number of ticks based on data span and amount
+            let maxTicks = 8; // Default
+            if (sortedData.length > 0) {
+                const firstDate = new Date(sortedData[0].timestamp);
+                const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
+                const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
+                
+                if (spanHours <= 6) {
+                    maxTicks = Math.min(8, Math.max(4, sortedData.length / 3)); // Show more detail for short spans
+                } else if (spanHours <= 24) {
+                    maxTicks = 6; // Moderate detail for daily view
+                } else {
+                    maxTicks = 4; // Fewer ticks for longer spans
+                }
+            }
 
             // Destroy existing chart
             if (temperatureChart) {
@@ -1050,9 +1088,11 @@
                                 text: 'Time'
                             },
                             ticks: {
-                                maxTicksLimit: 8,
+                                maxTicksLimit: Math.round(maxTicks),
                                 maxRotation: 45,
-                                minRotation: 0
+                                minRotation: 0,
+                                autoSkip: true,
+                                autoSkipPadding: 5
                             }
                         }
                     },
@@ -1108,7 +1148,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0930-door-details-enhancement</span>
+        Build: <span id="buildInfo">2025.07.28-0945-chart-datetime-improvements</span>
     </div>
 </body>
 </html>
