@@ -995,6 +995,13 @@
                 }
                 
                 const data = await response.json();
+                console.log(`API returned ${data.data?.length || 0} data points for ${hours} hour request`);
+                if (data.data && data.data.length > 0) {
+                    const firstTimestamp = new Date(data.data[0].timestamp);
+                    const lastTimestamp = new Date(data.data[data.data.length - 1].timestamp);
+                    const apiSpanHours = (lastTimestamp.getTime() - firstTimestamp.getTime()) / (1000 * 60 * 60);
+                    console.log(`API data spans ${apiSpanHours.toFixed(1)} hours from ${firstTimestamp.toISOString()} to ${lastTimestamp.toISOString()}`);
+                }
                 updateChart(data.data || [], hours);
                 
             } catch (error) {
@@ -1015,39 +1022,18 @@
             // We need to reverse it to show oldest to newest (left to right)
             let sortedData = [...data].reverse();
             
-            // Client-side filtering to ensure we only show the requested time span
-            // But be more lenient - allow a bit more data to ensure we have something to show
-            if (sortedData.length > 0 && requestedHours && sortedData.length > 10) {
-                const now = new Date();
-                // Add 20% buffer to requested hours to ensure we have data
-                const cutoffTime = new Date(now.getTime() - (requestedHours * 1.2 * 60 * 60 * 1000));
-                
-                // Filter out data older than the requested hours (with buffer)
-                const filteredData = sortedData.filter(item => {
-                    const itemDate = new Date(item.timestamp);
-                    return itemDate >= cutoffTime;
-                });
-                
-                // Only apply filtering if we still have reasonable amount of data
-                if (filteredData.length >= 3) {
-                    sortedData = filteredData;
-                    console.log(`Filtered to ${requestedHours} hours (with buffer): ${sortedData.length} points remaining`);
-                } else {
-                    console.log(`Filtering would remove too much data (${filteredData.length} points), keeping all ${sortedData.length} points`);
-                }
-            }
-            
-            // Debug: Log data span info
+            // Debug: Log API data span info
             if (sortedData.length > 0) {
                 const firstDate = new Date(sortedData[0].timestamp);
                 const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
                 const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
-                console.log(`Chart data: ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
+                console.log(`API returned ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
             } else {
                 console.log('No chart data available');
             }
             
             // Prepare labels with smart, context-aware formatting
+            // Focus on recent data for axis labels to avoid showing old dates
             const labels = sortedData.map((item, index) => {
                 // Try to parse the timestamp
                 let date = new Date(item.timestamp);
@@ -1061,15 +1047,17 @@
                     date = new Date(startTime.getTime() + (index * 30 * 60 * 1000)); // 30 minutes apart
                 }
                 
+                // Check if this data point is within the requested time range
+                // This helps avoid showing old date labels even if the server sent old data
+                const now = new Date();
+                const cutoffTime = new Date(now.getTime() - (requestedHours * 60 * 60 * 1000));
+                const isRecentEnough = date >= cutoffTime;
+                
                 // Smart formatting based on data span and context
                 try {
-                    const now = new Date();
                     const isToday = date.toDateString() === now.toDateString();
                     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                     const isYesterday = date.toDateString() === yesterday.toDateString();
-                    
-                    // Determine if we're looking at recent data (within 24 hours)
-                    const isRecent = (now.getTime() - date.getTime()) < (24 * 60 * 60 * 1000);
                     
                     // Get time without minutes for cleaner display
                     const timeOptions = { hour: 'numeric', hour12: true };
@@ -1078,20 +1066,29 @@
                     // Replace " AM" with "A" and " PM" with "P"
                     timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
                     
-                    if (isToday && isRecent) {
-                        // For today's recent data, just show time
-                        return timeStr;
-                    } else if (isYesterday) {
-                        // For yesterday, show "Yesterday HH:MMP"
-                        return `Yesterday ${timeStr}`;
+                    // For recent data that fits our time range, use appropriate labels
+                    if (isRecentEnough) {
+                        if (isToday) {
+                            // For today's data, just show time
+                            return timeStr;
+                        } else if (isYesterday && requestedHours > 12) {
+                            // For yesterday, show "Yesterday HH:MMP" only if looking at longer time spans
+                            return `Yesterday ${timeStr}`;
+                        } else if (requestedHours > 48) {
+                            // For longer time spans, show "M/D HH:MMP" (no leading zeros)
+                            const month = date.getMonth() + 1; // No leading zero
+                            const day = date.getDate(); // No leading zero
+                            return `${month}/${day} ${timeStr}`;
+                        } else {
+                            // For shorter spans with older data, just show time to avoid confusion
+                            return timeStr;
+                        }
                     } else {
-                        // For other days, show "M/D HH:MMP" (no leading zeros)
-                        const month = date.getMonth() + 1; // No leading zero
-                        const day = date.getDate(); // No leading zero
-                        return `${month}/${day} ${timeStr}`;
+                        // For old data points, show minimal info to avoid misleading labels
+                        return '•'; // Just a dot to indicate data exists but is outside range
                     }
                 } catch (e) {
-                    return `Point ${index + 1}`;
+                    return `${index + 1}`;
                 }
             });
 
@@ -1231,7 +1228,14 @@
                                 maxRotation: 45,
                                 minRotation: 0,
                                 autoSkip: true,
-                                autoSkipPadding: 5
+                                autoSkipPadding: 10,
+                                // Custom filter to prioritize recent time labels
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    // Hide dot markers from axis (these represent old data points)
+                                    if (label === '•') return '';
+                                    return label;
+                                }
                             }
                         }
                     },
@@ -1287,7 +1291,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1510-button-highlight-fix</span>
+        Build: <span id="buildInfo">2025.07.28-1530-axis-label-fix</span>
     </div>
 </body>
 </html>
