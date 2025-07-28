@@ -8,12 +8,15 @@
     <script>
         // Authentication check - redirect to login if not authenticated
         window.addEventListener('load', function() {
-            // TEMPORARILY DISABLED - Skip authentication for now
-            // const token = localStorage.getItem('ventilation_auth_token');
-            // if (!token) {
-            //     window.location.href = 'login.html';
-            //     return;
-            // }
+            const token = localStorage.getItem('ventilation_auth_token');
+            const apiKey = getApiKeyFromUrl();
+            
+            // If no token and no API key, show demo mode (don't redirect)
+            // This allows users to see the dashboard in demo mode before logging in
+            if (!token && !apiKey) {
+                console.log('No authentication, running in demo mode');
+                return;
+            }
         });
     </script>
     <style>
@@ -417,11 +420,20 @@
         // Authentication and API helper functions
         function getAuthHeaders() {
             const token = localStorage.getItem('ventilation_auth_token');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-                'X-API-Secret': CONFIG.apiSecret
+            const headers = {
+                'Content-Type': 'application/json'
             };
+            
+            // If user is logged in, use Bearer token authentication
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            // Otherwise, use API key if available
+            else if (CONFIG.apiSecret) {
+                headers['X-API-Secret'] = CONFIG.apiSecret;
+            }
+            
+            return headers;
         }
 
         function logout() {
@@ -449,7 +461,7 @@
             if (!CONFIG.apiSecret) {
                 const mockNotice = document.createElement('div');
                 mockNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
-                mockNotice.innerHTML = '📊 <strong>Demo Mode:</strong> Using simulated data. Add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
+                mockNotice.innerHTML = '📊 <strong>Demo Mode:</strong> Using simulated data. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
                 header.appendChild(mockNotice);
             }
             
@@ -469,9 +481,11 @@
             try {
                 updateConnectionStatus('connecting');
                 
-                // If no API secret is provided, use mock data for demo purposes
-                if (!CONFIG.apiSecret) {
-                    console.log('No API secret provided, using mock data');
+                const token = localStorage.getItem('ventilation_auth_token');
+                
+                // If no authentication method is available, use mock data for demo purposes
+                if (!token && !CONFIG.apiSecret) {
+                    console.log('No authentication available, using mock data');
                     const mockData = generateMockData();
                     updateDashboard(mockData);
                     updateConnectionStatus('connected');
@@ -480,10 +494,7 @@
                 
                 const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
                     method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Secret': CONFIG.apiSecret
-                    }
+                    headers: getAuthHeaders()
                 });
                 
                 // TEMPORARILY DISABLED - Skip 401 auth check for dev mode
@@ -662,9 +673,11 @@
             }
 
             try {
-                // If no API secret, generate mock chart data
-                if (!CONFIG.apiSecret) {
-                    console.log('No API secret provided, using mock chart data');
+                const token = localStorage.getItem('ventilation_auth_token');
+                
+                // If no authentication method is available, use mock chart data
+                if (!token && !CONFIG.apiSecret) {
+                    console.log('No authentication available, using mock chart data');
                     const mockChartData = generateMockChartData(hours);
                     updateChart(mockChartData);
                     return;
@@ -672,10 +685,7 @@
 
                 const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
                     method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Secret': CONFIG.apiSecret
-                    }
+                    headers: getAuthHeaders()
                 });
                 
                 // TEMPORARILY DISABLED - Skip 401 auth check for dev mode
@@ -906,7 +916,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0400-mockdata</span>
+        Build: <span id="buildInfo">2025.07.28-0500-auth-fixed</span>
     </div>
 </body>
 </html>
