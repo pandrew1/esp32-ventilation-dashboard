@@ -497,14 +497,18 @@
                     headers: getAuthHeaders()
                 });
                 
-                // TEMPORARILY DISABLED - Skip 401 auth check for dev mode
-                // if (response.status === 401) {
-                //     // Authentication failed, redirect to login
-                //     logout();
-                //     return;
-                // }
+                if (response.status === 401) {
+                    // Authentication failed, redirect to login
+                    logout();
+                    return;
+                }
                 
                 if (!response.ok) {
+                    // Log the error details for debugging
+                    console.error(`API Error: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    
                     // If unauthorized and no API secret, fall back to mock data
                     if (response.status === 401 || response.status === 404) {
                         console.log('API call failed, falling back to mock data');
@@ -522,6 +526,13 @@
                 
             } catch (error) {
                 console.error('Error fetching data:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    token: localStorage.getItem('ventilation_auth_token') ? 'Present' : 'Missing',
+                    apiSecret: CONFIG.apiSecret ? 'Present' : 'Missing'
+                });
+                
                 // Fall back to mock data instead of showing error
                 console.log('Network error, using mock data');
                 const mockData = generateMockData();
@@ -688,12 +699,11 @@
                     headers: getAuthHeaders()
                 });
                 
-                // TEMPORARILY DISABLED - Skip 401 auth check for dev mode
-                // if (response.status === 401) {
-                //     // Authentication failed, redirect to login
-                //     logout();
-                //     return;
-                // }
+                if (response.status === 401) {
+                    // Authentication failed, redirect to login
+                    logout();
+                    return;
+                }
                 
                 if (!response.ok) {
                     // Fall back to mock data if API fails
@@ -916,7 +926,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0500-auth-fixed</span>
+        Build: <span id="buildInfo">2025.07.28-0600-real-data</span>
     </div>
 </body>
 </html>
