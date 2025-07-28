@@ -374,15 +374,18 @@
                             <span>Storm Risk</span>
                             <span class="sensor-value" id="stormRisk">-</span>
                         </div>
-                        <div class="sensor-reading">
-                            <span>System Uptime</span>
-                            <span class="sensor-value" id="uptime">-</span>
+                        <div id="stormRiskExplanation" style="font-size: 12px; color: #666; margin-top: 10px; font-style: italic;">
+                            Storm risk status will be explained here.
                         </div>
                     </div>
 
                     <!-- System Reliability -->
                     <div class="card">
                         <h3>🔧 System Reliability</h3>
+                        <div class="sensor-reading">
+                            <span>System Uptime</span>
+                            <span class="sensor-value" id="uptime">-</span>
+                        </div>
                         <div class="sensor-reading">
                             <span>Total Reboots</span>
                             <span class="sensor-value" id="rebootCount">-</span>
@@ -439,7 +442,7 @@
             statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
             historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
             deviceId: 'ESP32-Ventilation-01',
-            refreshInterval: 30000, // 30 seconds
+            refreshInterval: 30000, // 30 seconds - check for new telemetry data
             apiSecret: getApiKeyFromUrl() || null // Get from URL parameter or environment
         };
 
@@ -677,6 +680,7 @@
             // Set weather to no data
             document.getElementById('forecastHigh').textContent = 'No data';
             document.getElementById('stormRisk').textContent = 'No data';
+            document.getElementById('stormRiskExplanation').textContent = 'Storm risk status will be explained here.';
 
             // Set system info to no data
             document.getElementById('uptime').textContent = 'No data';
@@ -733,8 +737,23 @@
 
             // Update weather with proper null/undefined handling
             const weather = data.weather || {};
+            const stormRiskValue = weather.stormRisk || 'No data';
             document.getElementById('forecastHigh').textContent = weather.forecastHigh != null ? `${weather.forecastHigh.toFixed(0)}°F` : 'No data';
-            document.getElementById('stormRisk').textContent = weather.stormRisk || 'No data';
+            document.getElementById('stormRisk').textContent = stormRiskValue;
+            
+            // Update storm risk explanation based on the actual value
+            const stormRiskExplanation = document.getElementById('stormRiskExplanation');
+            if (stormRiskValue && stormRiskValue !== 'No data') {
+                const explanations = {
+                    'Clear': 'Stable pressure - no significant changes over 3 hours.',
+                    'Possible': 'Low pressure below 1000 hPa detected.',
+                    'Likely': 'Pressure drop >3 hPa over 3 hours detected.',
+                    'Imminent': 'Rapid pressure drop >5 hPa over 3 hours detected!'
+                };
+                stormRiskExplanation.textContent = explanations[stormRiskValue] || `${stormRiskValue} - pressure trend indicates weather change.`;
+            } else {
+                stormRiskExplanation.textContent = 'Storm risk status will be explained here.';
+            }
             
             // Update system info with proper null/undefined handling
             const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
@@ -1195,7 +1214,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0945-chart-datetime-improvements</span>
+        Build: <span id="buildInfo">2025.07.28-1440-storm-thresholds-detailed</span>
     </div>
 </body>
 </html>
