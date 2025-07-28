@@ -1087,6 +1087,13 @@
             
             // Debug: Log API data span info
             if (sortedData.length > 0) {
+                console.log('Sample timestamps from API data:', {
+                    first: sortedData[0].timestamp,
+                    middle: sortedData[Math.floor(sortedData.length/2)]?.timestamp,
+                    last: sortedData[sortedData.length - 1].timestamp,
+                    timestampType: typeof sortedData[0].timestamp
+                });
+                
                 const firstDate = new Date(sortedData[0].timestamp);
                 const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
                 const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
@@ -1099,7 +1106,14 @@
                 
                 // If timestamp is invalid, create a fallback
                 if (isNaN(date.getTime())) {
-                    return `Point ${index + 1}`;
+                    // Try parsing as string or number
+                    const timestampValue = typeof item.timestamp === 'string' ? parseInt(item.timestamp) : item.timestamp;
+                    date = new Date(timestampValue);
+                    
+                    if (isNaN(date.getTime())) {
+                        console.warn(`Could not parse timestamp at index ${index}: ${item.timestamp}`);
+                        return `Point ${index + 1}`;
+                    }
                 }
                 
                 // Check if this data point is within the requested time range for label filtering
@@ -1304,7 +1318,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1555-revert-filtering</span>
+        Build: <span id="buildInfo">2025.07.28-1600-fix-timestamp-parsing</span>
     </div>
 </body>
 </html>
