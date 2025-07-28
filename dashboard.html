@@ -176,6 +176,20 @@
             color: #dc3545;
         }
 
+        .door-item {
+            font-size: 0.95em;
+        }
+
+        .door-detail {
+            margin: 8px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .door-detail strong {
+            color: #2c3e50;
+        }
+
         .chart-container {
             position: relative;
             height: 400px;
@@ -383,7 +397,7 @@
 
                 <!-- Door Status -->
                 <div class="card" id="doorSection" style="display: none;">
-                    <h3>🚪 Door Status</h3>
+                    <h3>🚪 Door Status & Activity</h3>
                     <div id="doorList"></div>
                 </div>
 
@@ -725,14 +739,81 @@
 
             doors.forEach(door => {
                 const doorItem = document.createElement('div');
-                doorItem.className = 'sensor-reading';
-                doorItem.innerHTML = `
-                    <span>${door.name || `Door ${door.id}`}</span>
-                    <span class="sensor-value ${door.open ? 'fan-on' : 'fan-off'}">
-                        ${door.open ? '🔓 Open' : '🔒 Closed'}
-                        ${door.open && door.minutesOpen ? ` (${door.minutesOpen}m)` : ''}
-                    </span>
+                doorItem.className = 'door-item';
+                doorItem.style.cssText = `
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 10px;
+                    background: ${door.open ? '#fff5f5' : '#f8fff8'};
+                    border-color: ${door.open ? '#ffcccb' : '#ccffcc'};
                 `;
+                
+                // Format timestamps
+                const formatTime = (timestamp) => {
+                    if (!timestamp || timestamp === '0') return 'N/A';
+                    const date = new Date(parseInt(timestamp) * 1000);
+                    const now = new Date();
+                    const isToday = date.toDateString() === now.toDateString();
+                    
+                    if (isToday) {
+                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } else {
+                        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    }
+                };
+                
+                const formatDuration = (minutes) => {
+                    if (minutes < 60) return `${minutes}m`;
+                    const hours = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+                };
+                
+                // Door name and current status
+                let statusHtml = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong style="font-size: 1.1em;">${door.name || `Door ${door.id}`}</strong>
+                        <span class="sensor-value ${door.open ? 'fan-on' : 'fan-off'}" style="font-size: 1.2em;">
+                            ${door.open ? '🔓 OPEN' : '🔒 CLOSED'}
+                        </span>
+                    </div>
+                `;
+                
+                // Current session info
+                if (door.open) {
+                    statusHtml += `
+                        <div class="door-detail">
+                            <strong>Current Session:</strong>
+                            <div style="margin-left: 15px;">
+                                • Opened at: ${formatTime(door.openedAt)}<br>
+                                • Duration: ${formatDuration(door.minutesOpen || 0)}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Daily summary
+                if (door.wasOpenedToday) {
+                    statusHtml += `
+                        <div class="door-detail" style="margin-top: 10px;">
+                            <strong>Today's Activity:</strong>
+                            <div style="margin-left: 15px;">
+                                • Total time open: ${formatDuration(door.minutesTotalToday || 0)}<br>
+                                • First opened: ${formatTime(door.firstOpenedToday)}<br>
+                                • Last opened: ${formatTime(door.lastOpenedToday)}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    statusHtml += `
+                        <div class="door-detail" style="margin-top: 10px; color: #666;">
+                            <strong>Today's Activity:</strong> Not opened today
+                        </div>
+                    `;
+                }
+                
+                doorItem.innerHTML = statusHtml;
                 doorList.appendChild(doorItem);
             });
         }
@@ -1027,7 +1108,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0900-chart-timeline-fix</span>
+        Build: <span id="buildInfo">2025.07.28-0930-door-details-enhancement</span>
     </div>
 </body>
 </html>
