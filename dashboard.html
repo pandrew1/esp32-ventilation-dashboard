@@ -571,6 +571,7 @@
         // Initialize dashboard
         async function initializeDashboard() {
             await refreshData();
+            console.log('Loading default 6-hour chart...');
             await loadChart(6); // Load 6-hour chart by default
             
             // Start auto-refresh
@@ -943,11 +944,15 @@
         }
 
         async function loadChart(hours) {
-            // Update active button
-            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
-            if (event && event.target) {
-                event.target.classList.add('active');
-            }
+            // Update active button - find the button with matching hours
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.classList.remove('active');
+                // Check if this button's onclick matches the requested hours
+                const onclick = btn.getAttribute('onclick');
+                if (onclick && onclick.includes(`loadChart(${hours})`)) {
+                    btn.classList.add('active');
+                }
+            });
 
             try {
                 const token = localStorage.getItem('ventilation_auth_token');
@@ -1003,6 +1008,8 @@
 
         function updateChart(data, requestedHours = 6) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
+            
+            console.log(`updateChart called with ${data.length} data points, requesting ${requestedHours} hours of data`);
             
             // Data comes from API in reverse chronological order (newest first)
             // We need to reverse it to show oldest to newest (left to right)
@@ -1280,7 +1287,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1500-chart-data-fix</span>
+        Build: <span id="buildInfo">2025.07.28-1510-button-highlight-fix</span>
     </div>
 </body>
 </html>
