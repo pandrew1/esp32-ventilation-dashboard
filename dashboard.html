@@ -1009,17 +1009,25 @@
             let sortedData = [...data].reverse();
             
             // Client-side filtering to ensure we only show the requested time span
-            if (sortedData.length > 0 && requestedHours) {
+            // But be more lenient - allow a bit more data to ensure we have something to show
+            if (sortedData.length > 0 && requestedHours && sortedData.length > 10) {
                 const now = new Date();
-                const cutoffTime = new Date(now.getTime() - (requestedHours * 60 * 60 * 1000));
+                // Add 20% buffer to requested hours to ensure we have data
+                const cutoffTime = new Date(now.getTime() - (requestedHours * 1.2 * 60 * 60 * 1000));
                 
-                // Filter out data older than the requested hours
-                sortedData = sortedData.filter(item => {
+                // Filter out data older than the requested hours (with buffer)
+                const filteredData = sortedData.filter(item => {
                     const itemDate = new Date(item.timestamp);
                     return itemDate >= cutoffTime;
                 });
                 
-                console.log(`Filtered to ${requestedHours} hours: ${sortedData.length} points remaining`);
+                // Only apply filtering if we still have reasonable amount of data
+                if (filteredData.length >= 3) {
+                    sortedData = filteredData;
+                    console.log(`Filtered to ${requestedHours} hours (with buffer): ${sortedData.length} points remaining`);
+                } else {
+                    console.log(`Filtering would remove too much data (${filteredData.length} points), keeping all ${sortedData.length} points`);
+                }
             }
             
             // Debug: Log data span info
@@ -1028,6 +1036,8 @@
                 const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
                 const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
                 console.log(`Chart data: ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
+            } else {
+                console.log('No chart data available');
             }
             
             // Prepare labels with smart, context-aware formatting
@@ -1082,6 +1092,20 @@
             const outdoorTemps = sortedData.map(item => item.sensors?.outdoor?.temp || null);
             const fanStatus = sortedData.map(item => item.system?.fanOn ? 1 : 0);
 
+            // Debug: Log data arrays
+            console.log('Chart data arrays:', {
+                labels: labels.length,
+                indoorTemps: indoorTemps.filter(t => t !== null).length,
+                outdoorTemps: outdoorTemps.filter(t => t !== null).length,
+                fanStatus: fanStatus.length,
+                sampleData: sortedData.length > 0 ? {
+                    timestamp: sortedData[0].timestamp,
+                    indoor: sortedData[0].sensors?.indoor,
+                    outdoor: sortedData[0].sensors?.outdoor,
+                    system: sortedData[0].system
+                } : 'No data'
+            });
+
             // Determine optimal number of ticks based on data span and amount
             let maxTicks = 8; // Default
             if (sortedData.length > 0) {
@@ -1101,6 +1125,34 @@
             // Destroy existing chart
             if (temperatureChart) {
                 temperatureChart.destroy();
+            }
+
+            // If no data, create empty chart with message
+            if (sortedData.length === 0) {
+                temperatureChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{
+                            label: 'No Data Available',
+                            data: [null],
+                            borderColor: '#ccc',
+                            backgroundColor: 'rgba(204, 204, 204, 0.1)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: { display: false }
+                        }
+                    }
+                });
+                return;
             }
 
             // Create new chart
@@ -1228,7 +1280,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1450-chart-time-filtering-fix</span>
+        Build: <span id="buildInfo">2025.07.28-1500-chart-data-fix</span>
     </div>
 </body>
 </html>
