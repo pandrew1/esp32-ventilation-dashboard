@@ -823,10 +823,24 @@
         function updateChart(data) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
             
-            // Prepare data
-            const labels = data.map(item => {
-                const date = new Date(item.timestamp);
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            // Prepare data with proper timestamp validation
+            const labels = data.map((item, index) => {
+                // Try to parse the timestamp
+                let date = new Date(item.timestamp);
+                
+                // If timestamp is invalid, create a fallback based on index
+                if (isNaN(date.getTime())) {
+                    // Create a fallback timestamp going backwards from now
+                    const now = new Date();
+                    date = new Date(now.getTime() - (data.length - index - 1) * 30 * 60 * 1000); // 30 minutes apart
+                }
+                
+                // Format with validation
+                try {
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } catch (e) {
+                    return `Data Point ${index + 1}`;
+                }
             }).reverse();
 
             const indoorTemps = data.map(item => item.sensors?.indoor?.temp || 0).reverse();
@@ -993,7 +1007,9 @@
             const data = [];
 
             for (let i = dataPoints - 1; i >= 0; i--) {
-                const timestamp = new Date(now.getTime() - (i * (hours * 60 * 60 * 1000) / dataPoints));
+                // Calculate timestamp more precisely to avoid floating point issues
+                const minutesAgo = (i * hours * 60) / dataPoints;
+                const timestamp = new Date(now.getTime() - (minutesAgo * 60 * 1000));
                 
                 // Generate realistic temperature curves (warmer during day)
                 const hourOfDay = timestamp.getHours();
@@ -1021,7 +1037,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0800-api-failure-notifications</span>
+        Build: <span id="buildInfo">2025.07.28-0815-chart-timestamp-fix</span>
     </div>
 </body>
 </html>
