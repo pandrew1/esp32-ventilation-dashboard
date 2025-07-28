@@ -1018,6 +1018,58 @@
             
             console.log(`updateChart called with ${data.length} data points, requesting ${requestedHours} hours of data`);
             
+            // Destroy existing chart
+            if (temperatureChart) {
+                temperatureChart.destroy();
+            }
+
+            // If no data, create a simple "no data" chart
+            if (!data || data.length === 0) {
+                console.log('Creating empty chart - no data available');
+                temperatureChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['No Data Available'],
+                        datasets: [{
+                            label: 'No Data',
+                            data: [0],
+                            borderColor: '#ddd',
+                            backgroundColor: 'rgba(221, 221, 221, 0.1)',
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { 
+                                display: true,
+                                labels: {
+                                    generateLabels: function() {
+                                        return [{
+                                            text: 'No data available - check authentication or API connection',
+                                            fillStyle: '#ddd',
+                                            strokeStyle: '#ddd'
+                                        }];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                display: true,
+                                title: { display: true, text: 'Waiting for data...' }
+                            },
+                            x: { 
+                                display: true,
+                                title: { display: true, text: 'Time' }
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+            
             // Data comes from API in reverse chronological order (newest first)
             // We need to reverse it to show oldest to newest (left to right)
             let sortedData = [...data].reverse();
@@ -1028,68 +1080,21 @@
                 const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
                 const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
                 console.log(`API returned ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
-            } else {
-                console.log('No chart data available');
             }
             
-            // Prepare labels with smart, context-aware formatting
-            // Focus on recent data for axis labels to avoid showing old dates
+            // Prepare labels with simpler time formatting
             const labels = sortedData.map((item, index) => {
-                // Try to parse the timestamp
                 let date = new Date(item.timestamp);
                 
-                // If timestamp is invalid, create a fallback based on index
+                // If timestamp is invalid, create a fallback
                 if (isNaN(date.getTime())) {
-                    // Create a fallback timestamp going forwards from hours ago
-                    const now = new Date();
-                    const hoursAgo = Math.max(1, data.length / 2); // Estimate hours based on data points
-                    const startTime = new Date(now.getTime() - (hoursAgo * 60 * 60 * 1000));
-                    date = new Date(startTime.getTime() + (index * 30 * 60 * 1000)); // 30 minutes apart
+                    return `Point ${index + 1}`;
                 }
                 
-                // Check if this data point is within the requested time range
-                // This helps avoid showing old date labels even if the server sent old data
-                const now = new Date();
-                const cutoffTime = new Date(now.getTime() - (requestedHours * 60 * 60 * 1000));
-                const isRecentEnough = date >= cutoffTime;
-                
-                // Smart formatting based on data span and context
-                try {
-                    const isToday = date.toDateString() === now.toDateString();
-                    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                    const isYesterday = date.toDateString() === yesterday.toDateString();
-                    
-                    // Get time without minutes for cleaner display
-                    const timeOptions = { hour: 'numeric', hour12: true };
-                    let timeStr = date.toLocaleTimeString([], timeOptions);
-                    
-                    // Replace " AM" with "A" and " PM" with "P"
-                    timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
-                    
-                    // For recent data that fits our time range, use appropriate labels
-                    if (isRecentEnough) {
-                        if (isToday) {
-                            // For today's data, just show time
-                            return timeStr;
-                        } else if (isYesterday && requestedHours > 12) {
-                            // For yesterday, show "Yesterday HH:MMP" only if looking at longer time spans
-                            return `Yesterday ${timeStr}`;
-                        } else if (requestedHours > 48) {
-                            // For longer time spans, show "M/D HH:MMP" (no leading zeros)
-                            const month = date.getMonth() + 1; // No leading zero
-                            const day = date.getDate(); // No leading zero
-                            return `${month}/${day} ${timeStr}`;
-                        } else {
-                            // For shorter spans with older data, just show time to avoid confusion
-                            return timeStr;
-                        }
-                    } else {
-                        // For old data points, show minimal info to avoid misleading labels
-                        return '•'; // Just a dot to indicate data exists but is outside range
-                    }
-                } catch (e) {
-                    return `${index + 1}`;
-                }
+                // Simple time formatting - just hour and AM/PM
+                const timeOptions = { hour: 'numeric', hour12: true };
+                let timeStr = date.toLocaleTimeString([], timeOptions);
+                return timeStr.replace(' AM', 'A').replace(' PM', 'P');
             });
 
             const indoorTemps = sortedData.map(item => item.sensors?.indoor?.temp || null);
@@ -1101,65 +1106,10 @@
                 labels: labels.length,
                 indoorTemps: indoorTemps.filter(t => t !== null).length,
                 outdoorTemps: outdoorTemps.filter(t => t !== null).length,
-                fanStatus: fanStatus.length,
-                sampleData: sortedData.length > 0 ? {
-                    timestamp: sortedData[0].timestamp,
-                    indoor: sortedData[0].sensors?.indoor,
-                    outdoor: sortedData[0].sensors?.outdoor,
-                    system: sortedData[0].system
-                } : 'No data'
+                fanStatus: fanStatus.length
             });
 
-            // Determine optimal number of ticks based on data span and amount
-            let maxTicks = 8; // Default
-            if (sortedData.length > 0) {
-                const firstDate = new Date(sortedData[0].timestamp);
-                const lastDate = new Date(sortedData[sortedData.length - 1].timestamp);
-                const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
-                
-                if (spanHours <= 6) {
-                    maxTicks = Math.min(8, Math.max(4, sortedData.length / 3)); // Show more detail for short spans
-                } else if (spanHours <= 24) {
-                    maxTicks = 6; // Moderate detail for daily view
-                } else {
-                    maxTicks = 4; // Fewer ticks for longer spans
-                }
-            }
-
-            // Destroy existing chart
-            if (temperatureChart) {
-                temperatureChart.destroy();
-            }
-
-            // If no data, create empty chart with message
-            if (sortedData.length === 0) {
-                temperatureChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: ['No Data'],
-                        datasets: [{
-                            label: 'No Data Available',
-                            data: [null],
-                            borderColor: '#ccc',
-                            backgroundColor: 'rgba(204, 204, 204, 0.1)'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }
-                        },
-                        scales: {
-                            x: { display: false },
-                            y: { display: false }
-                        }
-                    }
-                });
-                return;
-            }
-
-            // Create new chart
+            // Create new chart with data
             temperatureChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -1224,18 +1174,9 @@
                                 text: 'Time'
                             },
                             ticks: {
-                                maxTicksLimit: Math.round(maxTicks),
+                                maxTicksLimit: 8,
                                 maxRotation: 45,
-                                minRotation: 0,
-                                autoSkip: true,
-                                autoSkipPadding: 10,
-                                // Custom filter to prioritize recent time labels
-                                callback: function(value, index, values) {
-                                    const label = this.getLabelForValue(value);
-                                    // Hide dot markers from axis (these represent old data points)
-                                    if (label === '•') return '';
-                                    return label;
-                                }
+                                minRotation: 0
                             }
                         }
                     },
@@ -1291,7 +1232,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1530-axis-label-fix</span>
+        Build: <span id="buildInfo">2025.07.28-1540-chart-fix</span>
     </div>
 </body>
 </html>
