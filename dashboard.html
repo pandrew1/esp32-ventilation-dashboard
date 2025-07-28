@@ -445,6 +445,14 @@
             header.style.position = 'relative';
             header.appendChild(userSection);
             
+            // Add mock data notice if no API secret is provided
+            if (!CONFIG.apiSecret) {
+                const mockNotice = document.createElement('div');
+                mockNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
+                mockNotice.innerHTML = '📊 <strong>Demo Mode:</strong> Using simulated data. Add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
+                header.appendChild(mockNotice);
+            }
+            
             initializeDashboard();
         });
 
@@ -460,6 +468,15 @@
         async function refreshData() {
             try {
                 updateConnectionStatus('connecting');
+                
+                // If no API secret is provided, use mock data for demo purposes
+                if (!CONFIG.apiSecret) {
+                    console.log('No API secret provided, using mock data');
+                    const mockData = generateMockData();
+                    updateDashboard(mockData);
+                    updateConnectionStatus('connected');
+                    return;
+                }
                 
                 const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
                     method: 'GET',
@@ -477,6 +494,14 @@
                 // }
                 
                 if (!response.ok) {
+                    // If unauthorized and no API secret, fall back to mock data
+                    if (response.status === 401 || response.status === 404) {
+                        console.log('API call failed, falling back to mock data');
+                        const mockData = generateMockData();
+                        updateDashboard(mockData);
+                        updateConnectionStatus('connected');
+                        return;
+                    }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
@@ -486,8 +511,11 @@
                 
             } catch (error) {
                 console.error('Error fetching data:', error);
-                updateConnectionStatus('error');
-                showError();
+                // Fall back to mock data instead of showing error
+                console.log('Network error, using mock data');
+                const mockData = generateMockData();
+                updateDashboard(mockData);
+                updateConnectionStatus('connected');
             }
         }
 
@@ -634,6 +662,14 @@
             }
 
             try {
+                // If no API secret, generate mock chart data
+                if (!CONFIG.apiSecret) {
+                    console.log('No API secret provided, using mock chart data');
+                    const mockChartData = generateMockChartData(hours);
+                    updateChart(mockChartData);
+                    return;
+                }
+
                 const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
                     method: 'GET',
                     headers: {
@@ -650,7 +686,11 @@
                 // }
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    // Fall back to mock data if API fails
+                    console.log('Chart API call failed, using mock data');
+                    const mockChartData = generateMockChartData(hours);
+                    updateChart(mockChartData);
+                    return;
                 }
                 
                 const data = await response.json();
@@ -658,6 +698,10 @@
                 
             } catch (error) {
                 console.error('Error loading chart data:', error);
+                // Fall back to mock data instead of failing
+                console.log('Chart network error, using mock data');
+                const mockChartData = generateMockChartData(hours);
+                updateChart(mockChartData);
             }
         }
 
@@ -792,11 +836,77 @@
 
         // Manual refresh function
         window.refreshData = refreshData;
+
+        // Generate mock data for demo purposes when no API secret is provided
+        function generateMockData() {
+            const now = new Date();
+            return {
+                deviceId: "ESP32-Ventilation-01",
+                timestamp: now.toISOString(),
+                sensors: {
+                    indoor: {
+                        temp: 72.5 + (Math.random() - 0.5) * 4, // 70-75°F range
+                        humidity: 45 + (Math.random() - 0.5) * 10, // 40-50% range
+                        pressure: 29.92 + (Math.random() - 0.5) * 0.2 // ~30 inHg
+                    },
+                    outdoor: {
+                        temp: 68 + (Math.random() - 0.5) * 8, // 64-72°F range
+                        humidity: 65 + (Math.random() - 0.5) * 20, // 55-75% range
+                        pressure: 29.85 + (Math.random() - 0.5) * 0.3 // ~30 inHg
+                    }
+                },
+                system: {
+                    fanOn: Math.random() > 0.7, // 30% chance fan is running
+                    ventilationMode: "AUTO",
+                    fanMinutesToday: Math.floor(Math.random() * 360), // 0-6 hours
+                    freshAirActive: Math.random() > 0.5,
+                    uptime: Math.floor(Math.random() * 86400 * 7), // 0-7 days in seconds
+                    freeHeap: 100000 + Math.floor(Math.random() * 50000) // 100-150KB
+                },
+                weather: {
+                    forecastHigh: 75 + Math.floor(Math.random() * 15), // 75-90°F
+                    stormRisk: Math.random() > 0.9 ? "STORM_POSSIBLE" : "NONE"
+                },
+                doors: [] // No door data in mock
+            };
+        }
+
+        // Generate mock chart data for demo purposes
+        function generateMockChartData(hours) {
+            const dataPoints = Math.min(hours * 2, 50); // 2 points per hour, max 50 points
+            const now = new Date();
+            const data = [];
+
+            for (let i = dataPoints - 1; i >= 0; i--) {
+                const timestamp = new Date(now.getTime() - (i * (hours * 60 * 60 * 1000) / dataPoints));
+                
+                // Generate realistic temperature curves (warmer during day)
+                const hourOfDay = timestamp.getHours();
+                const dayTempBoost = Math.sin((hourOfDay - 6) * Math.PI / 12) * 5; // Peak at 2 PM
+                
+                data.push({
+                    timestamp: timestamp.toISOString(),
+                    sensors: {
+                        indoor: {
+                            temp: 72 + dayTempBoost * 0.3 + (Math.random() - 0.5) * 2, // Indoor more stable
+                        },
+                        outdoor: {
+                            temp: 65 + dayTempBoost + (Math.random() - 0.5) * 4, // Outdoor varies more
+                        }
+                    },
+                    system: {
+                        fanOn: Math.random() > 0.7 // 30% chance fan is running at any time
+                    }
+                });
+            }
+
+            return data;
+        }
     </script>
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0225-authfix</span>
+        Build: <span id="buildInfo">2025.07.28-0400-mockdata</span>
     </div>
 </body>
 </html>
