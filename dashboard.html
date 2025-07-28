@@ -11,10 +11,10 @@
             const token = localStorage.getItem('ventilation_auth_token');
             const apiKey = getApiKeyFromUrl();
             
-            // If no token and no API key, show demo mode (don't redirect)
-            // This allows users to see the dashboard in demo mode before logging in
+            // If no token and no API key, show no data message (don't redirect)
+            // This allows users to see the dashboard structure before logging in
             if (!token && !apiKey) {
-                console.log('No authentication, running in demo mode');
+                console.log('No authentication, showing no data state');
                 return;
             }
         });
@@ -465,7 +465,7 @@
                 animation: slideDown 0.3s ease-out;
             `;
             notice.innerHTML = `
-                <strong>${type === 'error' ? '⚠️ API Error:' : '📊 Using Mock Data:'}</strong> ${message}
+                <strong>${type === 'error' ? '⚠️ API Error:' : '⚠️ Data Unavailable:'}</strong> ${message}
                 <button onclick="this.parentElement.remove()" style="
                     float: right;
                     background: transparent;
@@ -518,13 +518,13 @@
             header.style.position = 'relative';
             header.appendChild(userSection);
             
-            // Add demo mode notice if no authentication is provided
+            // Add no-data notice if no authentication is provided
             const token = localStorage.getItem('ventilation_auth_token');
             if (!CONFIG.apiSecret && !token) {
-                const mockNotice = document.createElement('div');
-                mockNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
-                mockNotice.innerHTML = '📊 <strong>Demo Mode:</strong> Using simulated data. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
-                header.appendChild(mockNotice);
+                const noDataNotice = document.createElement('div');
+                noDataNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
+                noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> Data is currently unavailable. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
+                header.appendChild(noDataNotice);
             }
             
             initializeDashboard();
@@ -545,12 +545,11 @@
                 
                 const token = localStorage.getItem('ventilation_auth_token');
                 
-                // If no authentication method is available, use mock data for demo purposes
+                // If no authentication method is available, show no data
                 if (!token && !CONFIG.apiSecret) {
-                    console.log('No authentication available, using mock data');
-                    const mockData = generateMockData();
-                    updateDashboard(mockData);
-                    updateConnectionStatus('connected');
+                    console.log('No authentication available, showing no data state');
+                    showNoDataState();
+                    updateConnectionStatus('disconnected');
                     return;
                 }
                 
@@ -569,11 +568,10 @@
                         return;
                     } else if (token) {
                         // Using Bearer token but got 401 - functions may not support it yet
-                        console.log('Bearer token authentication failed, using mock data until functions are updated');
-                        showApiFailureNotice('Status API returned 401 Unauthorized. Azure Functions may not support Bearer token authentication yet. Displaying simulated data until functions are updated.', 'error');
-                        const mockData = generateMockData();
-                        updateDashboard(mockData);
-                        updateConnectionStatus('connected');
+                        console.log('Bearer token authentication failed, showing no data state');
+                        showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
+                        showNoDataState();
+                        updateConnectionStatus('disconnected');
                         return;
                     }
                 }
@@ -584,19 +582,17 @@
                     const errorText = await response.text();
                     console.error('Error response:', errorText);
                     
-                    // If unauthorized and no API secret, fall back to mock data
+                    // If unauthorized and no API secret, show no data
                     if (response.status === 401 || response.status === 404) {
-                        console.log('API call failed, falling back to mock data');
-                        showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Using simulated data until the issue is resolved.`, 'error');
-                        const mockData = generateMockData();
-                        updateDashboard(mockData);
-                        updateConnectionStatus('connected');
+                        console.log('API call failed, showing no data state');
+                        showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
+                        showNoDataState();
+                        updateConnectionStatus('disconnected');
                         return;
                     }
-                    showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Using simulated data until the issue is resolved.`, 'error');
-                    const mockData = generateMockData();
-                    updateDashboard(mockData);
-                    updateConnectionStatus('connected');
+                    showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
+                    showNoDataState();
+                    updateConnectionStatus('disconnected');
                     return;
                 }
                 
@@ -613,13 +609,48 @@
                     apiSecret: CONFIG.apiSecret ? 'Present' : 'Missing'
                 });
                 
-                // Fall back to mock data instead of showing error
-                console.log('Network error, using mock data');
-                showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Using simulated data until connection is restored.`, 'error');
-                const mockData = generateMockData();
-                updateDashboard(mockData);
-                updateConnectionStatus('connected');
+                // Show no data instead of mock data
+                console.log('Network error, showing no data state');
+                showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
+                showNoDataState();
+                updateConnectionStatus('disconnected');
             }
+        }
+
+        function showNoDataState() {
+            // Hide loading, show content with no data message
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+
+            // Set all sensor readings to "No data"
+            document.getElementById('indoorTemp').textContent = 'No data';
+            document.getElementById('indoorHumidity').textContent = 'No data';
+            document.getElementById('indoorPressure').textContent = 'No data';
+            document.getElementById('outdoorTemp').textContent = 'No data';
+            document.getElementById('outdoorHumidity').textContent = 'No data';
+            document.getElementById('outdoorPressure').textContent = 'No data';
+
+            // Set system status to no data
+            document.getElementById('fanStatus').textContent = '❓';
+            document.getElementById('fanStatus').className = 'fan-status';
+            document.getElementById('fanStatusText').textContent = 'No data';
+            document.getElementById('ventilationMode').textContent = 'No data';
+            document.getElementById('fanMinutes').textContent = 'No data';
+            document.getElementById('freshAirStatus').textContent = 'No data';
+
+            // Set weather to no data
+            document.getElementById('forecastHigh').textContent = 'No data';
+            document.getElementById('stormRisk').textContent = 'No data';
+
+            // Set system info to no data
+            document.getElementById('uptime').textContent = 'No data';
+
+            // Hide door section since no data
+            document.getElementById('doorSection').style.display = 'none';
+
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = 'No data available';
         }
 
         function updateDashboard(data) {
@@ -628,38 +659,45 @@
             document.getElementById('errorSection').style.display = 'none';
             document.getElementById('dashboardContent').style.display = 'block';
 
-            // Update sensors
+            // Update sensors with proper null/undefined handling
             const sensors = data.sensors || {};
             const indoor = sensors.indoor || {};
             const outdoor = sensors.outdoor || {};
             
-            document.getElementById('indoorTemp').textContent = `${(indoor.temp || 0).toFixed(1)}°F`;
-            document.getElementById('indoorHumidity').textContent = `${(indoor.humidity || 0).toFixed(0)}%`;
-            document.getElementById('indoorPressure').textContent = `${(indoor.pressure || 0).toFixed(2)} inHg`;
+            document.getElementById('indoorTemp').textContent = indoor.temp != null ? `${indoor.temp.toFixed(1)}°F` : 'No data';
+            document.getElementById('indoorHumidity').textContent = indoor.humidity != null ? `${indoor.humidity.toFixed(0)}%` : 'No data';
+            document.getElementById('indoorPressure').textContent = indoor.pressure != null ? `${indoor.pressure.toFixed(2)} inHg` : 'No data';
             
-            document.getElementById('outdoorTemp').textContent = `${(outdoor.temp || 0).toFixed(1)}°F`;
-            document.getElementById('outdoorHumidity').textContent = `${(outdoor.humidity || 0).toFixed(0)}%`;
-            document.getElementById('outdoorPressure').textContent = `${(outdoor.pressure || 0).toFixed(2)} inHg`;
+            document.getElementById('outdoorTemp').textContent = outdoor.temp != null ? `${outdoor.temp.toFixed(1)}°F` : 'No data';
+            document.getElementById('outdoorHumidity').textContent = outdoor.humidity != null ? `${outdoor.humidity.toFixed(0)}%` : 'No data';
+            document.getElementById('outdoorPressure').textContent = outdoor.pressure != null ? `${outdoor.pressure.toFixed(2)} inHg` : 'No data';
 
-            // Update system status
+            // Update system status with proper null/undefined handling
             const system = data.system || {};
-            const fanOn = system.fanOn || false;
+            const fanOn = system.fanOn;
             
-            document.getElementById('fanStatus').textContent = fanOn ? '🌀' : '⏸️';
-            document.getElementById('fanStatus').className = `fan-status ${fanOn ? 'fan-on' : 'fan-off'}`;
-            document.getElementById('fanStatusText').textContent = fanOn ? 'RUNNING' : 'STOPPED';
-            document.getElementById('ventilationMode').textContent = system.ventilationMode || 'UNKNOWN';
-            document.getElementById('fanMinutes').textContent = system.fanMinutesToday || 0;
-            document.getElementById('freshAirStatus').textContent = system.freshAirActive ? 'Active' : 'Inactive';
+            if (fanOn != null) {
+                document.getElementById('fanStatus').textContent = fanOn ? '🌀' : '⏸️';
+                document.getElementById('fanStatus').className = `fan-status ${fanOn ? 'fan-on' : 'fan-off'}`;
+                document.getElementById('fanStatusText').textContent = fanOn ? 'RUNNING' : 'STOPPED';
+            } else {
+                document.getElementById('fanStatus').textContent = '❓';
+                document.getElementById('fanStatus').className = 'fan-status';
+                document.getElementById('fanStatusText').textContent = 'No data';
+            }
+            
+            document.getElementById('ventilationMode').textContent = system.ventilationMode || 'No data';
+            document.getElementById('fanMinutes').textContent = system.fanMinutesToday != null ? system.fanMinutesToday : 'No data';
+            document.getElementById('freshAirStatus').textContent = system.freshAirActive != null ? (system.freshAirActive ? 'Active' : 'Inactive') : 'No data';
 
-            // Update weather
+            // Update weather with proper null/undefined handling
             const weather = data.weather || {};
-            document.getElementById('forecastHigh').textContent = `${(weather.forecastHigh || 0).toFixed(0)}°F`;
-            document.getElementById('stormRisk').textContent = weather.stormRisk || 'NONE';
+            document.getElementById('forecastHigh').textContent = weather.forecastHigh != null ? `${weather.forecastHigh.toFixed(0)}°F` : 'No data';
+            document.getElementById('stormRisk').textContent = weather.stormRisk || 'No data';
             
-            // Update system info
-            const uptimeHours = Math.floor((system.uptime || 0) / 3600);
-            document.getElementById('uptime').textContent = `${uptimeHours}h`;
+            // Update system info with proper null/undefined handling
+            const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
+            document.getElementById('uptime').textContent = uptimeHours != null ? `${uptimeHours}h` : 'No data';
 
             // Update doors if available
             if (data.doors && data.doors.length > 0) {
@@ -767,11 +805,10 @@
             try {
                 const token = localStorage.getItem('ventilation_auth_token');
                 
-                // If no authentication method is available, use mock chart data
+                // If no authentication method is available, show empty chart
                 if (!token && !CONFIG.apiSecret) {
-                    console.log('No authentication available, using mock chart data');
-                    const mockChartData = generateMockChartData(hours);
-                    updateChart(mockChartData);
+                    console.log('No authentication available, showing empty chart');
+                    updateChart([]);
                     return;
                 }
 
@@ -790,20 +827,18 @@
                         return;
                     } else if (token) {
                         // Using Bearer token but got 401 - functions may not support it yet
-                        console.log('Bearer token chart authentication failed, using mock data until functions are updated');
-                        showApiFailureNotice('History API returned 401 Unauthorized. Chart data will be simulated until Azure Functions support Bearer token authentication.', 'warning');
-                        const mockChartData = generateMockChartData(hours);
-                        updateChart(mockChartData);
+                        console.log('Bearer token chart authentication failed, showing empty chart');
+                        showApiFailureNotice('History API returned 401 Unauthorized. Chart data is currently unavailable.', 'warning');
+                        updateChart([]);
                         return;
                     }
                 }
                 
                 if (!response.ok) {
-                    // Fall back to mock data if API fails
-                    console.log('Chart API call failed, using mock data');
-                    showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart will display simulated data until the issue is resolved.`, 'warning');
-                    const mockChartData = generateMockChartData(hours);
-                    updateChart(mockChartData);
+                    // Show empty chart if API fails
+                    console.log('Chart API call failed, showing empty chart');
+                    showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart data is currently unavailable.`, 'warning');
+                    updateChart([]);
                     return;
                 }
                 
@@ -812,40 +847,57 @@
                 
             } catch (error) {
                 console.error('Error loading chart data:', error);
-                // Fall back to mock data instead of failing
-                console.log('Chart network error, using mock data');
-                showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart will display simulated data until connection is restored.`, 'warning');
-                const mockChartData = generateMockChartData(hours);
-                updateChart(mockChartData);
+                // Show empty chart instead of mock data
+                console.log('Chart network error, showing empty chart');
+                showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
+                updateChart([]);
             }
         }
 
         function updateChart(data) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
             
-            // Prepare data with proper timestamp validation
-            const labels = data.map((item, index) => {
+            // Data comes from API in reverse chronological order (newest first)
+            // We need to reverse it to show oldest to newest (left to right)
+            const sortedData = [...data].reverse();
+            
+            // Prepare labels with shorter, more readable format
+            const labels = sortedData.map((item, index) => {
                 // Try to parse the timestamp
                 let date = new Date(item.timestamp);
                 
                 // If timestamp is invalid, create a fallback based on index
                 if (isNaN(date.getTime())) {
-                    // Create a fallback timestamp going backwards from now
+                    // Create a fallback timestamp going forwards from hours ago
                     const now = new Date();
-                    date = new Date(now.getTime() - (data.length - index - 1) * 30 * 60 * 1000); // 30 minutes apart
+                    const hoursAgo = Math.max(1, data.length / 2); // Estimate hours based on data points
+                    const startTime = new Date(now.getTime() - (hoursAgo * 60 * 60 * 1000));
+                    date = new Date(startTime.getTime() + (index * 30 * 60 * 1000)); // 30 minutes apart
                 }
                 
-                // Format with validation
+                // Format with shorter, more readable format
                 try {
-                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const now = new Date();
+                    const isToday = date.toDateString() === now.toDateString();
+                    
+                    if (isToday) {
+                        // For today, just show time
+                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } else {
+                        // For other days, show short date + time
+                        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                        const day = date.getDate().toString().padStart(2, '0');
+                        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return `${month}/${day} ${time}`;
+                    }
                 } catch (e) {
-                    return `Data Point ${index + 1}`;
+                    return `Point ${index + 1}`;
                 }
-            }).reverse();
+            });
 
-            const indoorTemps = data.map(item => item.sensors?.indoor?.temp || 0).reverse();
-            const outdoorTemps = data.map(item => item.sensors?.outdoor?.temp || 0).reverse();
-            const fanStatus = data.map(item => item.system?.fanOn ? 1 : 0).reverse();
+            const indoorTemps = sortedData.map(item => item.sensors?.indoor?.temp || null);
+            const outdoorTemps = sortedData.map(item => item.sensors?.outdoor?.temp || null);
+            const fanStatus = sortedData.map(item => item.system?.fanOn ? 1 : 0);
 
             // Destroy existing chart
             if (temperatureChart) {
@@ -912,8 +964,14 @@
                             }
                         },
                         x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
                             ticks: {
-                                maxTicksLimit: 10
+                                maxTicksLimit: 8,
+                                maxRotation: 45,
+                                minRotation: 0
                             }
                         }
                     },
@@ -965,79 +1023,11 @@
 
         // Manual refresh function
         window.refreshData = refreshData;
-
-        // Generate mock data for demo purposes when no API secret is provided
-        function generateMockData() {
-            const now = new Date();
-            return {
-                deviceId: "ESP32-Ventilation-01",
-                timestamp: now.toISOString(),
-                sensors: {
-                    indoor: {
-                        temp: 72.5 + (Math.random() - 0.5) * 4, // 70-75°F range
-                        humidity: 45 + (Math.random() - 0.5) * 10, // 40-50% range
-                        pressure: 29.92 + (Math.random() - 0.5) * 0.2 // ~30 inHg
-                    },
-                    outdoor: {
-                        temp: 68 + (Math.random() - 0.5) * 8, // 64-72°F range
-                        humidity: 65 + (Math.random() - 0.5) * 20, // 55-75% range
-                        pressure: 29.85 + (Math.random() - 0.5) * 0.3 // ~30 inHg
-                    }
-                },
-                system: {
-                    fanOn: Math.random() > 0.7, // 30% chance fan is running
-                    ventilationMode: "AUTO",
-                    fanMinutesToday: Math.floor(Math.random() * 360), // 0-6 hours
-                    freshAirActive: Math.random() > 0.5,
-                    uptime: Math.floor(Math.random() * 86400 * 7), // 0-7 days in seconds
-                    freeHeap: 100000 + Math.floor(Math.random() * 50000) // 100-150KB
-                },
-                weather: {
-                    forecastHigh: 75 + Math.floor(Math.random() * 15), // 75-90°F
-                    stormRisk: Math.random() > 0.9 ? "STORM_POSSIBLE" : "NONE"
-                },
-                doors: [] // No door data in mock
-            };
-        }
-
-        // Generate mock chart data for demo purposes
-        function generateMockChartData(hours) {
-            const dataPoints = Math.min(hours * 2, 50); // 2 points per hour, max 50 points
-            const now = new Date();
-            const data = [];
-
-            for (let i = dataPoints - 1; i >= 0; i--) {
-                // Calculate timestamp more precisely to avoid floating point issues
-                const minutesAgo = (i * hours * 60) / dataPoints;
-                const timestamp = new Date(now.getTime() - (minutesAgo * 60 * 1000));
-                
-                // Generate realistic temperature curves (warmer during day)
-                const hourOfDay = timestamp.getHours();
-                const dayTempBoost = Math.sin((hourOfDay - 6) * Math.PI / 12) * 5; // Peak at 2 PM
-                
-                data.push({
-                    timestamp: timestamp.toISOString(),
-                    sensors: {
-                        indoor: {
-                            temp: 72 + dayTempBoost * 0.3 + (Math.random() - 0.5) * 2, // Indoor more stable
-                        },
-                        outdoor: {
-                            temp: 65 + dayTempBoost + (Math.random() - 0.5) * 4, // Outdoor varies more
-                        }
-                    },
-                    system: {
-                        fanOn: Math.random() > 0.7 // 30% chance fan is running at any time
-                    }
-                });
-            }
-
-            return data;
-        }
     </script>
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-0815-chart-timestamp-fix</span>
+        Build: <span id="buildInfo">2025.07.28-0900-chart-timeline-fix</span>
     </div>
 </body>
 </html>
