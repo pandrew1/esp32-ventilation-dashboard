@@ -397,8 +397,8 @@
     <script>
         // Configuration - Replace with your actual Azure Function URLs
         const CONFIG = {
-            statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/getventilationstatus',
-            historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/getventilationhistory',
+            statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
+            historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
             deviceId: 'ESP32-Ventilation-01',
             refreshInterval: 30000, // 30 seconds
             apiSecret: getApiKeyFromUrl() || null // Get from URL parameter or environment
