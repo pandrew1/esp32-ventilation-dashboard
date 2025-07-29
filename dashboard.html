@@ -422,35 +422,18 @@
                         </div>
                     </div>
 
-                    <!-- System Reliability -->
-                    <div class="card">
-                        <h3>🔧 System Reliability</h3>
-                        <div class="sensor-reading">
-                            <span>System Uptime</span>
-                            <span class="sensor-value" id="uptime">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Total Reboots</span>
-                            <span class="sensor-value" id="rebootCount">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>WiFi Outages</span>
-                            <span class="sensor-value" id="wifiOutageCount">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>WiFi Uptime</span>
-                            <span class="sensor-value" id="wifiUptime">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Longest Outage</span>
-                            <span class="sensor-value" id="longestOutage">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- System Incidents -->
+                    <!-- System Incidents -->
                 <div class="card">
-                    <h3>🚨 System Incidents (Last 30 Days)</h3>
+                    <h3>� System Incidents (Last 30 Days)</h3>
+                    
+                    <!-- System Overview -->
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f0f8ff; border-radius: 5px; font-size: 0.9em; color: #444; border-left: 4px solid #007bff;">
+                        <strong>System Overview:</strong> 
+                        Uptime: <span id="uptime">-</span> | 
+                        Total Reboots: <span id="rebootCount">-</span> | 
+                        WiFi Outages: <span id="wifiOutageCount">-</span>
+                    </div>
+                    
                     <div id="incidentsList"></div>
                     <div id="incidentsSummary" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;">
                         Loading incident data...
