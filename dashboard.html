@@ -14,7 +14,7 @@
             // If no token and no API key, show no data message (don't redirect)
             // This allows users to see the dashboard structure before logging in
             if (!token && !apiKey) {
-                console.log('No authentication, showing no data state');
+                // Show no data state without authentication
                 return;
             }
         });
@@ -254,6 +254,49 @@
             color: #155724;
         }
 
+        .incident-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 4px solid;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .incident-critical {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+
+        .incident-high {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+
+        .incident-medium {
+            background: #cce7ff;
+            border-left-color: #007bff;
+            color: #004085;
+        }
+
+        .incident-low {
+            background: #f8f9fa;
+            border-left-color: #6c757d;
+            color: #495057;
+        }
+
+        .incident-header {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .incident-details {
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
         .loading {
             text-align: center;
             padding: 50px;
@@ -402,6 +445,15 @@
                             <span>Longest Outage</span>
                             <span class="sensor-value" id="longestOutage">-</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- System Incidents -->
+                <div class="card">
+                    <h3>🚨 System Incidents (Last 30 Days)</h3>
+                    <div id="incidentsList"></div>
+                    <div id="incidentsSummary" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;">
+                        Loading incident data...
                     </div>
                 </div>
 
@@ -571,7 +623,7 @@
         // Initialize dashboard
         async function initializeDashboard() {
             await refreshData();
-            console.log('Loading default 6-hour chart...');
+            // Load default 6-hour chart
             await loadChart(6); // Load 6-hour chart by default
             
             // Start auto-refresh
@@ -586,7 +638,7 @@
                 
                 // If no authentication method is available, show no data
                 if (!token && !CONFIG.apiSecret) {
-                    console.log('No authentication available, showing no data state');
+                    // No authentication available, show no data state
                     showNoDataState();
                     updateConnectionStatus('disconnected');
                     return;
@@ -607,7 +659,7 @@
                         return;
                     } else if (token) {
                         // Using Bearer token but got 401 - functions may not support it yet
-                        console.log('Bearer token authentication failed, showing no data state');
+                        // Bearer token authentication failed, show no data state
                         showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
                         showNoDataState();
                         updateConnectionStatus('disconnected');
@@ -623,7 +675,7 @@
                     
                     // If unauthorized and no API secret, show no data
                     if (response.status === 401 || response.status === 404) {
-                        console.log('API call failed, showing no data state');
+                        // API call failed, show no data state
                         showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
                         showNoDataState();
                         updateConnectionStatus('disconnected');
@@ -649,7 +701,7 @@
                 });
                 
                 // Show no data instead of mock data
-                console.log('Network error, showing no data state');
+                // Network error, show no data state
                 showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
                 showNoDataState();
                 updateConnectionStatus('disconnected');
@@ -780,6 +832,11 @@
                 document.getElementById('longestOutage').textContent = 'No data';
             }
 
+            // Update incidents if available
+            if (data.incidents) {
+                updateIncidents(data.incidents);
+            }
+
             // Update doors if available
             if (data.doors && data.doors.length > 0) {
                 updateDoorStatus(data.doors);
@@ -885,6 +942,111 @@
             });
         }
 
+        function updateIncidents(incidents) {
+            const incidentsList = document.getElementById('incidentsList');
+            const incidentsSummary = document.getElementById('incidentsSummary');
+            
+            if (!incidents || incidents.length === 0) {
+                incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No incidents recorded in the last 30 days</div>';
+                incidentsSummary.innerHTML = '<strong>All systems operating normally</strong> - No incidents detected';
+                return;
+            }
+
+            // Sort incidents by start time (newest first)
+            const sortedIncidents = incidents.sort((a, b) => b.startTime - a.startTime);
+            
+            // Define incident type names and icons
+            const incidentTypes = {
+                0: { name: 'Power Loss', icon: '⚡' },
+                1: { name: 'WiFi Down', icon: '📶' },
+                2: { name: 'Internet Down', icon: '🌐' },
+                3: { name: 'API Down', icon: '☁️' },
+                4: { name: 'Storm Event', icon: '🌩️' },
+                5: { name: 'Heat Event', icon: '🔥' },
+                6: { name: 'Software Update', icon: '🔄' }
+            };
+            
+            const severityNames = ['Critical', 'High', 'Medium', 'Low'];
+            const severityClasses = ['incident-critical', 'incident-high', 'incident-medium', 'incident-low'];
+            
+            // Build incidents HTML
+            let incidentsHtml = '';
+            for (const incident of sortedIncidents.slice(0, 10)) { // Show last 10 incidents
+                const typeInfo = incidentTypes[incident.type] || { name: 'Unknown', icon: '❓' };
+                const severity = severityNames[incident.severity] || 'Unknown';
+                const severityClass = severityClasses[incident.severity] || 'incident-low';
+                
+                const startTime = new Date(incident.startTime * 1000);
+                const endTime = incident.endTime > 0 ? new Date(incident.endTime * 1000) : null;
+                
+                const formatDateTime = (date) => {
+                    const now = new Date();
+                    const isToday = date.toDateString() === now.toDateString();
+                    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    const isYesterday = date.toDateString() === yesterday.toDateString();
+                    
+                    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    if (isToday) return `Today ${timeStr}`;
+                    if (isYesterday) return `Yesterday ${timeStr}`;
+                    return `${date.toLocaleDateString()} ${timeStr}`;
+                };
+                
+                const formatDuration = (seconds) => {
+                    if (seconds < 60) return `${seconds}s`;
+                    const minutes = Math.floor(seconds / 60);
+                    if (minutes < 60) return `${minutes}m`;
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+                };
+                
+                const duration = incident.endTime > 0 ? 
+                    formatDuration(incident.duration) : 
+                    'Ongoing';
+                
+                const timeRange = endTime ? 
+                    `${formatDateTime(startTime)} - ${formatDateTime(endTime)}` :
+                    `${formatDateTime(startTime)} (ongoing)`;
+                
+                incidentsHtml += `
+                    <div class="incident-item ${severityClass}">
+                        <div class="incident-header">
+                            ${typeInfo.icon} ${severity} ${typeInfo.name}
+                        </div>
+                        <div class="incident-details">
+                            ${timeRange} (${duration})
+                        </div>
+                    </div>
+                `;
+            }
+            
+            incidentsList.innerHTML = incidentsHtml;
+            
+            // Build summary
+            const totalIncidents = incidents.length;
+            const severityCounts = [0, 0, 0, 0];
+            incidents.forEach(incident => {
+                if (incident.severity >= 0 && incident.severity <= 3) {
+                    severityCounts[incident.severity]++;
+                }
+            });
+            
+            const summaryParts = [];
+            if (totalIncidents === 1) {
+                summaryParts.push('1 incident');
+            } else {
+                summaryParts.push(`${totalIncidents} incidents`);
+            }
+            
+            if (severityCounts[0] > 0) summaryParts.push(`${severityCounts[0]} Critical`);
+            if (severityCounts[1] > 0) summaryParts.push(`${severityCounts[1]} High`);
+            if (severityCounts[2] > 0) summaryParts.push(`${severityCounts[2]} Medium`);
+            if (severityCounts[3] > 0) summaryParts.push(`${severityCounts[3]} Low`);
+            
+            incidentsSummary.innerHTML = `<strong>Last 30 days:</strong> ${summaryParts.join(' | ')}`;
+        }
+
         function checkAlerts(data) {
             const alerts = [];
             const sensors = data.sensors || {};
@@ -959,7 +1121,7 @@
                 
                 // If no authentication method is available, show empty chart
                 if (!token && !CONFIG.apiSecret) {
-                    console.log('No authentication available, showing empty chart');
+                    // No authentication available, show empty chart
                     updateChart([], hours);
                     return;
                 }
@@ -979,7 +1141,7 @@
                         return;
                     } else if (token) {
                         // Using Bearer token but got 401 - functions may not support it yet
-                        console.log('Bearer token chart authentication failed, showing empty chart');
+                        // Bearer token chart authentication failed, show empty chart
                         showApiFailureNotice('History API returned 401 Unauthorized. Chart data is currently unavailable.', 'warning');
                         updateChart([], hours);
                         return;
@@ -988,14 +1150,13 @@
                 
                 if (!response.ok) {
                     // Show empty chart if API fails
-                    console.log('Chart API call failed, showing empty chart');
+                    // Chart API call failed, show empty chart
                     showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart data is currently unavailable.`, 'warning');
                     updateChart([], hours);
                     return;
                 }
                 
                 const data = await response.json();
-                console.log(`API returned ${data.data?.length || 0} data points for ${hours} hour request`);
                 if (data.data && data.data.length > 0) {
                     try {
                         const firstTimestamp = new Date(data.data[0].timestamp);
@@ -1004,13 +1165,10 @@
                         // Check if timestamps are valid before trying to use them
                         if (!isNaN(firstTimestamp.getTime()) && !isNaN(lastTimestamp.getTime())) {
                             const apiSpanHours = (lastTimestamp.getTime() - firstTimestamp.getTime()) / (1000 * 60 * 60);
-                            console.log(`API data spans ${apiSpanHours.toFixed(1)} hours from ${firstTimestamp.toISOString()} to ${lastTimestamp.toISOString()}`);
-                        } else {
-                            console.log('API data timestamps could not be parsed, proceeding with chart update');
-                            console.log('First timestamp:', data.data[0].timestamp, 'Last timestamp:', data.data[data.data.length - 1].timestamp);
+                            // API data span calculated for internal tracking
                         }
                     } catch (timestampError) {
-                        console.log('Error parsing timestamps for logging, proceeding with chart update:', timestampError.message);
+                        // Error parsing timestamps for logging, proceeding with chart update
                     }
                 }
                 updateChart(data.data || [], hours);
@@ -1018,7 +1176,6 @@
             } catch (error) {
                 console.error('Error loading chart data:', error);
                 // Show empty chart instead of mock data
-                console.log('Chart network error, showing empty chart');
                 showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
                 updateChart([], hours);
             }
@@ -1027,8 +1184,6 @@
         function updateChart(data, requestedHours = 6) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
             
-            console.log(`updateChart called with ${data.length} data points, requesting ${requestedHours} hours of data`);
-            
             // Destroy existing chart
             if (temperatureChart) {
                 temperatureChart.destroy();
@@ -1036,7 +1191,6 @@
 
             // If no data, create a simple "no data" chart
             if (!data || data.length === 0) {
-                console.log('Creating empty chart - no data available');
                 temperatureChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -1085,28 +1239,7 @@
             // We need to reverse it to show oldest to newest (left to right)
             let sortedData = [...data].reverse();
             
-                // Debug: Log API data span info
-                if (sortedData.length > 0) {
-                    console.log('Sample timestamps from API data:', {
-                        first: sortedData[0].timestamp,
-                        middle: sortedData[Math.floor(sortedData.length/2)]?.timestamp,
-                        last: sortedData[sortedData.length - 1].timestamp,
-                        timestampType: typeof sortedData[0].timestamp
-                    });
-                    
-                    // Parse timestamps correctly (Unix seconds to milliseconds)
-                    const firstTimestamp = typeof sortedData[0].timestamp === 'string' ? 
-                        parseInt(sortedData[0].timestamp) * 1000 : 
-                        (sortedData[0].timestamp < 10000000000 ? sortedData[0].timestamp * 1000 : sortedData[0].timestamp);
-                    const lastTimestamp = typeof sortedData[sortedData.length - 1].timestamp === 'string' ? 
-                        parseInt(sortedData[sortedData.length - 1].timestamp) * 1000 : 
-                        (sortedData[sortedData.length - 1].timestamp < 10000000000 ? sortedData[sortedData.length - 1].timestamp * 1000 : sortedData[sortedData.length - 1].timestamp);
-                    
-                    const firstDate = new Date(firstTimestamp);
-                    const lastDate = new Date(lastTimestamp);
-                    const spanHours = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60);
-                    console.log(`API returned ${sortedData.length} points spanning ${spanHours.toFixed(1)} hours from ${firstDate.toLocaleString()} to ${lastDate.toLocaleString()}`);
-                }            // Prepare labels with smart time formatting but avoid old dates for axis labels
+            // Prepare labels with smart time formatting but avoid old dates for axis labels
             const labels = sortedData.map((item, index) => {
                 let date;
                 
@@ -1125,7 +1258,6 @@
                 
                 // If timestamp is still invalid, create a fallback
                 if (isNaN(date.getTime())) {
-                    console.warn(`Could not parse timestamp at index ${index}: ${item.timestamp}`);
                     return `Point ${index + 1}`;
                 }
                 
@@ -1196,20 +1328,6 @@
                     return item.system.fanOn ? 1 : 0;
                 }
                 return 0;
-            });
-
-            // Debug: Log data arrays
-            console.log('Chart data arrays:', {
-                labels: labels.length,
-                indoorTemps: indoorTemps.filter(t => t !== null).length,
-                outdoorTemps: outdoorTemps.filter(t => t !== null).length,
-                fanStatus: fanStatus.length,
-                sampleData: sortedData.length > 0 ? {
-                    timestamp: sortedData[0].timestamp,
-                    indoor: sortedData[0].sensors?.indoor,
-                    outdoor: sortedData[0].sensors?.outdoor,
-                    system: sortedData[0].system
-                } : 'No data'
             });
 
             // Create new chart with data
@@ -1343,7 +1461,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.28-1610-responsive-time-labels</span>
+        Build: <span id="buildInfo">2025.07.28-1700-incident-tracking</span>
     </div>
 </body>
 </html>
