@@ -1210,10 +1210,20 @@
             const labels = sortedData.map((item, index) => {
                 let date;
                 
-                // Handle Unix timestamps (seconds) - convert to milliseconds
+                // Handle different timestamp formats
                 if (typeof item.timestamp === 'string') {
-                    const unixSeconds = parseInt(item.timestamp);
-                    date = new Date(unixSeconds * 1000); // Convert seconds to milliseconds
+                    // Try parsing as ISO date string first (2025-01-28T21:15:00.123456 format)
+                    if (item.timestamp.includes('T') || item.timestamp.includes('-')) {
+                        date = new Date(item.timestamp);
+                    } else {
+                        // Try as Unix timestamp in seconds
+                        const unixSeconds = parseInt(item.timestamp);
+                        if (!isNaN(unixSeconds) && unixSeconds > 1000000000) { // Valid Unix timestamp
+                            date = new Date(unixSeconds * 1000); // Convert seconds to milliseconds
+                        } else {
+                            date = new Date(item.timestamp); // Let Date constructor handle it
+                        }
+                    }
                 } else if (typeof item.timestamp === 'number') {
                     // If it's already a number, check if it needs conversion
                     const timestamp = item.timestamp;
@@ -1223,9 +1233,20 @@
                     date = new Date(item.timestamp);
                 }
                 
-                // If timestamp is still invalid, create a fallback
+                // If timestamp is still invalid, create a time-based fallback label
                 if (isNaN(date.getTime())) {
-                    return `Point ${index + 1}`;
+                    // Try to use the table entity timestamp as a fallback
+                    if (item.Timestamp) {
+                        date = new Date(item.Timestamp);
+                    }
+                    
+                    // If still invalid, use index-based time estimate
+                    if (isNaN(date.getTime())) {
+                        // Estimate time based on index (assuming 30-second intervals)
+                        const now = new Date();
+                        const estimatedTime = new Date(now.getTime() - (index * 30000)); // 30 seconds per data point
+                        return estimatedTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                    }
                 }
                 
                 // Check if this data point is within the requested time range for label filtering
