@@ -1453,6 +1453,12 @@
                 return null;
             }).filter(point => point !== null);
 
+            // Debug fan status data
+            console.log('Fan status data points:', fanStatus.length);
+            if (fanStatus.length > 0) {
+                console.log('Sample fan status data:', fanStatus.slice(0, 3));
+            }
+
             // Create new chart with time-based data
             temperatureChart = new Chart(ctx, {
                 type: 'line',
@@ -1487,7 +1493,11 @@
                             data: fanStatus,
                             borderColor: '#28a745',
                             backgroundColor: 'rgba(40, 167, 69, 0.2)',
-                            type: 'bar',
+                            stepped: true,
+                            fill: true,
+                            tension: 0,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
                             yAxisID: 'fan'
                         }
                     ]
