@@ -394,6 +394,23 @@
                         </div>
                     </div>
 
+                    <!-- Garage Sensors -->
+                    <div class="card">
+                        <h3>🏠 Garage Environment</h3>
+                        <div class="sensor-reading">
+                            <span>Temperature</span>
+                            <span class="sensor-value temperature" id="garageTemp">-°F</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Humidity</span>
+                            <span class="sensor-value humidity" id="garageHumidity">-%</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Pressure</span>
+                            <span class="sensor-value pressure" id="garagePressure">- inHg</span>
+                        </div>
+                    </div>
+
                     <!-- System Status -->
                     <div class="card">
                         <h3>⚙️ System Status</h3>
@@ -711,6 +728,9 @@
             document.getElementById('outdoorTemp').textContent = 'No data';
             document.getElementById('outdoorHumidity').textContent = 'No data';
             document.getElementById('outdoorPressure').textContent = 'No data';
+            document.getElementById('garageTemp').textContent = 'No data';
+            document.getElementById('garageHumidity').textContent = 'No data';
+            document.getElementById('garagePressure').textContent = 'No data';
 
             // Set system status to no data
             document.getElementById('fanStatus').textContent = '❓';
@@ -749,6 +769,7 @@
             const sensors = data.sensors || {};
             const indoor = sensors.indoor || {};
             const outdoor = sensors.outdoor || {};
+            const garage = sensors.garage || {};
             
             document.getElementById('indoorTemp').textContent = indoor.temp != null ? `${indoor.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('indoorHumidity').textContent = indoor.humidity != null ? `${indoor.humidity.toFixed(0)}%` : 'No data';
@@ -757,6 +778,10 @@
             document.getElementById('outdoorTemp').textContent = outdoor.temp != null ? `${outdoor.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('outdoorHumidity').textContent = outdoor.humidity != null ? `${outdoor.humidity.toFixed(0)}%` : 'No data';
             document.getElementById('outdoorPressure').textContent = outdoor.pressure != null ? `${outdoor.pressure.toFixed(2)} inHg` : 'No data';
+            
+            document.getElementById('garageTemp').textContent = garage.temp != null ? `${garage.temp.toFixed(1)}°F` : 'No data';
+            document.getElementById('garageHumidity').textContent = garage.humidity != null ? `${garage.humidity.toFixed(0)}%` : 'No data';
+            document.getElementById('garagePressure').textContent = garage.pressure != null ? `${garage.pressure.toFixed(2)} inHg` : 'No data';
 
             // Update system status with proper null/undefined handling
             const system = data.system || {};
@@ -1032,6 +1057,13 @@
                 alerts.push({type: 'danger', message: `High indoor temperature: ${indoorTemp.toFixed(1)}°F`});
             } else if (indoorTemp < 60) {
                 alerts.push({type: 'warning', message: `Low indoor temperature: ${indoorTemp.toFixed(1)}°F`});
+            }
+
+            const garageTemp = sensors.garage?.temp || 0;
+            if (garageTemp > 95) {
+                alerts.push({type: 'danger', message: `High garage temperature: ${garageTemp.toFixed(1)}°F`});
+            } else if (garageTemp < 35) {
+                alerts.push({type: 'warning', message: `Low garage temperature: ${garageTemp.toFixed(1)}°F`});
             }
 
             // System alerts
@@ -1401,6 +1433,16 @@
                 return null;
             }).filter(point => point !== null);
             
+            const garageTemps = timeBasedData.map(dataPoint => {
+                if (dataPoint.item.sensors && dataPoint.item.sensors.garage && typeof dataPoint.item.sensors.garage.temp === 'number') {
+                    return {
+                        x: dataPoint.timestamp,
+                        y: dataPoint.item.sensors.garage.temp
+                    };
+                }
+                return null;
+            }).filter(point => point !== null);
+            
             const fanStatus = timeBasedData.map(dataPoint => {
                 if (dataPoint.item.system && typeof dataPoint.item.system.fanOn === 'boolean') {
                     return {
@@ -1432,6 +1474,14 @@
                             data: outdoorTemps,
                             borderColor: '#3498db',
                             backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'temp'
+                        },
+                        {
+                            label: 'Garage Temperature (°F)',
+                            data: garageTemps,
+                            borderColor: '#f39c12',
+                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
                             tension: 0.4,
                             yAxisID: 'temp'
                         },
@@ -1546,7 +1596,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.29-1500-smart-chart-refresh</span>
+        Build: <span id="buildInfo">2025.07.29-1600-garage-data-display</span>
     </div>
 </body>
 </html>
