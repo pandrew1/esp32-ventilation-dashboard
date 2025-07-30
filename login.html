@@ -380,16 +380,6 @@
             document.getElementById('message').style.display = 'none';
         }
 
-        // Dev mode bypass function
-        function devModeLogin() {
-            localStorage.setItem('ventilation_auth_token', 'dev-mode-token-' + Date.now());
-            localStorage.setItem('ventilation_user_email', 'dev@example.com');
-            showMessage('Dev mode activated! Redirecting...', 'success');
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1000);
-        }
-
         // Check if user is already logged in
         window.addEventListener('load', function() {
             const token = localStorage.getItem('ventilation_auth_token');
