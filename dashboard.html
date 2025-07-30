@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Ventilation Control Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script>
         // Authentication check - redirect to login if not authenticated
         window.addEventListener('load', function() {
@@ -492,6 +493,7 @@
         let temperatureChart = null;
         let refreshTimer = null;
         let currentChartHours = 6; // Track the currently displayed time period
+        let latestChartDataTimestamp = null; // Track the latest data point timestamp to avoid unnecessary chart refreshes
 
         // Authentication and API helper functions
         function getAuthHeaders() {
@@ -1156,12 +1158,123 @@
         // Function to refresh the currently displayed chart without changing time period
         async function refreshCurrentChart() {
             if (temperatureChart) {
-                await loadChart(currentChartHours);
+                // Check if there's new chart data before refreshing
+                await checkAndRefreshChart(currentChartHours);
+            }
+        }
+
+        // Smart chart refresh - only refreshes if new data is available
+        async function checkAndRefreshChart(hours) {
+            try {
+                const token = localStorage.getItem('ventilation_auth_token');
+                
+                // If no authentication method is available, skip chart refresh
+                if (!token && !CONFIG.apiSecret) {
+                    return;
+                }
+
+                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    // Don't refresh chart if API fails
+                    return;
+                }
+                
+                const data = await response.json();
+                if (!data.data || data.data.length === 0) {
+                    // No data available, don't refresh
+                    return;
+                }
+
+                // Get the latest timestamp from the new data
+                const latestDataPoint = data.data[0]; // API returns newest first
+                let newLatestTimestamp = null;
+
+                // Parse the timestamp from the latest data point
+                if (latestDataPoint.timestamp) {
+                    if (typeof latestDataPoint.timestamp === 'string') {
+                        if (latestDataPoint.timestamp.includes('T') || latestDataPoint.timestamp.includes('-')) {
+                            newLatestTimestamp = new Date(latestDataPoint.timestamp);
+                        } else {
+                            const unixSeconds = parseInt(latestDataPoint.timestamp);
+                            if (!isNaN(unixSeconds) && unixSeconds > 1000000000) {
+                                newLatestTimestamp = new Date(unixSeconds * 1000);
+                            } else {
+                                newLatestTimestamp = new Date(latestDataPoint.timestamp);
+                            }
+                        }
+                    } else if (typeof latestDataPoint.timestamp === 'number') {
+                        const timestamp = latestDataPoint.timestamp;
+                        newLatestTimestamp = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+                    } else {
+                        newLatestTimestamp = new Date(latestDataPoint.timestamp);
+                    }
+                }
+
+                // If we can't parse the timestamp, refresh anyway to be safe
+                if (!newLatestTimestamp || isNaN(newLatestTimestamp.getTime())) {
+                    console.log('Chart refresh: Unable to parse timestamp, refreshing anyway');
+                    updateChart(data.data, hours);
+                    return;
+                }
+
+                // Check if this is newer than our stored latest timestamp
+                if (!latestChartDataTimestamp || newLatestTimestamp > latestChartDataTimestamp) {
+                    console.log(`Chart refresh: New data available (${newLatestTimestamp.toLocaleTimeString()})`, {
+                        previous: latestChartDataTimestamp ? latestChartDataTimestamp.toLocaleTimeString() : 'none',
+                        new: newLatestTimestamp.toLocaleTimeString()
+                    });
+                    
+                    // Update our stored timestamp and refresh the chart
+                    latestChartDataTimestamp = newLatestTimestamp;
+                    updateChart(data.data, hours);
+                } else {
+                    console.log('Chart refresh: No new data, skipping refresh', {
+                        latest: latestChartDataTimestamp.toLocaleTimeString(),
+                        checked: newLatestTimestamp.toLocaleTimeString()
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error checking for new chart data:', error);
+                // On error, don't refresh to avoid unnecessary animations
             }
         }
 
         function updateChart(data, requestedHours = 6) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
+            
+            // Update latest timestamp tracking for smart refresh
+            if (data && data.length > 0) {
+                const latestDataPoint = data[0]; // API returns newest first
+                if (latestDataPoint.timestamp) {
+                    let timestamp;
+                    if (typeof latestDataPoint.timestamp === 'string') {
+                        if (latestDataPoint.timestamp.includes('T') || latestDataPoint.timestamp.includes('-')) {
+                            timestamp = new Date(latestDataPoint.timestamp);
+                        } else {
+                            const unixSeconds = parseInt(latestDataPoint.timestamp);
+                            if (!isNaN(unixSeconds) && unixSeconds > 1000000000) {
+                                timestamp = new Date(unixSeconds * 1000);
+                            } else {
+                                timestamp = new Date(latestDataPoint.timestamp);
+                            }
+                        }
+                    } else if (typeof latestDataPoint.timestamp === 'number') {
+                        const ts = latestDataPoint.timestamp;
+                        timestamp = ts < 10000000000 ? new Date(ts * 1000) : new Date(ts);
+                    } else {
+                        timestamp = new Date(latestDataPoint.timestamp);
+                    }
+                    
+                    if (!isNaN(timestamp.getTime())) {
+                        latestChartDataTimestamp = timestamp;
+                    }
+                }
+            }
             
             // Destroy existing chart
             if (temperatureChart) {
@@ -1218,8 +1331,8 @@
             // We need to reverse it to show oldest to newest (left to right)
             let sortedData = [...data].reverse();
             
-            // Prepare labels with smart time formatting but avoid old dates for axis labels
-            const labels = sortedData.map((item, index) => {
+            // Prepare time-based data points for proper temporal spacing
+            const timeBasedData = sortedData.map((item, index) => {
                 let date;
                 
                 // Handle different timestamp formats
@@ -1245,7 +1358,7 @@
                     date = new Date(item.timestamp);
                 }
                 
-                // If timestamp is still invalid, create a time-based fallback label
+                // If timestamp is still invalid, create a time-based fallback
                 if (isNaN(date.getTime())) {
                     // Try to use the table entity timestamp as a fallback
                     if (item.Timestamp) {
@@ -1256,85 +1369,55 @@
                     if (isNaN(date.getTime())) {
                         // Estimate time based on index (assuming 30-second intervals)
                         const now = new Date();
-                        const estimatedTime = new Date(now.getTime() - (index * 30000)); // 30 seconds per data point
-                        return estimatedTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                        date = new Date(now.getTime() - ((sortedData.length - index - 1) * 30000)); // 30 seconds per data point
                     }
                 }
                 
-                // Check if this data point is within the requested time range for label filtering
-                const now = new Date();
-                const cutoffTime = new Date(now.getTime() - (requestedHours * 60 * 60 * 1000));
-                const isRecentEnough = date >= cutoffTime;
-                
-                // Smart formatting based on data span and context
-                const isToday = date.toDateString() === now.toDateString();
-                const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                const isYesterday = date.toDateString() === yesterday.toDateString();
-                
-                // Check if we're on desktop (more space available) vs mobile
-                const isDesktop = window.innerWidth > 768;
-                
-                // Get time formatting - include minutes on desktop if there's space
-                let timeStr;
-                if (isDesktop && requestedHours <= 24) {
-                    // Desktop with 24 hours or less - show minutes for better precision
-                    const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
-                    timeStr = date.toLocaleTimeString([], timeOptions);
-                    timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
-                } else {
-                    // Mobile or longer time spans - keep it simple with just hours
-                    const timeOptions = { hour: 'numeric', hour12: true };
-                    timeStr = date.toLocaleTimeString([], timeOptions);
-                    timeStr = timeStr.replace(' AM', 'A').replace(' PM', 'P');
-                }
-                
-                // For recent data that fits our time range, use appropriate labels
-                if (isRecentEnough) {
-                    if (isToday) {
-                        return timeStr;
-                    } else if (isYesterday && requestedHours > 12) {
-                        return `Yesterday ${timeStr}`;
-                    } else if (requestedHours > 48) {
-                        const month = date.getMonth() + 1;
-                        const day = date.getDate();
-                        return `${month}/${day} ${timeStr}`;
-                    } else {
-                        return timeStr;
-                    }
-                } else {
-                    // For old data points, use a dot to avoid misleading labels
-                    return '•';
-                }
+                return {
+                    timestamp: date,
+                    item: item
+                };
             });
 
-            // Extract the actual sensor data from the sorted data
-            const indoorTemps = sortedData.map(item => {
+            // Extract the actual sensor data with timestamps for Chart.js time scale
+            const indoorTemps = timeBasedData.map(dataPoint => {
                 // Check if the item has the expected structure
-                if (item.sensors && item.sensors.indoor && typeof item.sensors.indoor.temp === 'number') {
-                    return item.sensors.indoor.temp;
+                if (dataPoint.item.sensors && dataPoint.item.sensors.indoor && typeof dataPoint.item.sensors.indoor.temp === 'number') {
+                    return {
+                        x: dataPoint.timestamp,
+                        y: dataPoint.item.sensors.indoor.temp
+                    };
                 }
                 return null;
-            });
+            }).filter(point => point !== null);
             
-            const outdoorTemps = sortedData.map(item => {
-                if (item.sensors && item.sensors.outdoor && typeof item.sensors.outdoor.temp === 'number') {
-                    return item.sensors.outdoor.temp;
+            const outdoorTemps = timeBasedData.map(dataPoint => {
+                if (dataPoint.item.sensors && dataPoint.item.sensors.outdoor && typeof dataPoint.item.sensors.outdoor.temp === 'number') {
+                    return {
+                        x: dataPoint.timestamp,
+                        y: dataPoint.item.sensors.outdoor.temp
+                    };
                 }
                 return null;
-            });
+            }).filter(point => point !== null);
             
-            const fanStatus = sortedData.map(item => {
-                if (item.system && typeof item.system.fanOn === 'boolean') {
-                    return item.system.fanOn ? 1 : 0;
+            const fanStatus = timeBasedData.map(dataPoint => {
+                if (dataPoint.item.system && typeof dataPoint.item.system.fanOn === 'boolean') {
+                    return {
+                        x: dataPoint.timestamp,
+                        y: dataPoint.item.system.fanOn ? 1 : 0
+                    };
                 }
-                return 0;
+                return {
+                    x: dataPoint.timestamp,
+                    y: 0
+                };
             });
 
-            // Create new chart with data
+            // Create new chart with time-based data
             temperatureChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
                     datasets: [
                         {
                             label: 'Indoor Temperature (°F)',
@@ -1390,6 +1473,15 @@
                             }
                         },
                         x: {
+                            type: 'time',
+                            time: {
+                                displayFormats: {
+                                    minute: 'h:mm a',
+                                    hour: 'h a',
+                                    day: 'M/d'
+                                },
+                                tooltipFormat: 'MMM d, h:mm a'
+                            },
                             title: {
                                 display: true,
                                 text: 'Time'
@@ -1398,14 +1490,7 @@
                                 maxTicksLimit: 8,
                                 maxRotation: 45,
                                 minRotation: 0,
-                                autoSkip: true,
-                                autoSkipPadding: 10,
-                                // Filter out dot markers from axis
-                                callback: function(value, index, values) {
-                                    const label = this.getLabelForValue(value);
-                                    if (label === '•') return '';
-                                    return label;
-                                }
+                                autoSkip: true
                             }
                         }
                     },
@@ -1461,7 +1546,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.07.29-1200-auto-chart-refresh</span>
+        Build: <span id="buildInfo">2025.07.29-1500-smart-chart-refresh</span>
     </div>
 </body>
 </html>
