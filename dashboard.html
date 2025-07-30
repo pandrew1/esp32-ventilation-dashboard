@@ -1450,11 +1450,8 @@
                         y: dataPoint.item.system.fanOn ? 1 : 0
                     };
                 }
-                return {
-                    x: dataPoint.timestamp,
-                    y: 0
-                };
-            });
+                return null;
+            }).filter(point => point !== null);
 
             // Create new chart with time-based data
             temperatureChart = new Chart(ctx, {
