@@ -421,6 +421,8 @@
                                 <div>Mode: <strong id="ventilationMode">-</strong></div>
                                 <div>Runtime Today: <strong id="fanMinutes">0</strong> minutes</div>
                                 <div>Fresh Air: <strong id="freshAirStatus">-</strong></div>
+                                <div>Operating Hours: <strong id="ventilationHours">-</strong></div>
+                                <div>Cooling Effect: <strong id="coolingEffect">-</strong></div>
                             </div>
                         </div>
                     </div>
@@ -739,6 +741,8 @@
             document.getElementById('ventilationMode').textContent = 'No data';
             document.getElementById('fanMinutes').textContent = 'No data';
             document.getElementById('freshAirStatus').textContent = 'No data';
+            document.getElementById('ventilationHours').textContent = 'No data';
+            document.getElementById('coolingEffect').textContent = 'No data';
 
             // Set weather to no data
             document.getElementById('forecastHigh').textContent = 'No data';
@@ -800,6 +804,16 @@
             document.getElementById('ventilationMode').textContent = system.ventilationMode || 'No data';
             document.getElementById('fanMinutes').textContent = system.fanMinutesToday != null ? system.fanMinutesToday : 'No data';
             document.getElementById('freshAirStatus').textContent = system.freshAirActive != null ? (system.freshAirActive ? 'Active' : 'Inactive') : 'No data';
+            document.getElementById('ventilationHours').textContent = system.operatingHours || 'No data';
+            
+            // Calculate and display cooling effect
+            const coolingEffect = calculateCoolingEffect(
+                indoor.temp, 
+                outdoor.temp, 
+                system.fanMinutesToday, 
+                fanOn
+            );
+            document.getElementById('coolingEffect').textContent = coolingEffect;
 
             // Update weather with proper null/undefined handling
             const weather = data.weather || {};
@@ -1599,6 +1613,62 @@
 
         // Manual refresh function
         window.refreshData = refreshData;
+
+        // Cooling effect calculation function
+        function calculateCoolingEffect(indoorTemp, outdoorTemp, fanMinutes, fanCurrentlyOn) {
+            // Return "No data" if we don't have the required temperatures
+            if (indoorTemp == null || outdoorTemp == null || fanMinutes == null) {
+                return 'No data';
+            }
+
+            // If fan hasn't run today, show that
+            if (fanMinutes === 0) {
+                return fanCurrentlyOn ? 'Starting...' : 'Not used today';
+            }
+
+            // Constants for 4500 CFM fan system
+            const FAN_CFM = 4500; // Cubic feet per minute
+            const AIR_DENSITY = 0.075; // lbs per cubic foot at standard conditions
+            const SPECIFIC_HEAT_AIR = 0.24; // BTU per lb per °F
+            const MINUTES_PER_HOUR = 60;
+
+            // Calculate temperature difference (how much cooling potential exists)
+            const tempDiff = indoorTemp - outdoorTemp;
+            
+            // If outdoor is warmer than indoor, no cooling benefit
+            if (tempDiff <= 0) {
+                return fanCurrentlyOn ? 'Warming air' : 'No cooling benefit';
+            }
+
+            // Calculate heat transfer rate (BTU/hr) when fan is running
+            const airMassFlowRate = FAN_CFM * AIR_DENSITY; // lbs/min
+            const heatTransferRate = airMassFlowRate * SPECIFIC_HEAT_AIR * tempDiff * MINUTES_PER_HOUR; // BTU/hr
+
+            // Estimate temperature reduction based on runtime
+            // Assume typical house volume of ~20,000 cubic feet
+            const HOUSE_VOLUME_CF = 20000;
+            const houseAirMass = HOUSE_VOLUME_CF * AIR_DENSITY; // lbs of air in house
+            
+            // Calculate total heat removed over the runtime period
+            const totalHeatRemoved = heatTransferRate * (fanMinutes / MINUTES_PER_HOUR); // BTU
+            
+            // Estimate temperature drop in the house
+            const estimatedTempDrop = totalHeatRemoved / (houseAirMass * SPECIFIC_HEAT_AIR); // °F
+
+            // Format the results
+            const heatTransferKBTU = (heatTransferRate / 1000).toFixed(1); // Convert to thousands of BTU/hr
+            const tempReduction = Math.min(estimatedTempDrop, tempDiff).toFixed(1); // Cap at available temp difference
+
+            // Create status message based on current state
+            let status = '';
+            if (fanCurrentlyOn) {
+                status = ` (Running: ${heatTransferKBTU}k BTU/hr)`;
+            } else {
+                status = ` (Last run: ${heatTransferKBTU}k BTU/hr rate)`;
+            }
+
+            return `~${tempReduction}°F reduction${status}`;
+        }
     </script>
 
     <!-- Discrete Build Info Footer -->
