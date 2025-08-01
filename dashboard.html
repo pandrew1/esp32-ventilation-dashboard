@@ -1644,30 +1644,41 @@
             const airMassFlowRate = FAN_CFM * AIR_DENSITY; // lbs/min
             const heatTransferRate = airMassFlowRate * SPECIFIC_HEAT_AIR * tempDiff * MINUTES_PER_HOUR; // BTU/hr
 
-            // Estimate temperature reduction based on runtime
-            // Assume typical house volume of ~20,000 cubic feet
-            const HOUSE_VOLUME_CF = 20000;
+            // Estimate HOURLY cooling rate (more realistic)
+            // House volume ~25,000 cubic feet (including high ceilings)
+            const HOUSE_VOLUME_CF = 25000;
             const houseAirMass = HOUSE_VOLUME_CF * AIR_DENSITY; // lbs of air in house
             
-            // Calculate total heat removed over the runtime period
-            const totalHeatRemoved = heatTransferRate * (fanMinutes / MINUTES_PER_HOUR); // BTU
+            // Calculate theoretical temperature drop per hour of continuous operation
+            // This assumes perfect mixing and no heat gain during operation
+            const hourlyTempDropPotential = heatTransferRate / (houseAirMass * SPECIFIC_HEAT_AIR); // °F/hr
             
-            // Estimate temperature drop in the house
-            const estimatedTempDrop = totalHeatRemoved / (houseAirMass * SPECIFIC_HEAT_AIR); // °F
+            // Apply realistic efficiency factors:
+            // - Air mixing efficiency: ~60% (not perfect mixing)
+            // - Heat gain offset: ~40% (sun, appliances, thermal mass warming)
+            const MIXING_EFFICIENCY = 0.6;
+            const HEAT_GAIN_FACTOR = 0.4; // Reduces effective cooling
+            
+            const practicalHourlyRate = hourlyTempDropPotential * MIXING_EFFICIENCY * (1 - HEAT_GAIN_FACTOR);
+            
+            // Calculate average cooling rate based on actual usage pattern
+            // If fan runs 50% of the time, effective rate is halved
+            const operatingEfficiency = Math.min(fanMinutes / (60 * 16), 1.0); // Assume 16-hour operating window
+            const effectiveHourlyRate = practicalHourlyRate * operatingEfficiency;
 
             // Format the results
             const heatTransferKBTU = (heatTransferRate / 1000).toFixed(1); // Convert to thousands of BTU/hr
-            const tempReduction = Math.min(estimatedTempDrop, tempDiff).toFixed(1); // Cap at available temp difference
+            const hourlyRate = Math.min(effectiveHourlyRate, tempDiff * 0.5).toFixed(1); // Cap at 50% of temp difference
 
             // Create status message based on current state
             let status = '';
             if (fanCurrentlyOn) {
-                status = ` (Running: ${heatTransferKBTU}k BTU/hr)`;
+                status = ` (${heatTransferKBTU}k BTU/hr)`;
             } else {
-                status = ` (Last run: ${heatTransferKBTU}k BTU/hr rate)`;
+                status = ` (${Math.round(fanMinutes)}min today)`;
             }
 
-            return `~${tempReduction}°F reduction${status}`;
+            return `~${hourlyRate}°F/hr rate${status}`;
         }
     </script>
 
