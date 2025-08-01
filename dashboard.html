@@ -448,6 +448,19 @@
                 <div class="card">
                     <h3>� System Incidents (Last 30 Days)</h3>
                     
+                    <!-- Incident Severity Filter -->
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
+                        <label style="font-weight: bold; margin-right: 10px; color: #333;">Filter by Severity:</label>
+                        <select id="severityFilter" onchange="applyIncidentFilter()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                            <option value="all">All Incidents</option>
+                            <option value="0">Critical Only</option>
+                            <option value="1">High and Above</option>
+                            <option value="2">Medium and Above</option>
+                            <option value="3">Low and Above (All)</option>
+                        </select>
+                        <span id="filterStatus" style="margin-left: 10px; font-size: 0.85em; color: #666;"></span>
+                    </div>
+                    
                     <!-- System Overview -->
                     <div style="margin-bottom: 15px; padding: 10px; background: #f0f8ff; border-radius: 5px; font-size: 0.9em; color: #444; border-left: 4px solid #007bff;">
                         <strong>System Overview:</strong> 
@@ -958,9 +971,13 @@
             const incidentsList = document.getElementById('incidentsList');
             const incidentsSummary = document.getElementById('incidentsSummary');
             
+            // Store original data for filtering
+            originalIncidentsData = incidents || [];
+            
             if (!incidents || incidents.length === 0) {
                 incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No incidents recorded in the last 30 days</div>';
                 incidentsSummary.innerHTML = '<strong>All systems operating normally</strong> - No incidents detected';
+                document.getElementById('filterStatus').textContent = 'No incident data available';
                 return;
             }
 
@@ -989,6 +1006,86 @@
             if (validIncidents.length === 0) {
                 incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No valid incidents found in the last 30 days (some data may be corrupted)</div>';
                 incidentsSummary.innerHTML = '<strong>No valid incident data available</strong> - Check for data corruption';
+                document.getElementById('filterStatus').textContent = 'No valid incident data available';
+                return;
+            }
+
+            // Store the valid incidents for filtering
+            originalIncidentsData = validIncidents;
+            
+            // Reset filter to "All Incidents" and apply it
+            document.getElementById('severityFilter').value = 'all';
+            applyIncidentFilter();
+        }
+
+        // Global variable to store original incidents data for filtering
+        let originalIncidentsData = [];
+
+        // Function to apply incident severity filter
+        function applyIncidentFilter() {
+            const filterValue = document.getElementById('severityFilter').value;
+            const filterStatus = document.getElementById('filterStatus');
+            
+            if (!originalIncidentsData || originalIncidentsData.length === 0) {
+                filterStatus.textContent = 'No incident data available';
+                return;
+            }
+            
+            let filteredIncidents;
+            let filterDescription;
+            
+            if (filterValue === 'all') {
+                filteredIncidents = originalIncidentsData;
+                filterDescription = 'Showing all incidents';
+            } else {
+                const maxSeverity = parseInt(filterValue);
+                filteredIncidents = originalIncidentsData.filter(incident => incident.severity <= maxSeverity);
+                
+                const severityNames = ['Critical', 'High', 'Medium', 'Low'];
+                if (maxSeverity === 0) {
+                    filterDescription = 'Showing Critical only';
+                } else {
+                    filterDescription = `Showing ${severityNames[maxSeverity]} and above`;
+                }
+            }
+            
+            filterStatus.textContent = `${filterDescription} (${filteredIncidents.length} of ${originalIncidentsData.length} incidents)`;
+            
+            // Re-render incidents with filtered data
+            renderFilteredIncidents(filteredIncidents);
+        }
+
+        // Function to render filtered incidents (extracted from updateIncidents)
+        function renderFilteredIncidents(incidents) {
+            const incidentsList = document.getElementById('incidentsList');
+            const incidentsSummary = document.getElementById('incidentsSummary');
+            
+            if (!incidents || incidents.length === 0) {
+                incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No incidents match the selected filter</div>';
+                incidentsSummary.innerHTML = `<strong>Filtered results:</strong> No incidents`;
+                return;
+            }
+
+            // Filter out incidents with corrupted timestamps (same validation as in updateIncidents)
+            function isValidIncidentTimestamp(timestamp) {
+                if (!timestamp || timestamp <= 0) return false;
+                
+                const date = new Date(timestamp * 1000);
+                if (isNaN(date.getTime())) return false;
+                
+                const year = date.getFullYear();
+                return year >= 2020 && year <= 2030;
+            }
+            
+            const validIncidents = incidents.filter(incident => {
+                const validStart = isValidIncidentTimestamp(incident.startTime);
+                const validEnd = incident.endTime === 0 || isValidIncidentTimestamp(incident.endTime);
+                return validStart && validEnd;
+            });
+            
+            if (validIncidents.length === 0) {
+                incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No valid incidents found matching the filter (some data may be corrupted)</div>';
+                incidentsSummary.innerHTML = `<strong>Filtered results:</strong> No valid incidents`;
                 return;
             }
 
@@ -999,7 +1096,7 @@
             const incidentTypes = {
                 0: { name: 'Power Loss', icon: '⚡' },
                 1: { name: 'WiFi Down', icon: '📶' },
-                2: { name: 'Internet Down', icon: '🌐' },
+                2: { name: 'Internet Down', icon: '�' },
                 3: { name: 'API Down', icon: '☁️' },
                 4: { name: 'Storm Event', icon: '🌩️' },
                 5: { name: 'Heat Event', icon: '🔥' },
@@ -1011,7 +1108,7 @@
             
             // Build incidents HTML
             let incidentsHtml = '';
-            for (const incident of sortedIncidents.slice(0, 10)) { // Show last 10 incidents
+            for (const incident of sortedIncidents) { // Show all filtered incidents
                 const typeInfo = incidentTypes[incident.type] || { name: 'Unknown', icon: '❓' };
                 const severity = severityNames[incident.severity] || 'Unknown';
                 const severityClass = severityClasses[incident.severity] || 'incident-low';
@@ -1022,32 +1119,32 @@
                 const formatDateTime = (date) => {
                     const now = new Date();
                     const isToday = date.toDateString() === now.toDateString();
-                    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                    const isYesterday = date.toDateString() === yesterday.toDateString();
+                    const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString();
                     
-                    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    
-                    if (isToday) return `Today ${timeStr}`;
-                    if (isYesterday) return `Yesterday ${timeStr}`;
-                    return `${date.toLocaleDateString()} ${timeStr}`;
+                    if (isToday) {
+                        return `Today ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    } else if (isYesterday) {
+                        return `Yesterday ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    } else {
+                        return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ' ' + 
+                               date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
                 };
                 
                 const formatDuration = (seconds) => {
                     if (seconds < 60) return `${seconds}s`;
-                    const minutes = Math.floor(seconds / 60);
-                    if (minutes < 60) return `${minutes}m`;
-                    const hours = Math.floor(minutes / 60);
-                    const remainingMinutes = minutes % 60;
-                    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+                    if (seconds < 3600) return `${Math.floor(seconds/60)}m ${seconds%60}s`;
+                    const hours = Math.floor(seconds/3600);
+                    const mins = Math.floor((seconds%3600)/60);
+                    return `${hours}h ${mins}m`;
                 };
                 
                 const duration = incident.endTime > 0 ? 
-                    formatDuration(incident.duration) : 
-                    'Ongoing';
+                    formatDuration(incident.endTime - incident.startTime) : 'Ongoing';
                 
                 const timeRange = endTime ? 
-                    `${formatDateTime(startTime)} - ${formatDateTime(endTime)}` :
-                    `${formatDateTime(startTime)} (ongoing)`;
+                    `${formatDateTime(startTime)} - ${formatDateTime(endTime)} (${duration})` :
+                    `${formatDateTime(startTime)} - Ongoing`;
                 
                 incidentsHtml += `
                     <div class="incident-item ${severityClass}">
@@ -1055,7 +1152,7 @@
                             ${typeInfo.icon} ${severity} ${typeInfo.name}
                         </div>
                         <div class="incident-details">
-                            ${timeRange} (${duration})
+                            ${timeRange}
                         </div>
                     </div>
                 `;
@@ -1084,7 +1181,7 @@
             if (severityCounts[2] > 0) summaryParts.push(`${severityCounts[2]} Medium`);
             if (severityCounts[3] > 0) summaryParts.push(`${severityCounts[3]} Low`);
             
-            incidentsSummary.innerHTML = `<strong>Last 30 days:</strong> ${summaryParts.join(' | ')}`;
+            incidentsSummary.innerHTML = `<strong>Filtered results:</strong> ${summaryParts.join(' | ')}`;
         }
 
         function checkAlerts(data) {
