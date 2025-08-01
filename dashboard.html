@@ -464,6 +464,29 @@
                     <div id="doorList"></div>
                 </div>
 
+                <!-- Incident Trends Chart -->
+                <div class="card">
+                    <h3>📊 Critical & High Incident Trends (12 Months)</h3>
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
+                        <label style="font-weight: bold; margin-right: 10px; color: #333;">View:</label>
+                        <select id="trendsViewFilter" onchange="loadIncidentTrends()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
+                            <option value="weekly" selected>Weekly View</option>
+                            <option value="monthly">Monthly Summary</option>
+                        </select>
+                        
+                        <label style="font-weight: bold; margin-right: 10px; color: #333;">Severity:</label>
+                        <select id="trendsSeverityFilter" onchange="loadIncidentTrends()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                            <option value="critical-high" selected>Critical & High</option>
+                            <option value="critical">Critical Only</option>
+                            <option value="high">High Only</option>
+                        </select>
+                        <span id="trendsStatus" style="margin-left: 10px; font-size: 0.85em; color: #666;"></span>
+                    </div>
+                    <div class="chart-container" style="height: 400px;">
+                        <canvas id="incidentTrendsChart"></canvas>
+                    </div>
+                </div>
+
                     <!-- System Incidents -->
                 <div class="card">
                     <h3>🔧 System Incidents</h3>
@@ -530,6 +553,7 @@
         }
 
         let temperatureChart = null;
+        let incidentTrendsChart = null;
         let refreshTimer = null;
         let currentChartHours = 6; // Track the currently displayed time period
         let latestChartDataTimestamp = null; // Track the latest data point timestamp to avoid unnecessary chart refreshes
@@ -652,6 +676,9 @@
             await refreshData();
             // Load default 6-hour chart
             await loadChart(6); // Load 6-hour chart by default
+            
+            // Load incident trends chart
+            await loadIncidentTrends();
             
             // Start auto-refresh
             startAutoRefresh();
@@ -1802,6 +1829,311 @@
                     }
                 }
             });
+        }
+
+        // Load and display incident trends chart
+        async function loadIncidentTrends() {
+            const viewType = document.getElementById('trendsViewFilter').value;
+            const severityFilter = document.getElementById('trendsSeverityFilter').value;
+            const trendsStatus = document.getElementById('trendsStatus');
+            
+            try {
+                trendsStatus.textContent = 'Loading incident trends...';
+                
+                // Get 12 months of incident data
+                const now = new Date();
+                const oneYearAgo = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
+                
+                // For now, we'll use the original incidents data if available
+                // In a real implementation, you'd fetch data with a longer time range
+                if (!originalIncidentsData || originalIncidentsData.length === 0) {
+                    trendsStatus.textContent = 'No incident data available for trends analysis';
+                    updateIncidentTrendsChart([], viewType, severityFilter);
+                    return;
+                }
+                
+                // Filter by severity
+                let filteredIncidents = originalIncidentsData.filter(incident => {
+                    if (severityFilter === 'critical') return incident.severity === 0;
+                    if (severityFilter === 'high') return incident.severity === 1;
+                    if (severityFilter === 'critical-high') return incident.severity <= 1;
+                    return false;
+                });
+                
+                // Filter by time range (last 12 months)
+                const cutoffTimestamp = Math.floor(oneYearAgo.getTime() / 1000);
+                filteredIncidents = filteredIncidents.filter(incident => incident.startTime >= cutoffTimestamp);
+                
+                trendsStatus.textContent = `Showing ${filteredIncidents.length} incidents over last 12 months`;
+                updateIncidentTrendsChart(filteredIncidents, viewType, severityFilter);
+                
+            } catch (error) {
+                console.error('Error loading incident trends:', error);
+                trendsStatus.textContent = 'Error loading incident trends data';
+                updateIncidentTrendsChart([], viewType, severityFilter);
+            }
+        }
+
+        function updateIncidentTrendsChart(incidents, viewType, severityFilter) {
+            const ctx = document.getElementById('incidentTrendsChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (incidentTrendsChart) {
+                incidentTrendsChart.destroy();
+            }
+            
+            // Define all incident types with colors and icons
+            const incidentTypes = {
+                0: { name: 'Power Loss', icon: '⚡', criticalColor: '#8B0000', highColor: '#FF6B6B' },
+                1: { name: 'WiFi Down', icon: '📶', criticalColor: '#FF4500', highColor: '#FFA500' },
+                2: { name: 'Internet Down', icon: '🌐', criticalColor: '#000080', highColor: '#6495ED' },
+                3: { name: 'API Down', icon: '☁️', criticalColor: '#4682B4', highColor: '#87CEEB' },
+                4: { name: 'Storm Event', icon: '🌩️', criticalColor: '#483D8B', highColor: '#9370DB' },
+                5: { name: 'Heat Event', icon: '🔥', criticalColor: '#DC143C', highColor: '#FF69B4' },
+                6: { name: 'Freeze Event', icon: '🧊', criticalColor: '#00CED1', highColor: '#20B2AA' }
+            };
+            
+            if (!incidents || incidents.length === 0) {
+                // Create empty chart
+                incidentTrendsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['No Data Available'],
+                        datasets: [{
+                            label: 'No incidents to display',
+                            data: [0],
+                            backgroundColor: '#ddd'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+                return;
+            }
+            
+            // Process incidents based on view type
+            let chartData, chartLabels;
+            
+            if (viewType === 'weekly') {
+                [chartData, chartLabels] = processWeeklyIncidentData(incidents, incidentTypes, severityFilter);
+            } else {
+                [chartData, chartLabels] = processMonthlyIncidentData(incidents, incidentTypes, severityFilter);
+            }
+            
+            // Create the chart
+            incidentTrendsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: chartData
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: viewType === 'weekly' ? 'Weeks (Last 12 Months)' : 'Months'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Incidents'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    const incidentType = incidentTypes[context.dataset.incidentType];
+                                    const severity = context.dataset.severity;
+                                    const count = context.parsed.y;
+                                    if (count > 0) {
+                                        return `${incidentType.icon} ${count} ${severity} ${incidentType.name}`;
+                                    }
+                                    return null;
+                                },
+                                footer: function(context) {
+                                    const totalIncidents = context.reduce((sum, item) => sum + item.parsed.y, 0);
+                                    return totalIncidents > 0 ? `Total: ${totalIncidents} incidents` : '';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function processWeeklyIncidentData(incidents, incidentTypes, severityFilter) {
+            // Create weekly buckets for the last 12 months
+            const now = new Date();
+            const weeks = [];
+            const weeklyData = {};
+            
+            // Generate last 52 weeks
+            for (let i = 51; i >= 0; i--) {
+                const weekStart = new Date(now.getTime() - (i * 7 * 24 * 60 * 60 * 1000));
+                const weekEnd = new Date(weekStart.getTime() + (6 * 24 * 60 * 60 * 1000));
+                const weekLabel = `${weekStart.toLocaleDateString('en-US', {month: 'short'})} ${Math.ceil(weekStart.getDate()/7)}`;
+                
+                weeks.push({
+                    label: weekLabel,
+                    start: Math.floor(weekStart.getTime() / 1000),
+                    end: Math.floor(weekEnd.getTime() / 1000)
+                });
+                
+                weeklyData[weekLabel] = {};
+                // Initialize all incident types and severities to 0
+                Object.keys(incidentTypes).forEach(type => {
+                    weeklyData[weekLabel][type] = { critical: 0, high: 0 };
+                });
+            }
+            
+            // Categorize incidents into weekly buckets
+            incidents.forEach(incident => {
+                const incidentWeek = weeks.find(week => 
+                    incident.startTime >= week.start && incident.startTime <= week.end
+                );
+                
+                if (incidentWeek) {
+                    const severity = incident.severity === 0 ? 'critical' : 'high';
+                    if (weeklyData[incidentWeek.label][incident.type]) {
+                        weeklyData[incidentWeek.label][incident.type][severity]++;
+                    }
+                }
+            });
+            
+            // Create datasets for chart
+            const datasets = [];
+            const chartLabels = weeks.map(week => week.label);
+            
+            Object.keys(incidentTypes).forEach(typeId => {
+                const type = incidentTypes[typeId];
+                
+                if (severityFilter === 'critical' || severityFilter === 'critical-high') {
+                    datasets.push({
+                        label: `Critical ${type.name} ${type.icon}`,
+                        data: weeks.map(week => weeklyData[week.label][typeId]?.critical || 0),
+                        backgroundColor: type.criticalColor,
+                        borderColor: type.criticalColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'Critical'
+                    });
+                }
+                
+                if (severityFilter === 'high' || severityFilter === 'critical-high') {
+                    datasets.push({
+                        label: `High ${type.name} ${type.icon}`,
+                        data: weeks.map(week => weeklyData[week.label][typeId]?.high || 0),
+                        backgroundColor: type.highColor,
+                        borderColor: type.highColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'High'
+                    });
+                }
+            });
+            
+            return [datasets, chartLabels];
+        }
+
+        function processMonthlyIncidentData(incidents, incidentTypes, severityFilter) {
+            // Create monthly buckets for the last 12 months
+            const now = new Date();
+            const months = [];
+            const monthlyData = {};
+            
+            // Generate last 12 months
+            for (let i = 11; i >= 0; i--) {
+                const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthLabel = monthDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'});
+                const monthStart = Math.floor(monthDate.getTime() / 1000);
+                const nextMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
+                const monthEnd = Math.floor(nextMonth.getTime() / 1000) - 1;
+                
+                months.push({
+                    label: monthLabel,
+                    start: monthStart,
+                    end: monthEnd
+                });
+                
+                monthlyData[monthLabel] = {};
+                Object.keys(incidentTypes).forEach(type => {
+                    monthlyData[monthLabel][type] = { critical: 0, high: 0 };
+                });
+            }
+            
+            // Categorize incidents into monthly buckets
+            incidents.forEach(incident => {
+                const incidentMonth = months.find(month => 
+                    incident.startTime >= month.start && incident.startTime <= month.end
+                );
+                
+                if (incidentMonth) {
+                    const severity = incident.severity === 0 ? 'critical' : 'high';
+                    if (monthlyData[incidentMonth.label][incident.type]) {
+                        monthlyData[incidentMonth.label][incident.type][severity]++;
+                    }
+                }
+            });
+            
+            // Create datasets for chart (same logic as weekly but with monthly data)
+            const datasets = [];
+            const chartLabels = months.map(month => month.label);
+            
+            Object.keys(incidentTypes).forEach(typeId => {
+                const type = incidentTypes[typeId];
+                
+                if (severityFilter === 'critical' || severityFilter === 'critical-high') {
+                    datasets.push({
+                        label: `Critical ${type.name} ${type.icon}`,
+                        data: months.map(month => monthlyData[month.label][typeId]?.critical || 0),
+                        backgroundColor: type.criticalColor,
+                        borderColor: type.criticalColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'Critical'
+                    });
+                }
+                
+                if (severityFilter === 'high' || severityFilter === 'critical-high') {
+                    datasets.push({
+                        label: `High ${type.name} ${type.icon}`,
+                        data: months.map(month => monthlyData[month.label][typeId]?.high || 0),
+                        backgroundColor: type.highColor,
+                        borderColor: type.highColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'High'
+                    });
+                }
+            });
+            
+            return [datasets, chartLabels];
         }
 
         function updateConnectionStatus(status) {
