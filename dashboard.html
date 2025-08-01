@@ -1074,6 +1074,11 @@
             const cutoffTimestamp = Math.floor(cutoffTime.getTime() / 1000);
             
             let timeFilteredIncidents = originalIncidentsData.filter(incident => {
+                // Always include ongoing incidents (endTime = 0) regardless of start time
+                if (incident.endTime === 0) {
+                    return true;
+                }
+                // For completed incidents, check if they started within the time period
                 return incident.startTime >= cutoffTimestamp;
             });
             
