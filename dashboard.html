@@ -1997,7 +1997,20 @@
             for (let i = 51; i >= 0; i--) {
                 const weekStart = new Date(now.getTime() - (i * 7 * 24 * 60 * 60 * 1000));
                 const weekEnd = new Date(weekStart.getTime() + (6 * 24 * 60 * 60 * 1000));
-                const weekLabel = `${weekStart.toLocaleDateString('en-US', {month: 'short'})} ${Math.ceil(weekStart.getDate()/7)}`;
+                
+                // Create intuitive date range labels (e.g., "Jul 1-7", "Jul 8-14")
+                const startMonth = weekStart.toLocaleDateString('en-US', {month: 'short'});
+                const startDay = weekStart.getDate();
+                const endDay = weekEnd.getDate();
+                const endMonth = weekEnd.toLocaleDateString('en-US', {month: 'short'});
+                
+                // Handle cases where week spans across months
+                let weekLabel;
+                if (startMonth === endMonth) {
+                    weekLabel = `${startMonth} ${startDay}-${endDay}`;
+                } else {
+                    weekLabel = `${startMonth} ${startDay}-${endMonth} ${endDay}`;
+                }
                 
                 weeks.push({
                     label: weekLabel,
