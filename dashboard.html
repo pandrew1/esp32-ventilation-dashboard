@@ -975,8 +975,7 @@
                 3: { name: 'API Down', icon: '☁️' },
                 4: { name: 'Storm Event', icon: '🌩️' },
                 5: { name: 'Heat Event', icon: '🔥' },
-                6: { name: 'Freeze Event', icon: '🧊' },
-                7: { name: 'Software Update', icon: '🔄' }
+                6: { name: 'Freeze Event', icon: '🧊' }
             };
             
             const severityNames = ['Critical', 'High', 'Medium', 'Low'];
@@ -1636,9 +1635,16 @@
             // Calculate temperature difference (how much cooling potential exists)
             const tempDiff = indoorTemp - outdoorTemp;
             
-            // If outdoor is warmer than indoor, no cooling benefit
+            // If outdoor is warmer than indoor, show day's performance instead of "No cooling benefit"
             if (tempDiff <= 0) {
-                return fanCurrentlyOn ? 'Warming air' : 'No cooling benefit';
+                if (fanCurrentlyOn) {
+                    return 'Warming air';
+                } else {
+                    // Calculate and show today's cooling achievement
+                    const fanHours = (fanMinutes / 60).toFixed(1);
+                    const dutyCycle = ((fanMinutes / (24 * 60)) * 100).toFixed(1);
+                    return `${fanHours}h runtime (${dutyCycle}% duty cycle)`;
+                }
             }
 
             // Calculate heat transfer rate (BTU/hr) when fan is running
@@ -1676,7 +1682,10 @@
             if (fanCurrentlyOn) {
                 status = ` (${heatTransferKBTU}k BTU/hr)`;
             } else {
-                status = ` (${Math.round(fanMinutes)}min today)`;
+                // Show daily performance summary when fan is off
+                const fanHours = (fanMinutes / 60).toFixed(1);
+                const totalCooling = (effectiveHourlyRate * (fanMinutes / 60)).toFixed(1);
+                status = ` (${fanHours}h today, ~${totalCooling}°F total cooling)`;
             }
 
             return `~${hourlyRate}°F/hr rate${status}`;
