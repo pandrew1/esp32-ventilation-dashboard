@@ -444,14 +444,41 @@
                     </div>
                 </div>
 
+                <!-- Historical Charts -->
+                <div class="card">
+                    <h3>📈 Historical Data</h3>
+                    <div class="time-controls">
+                        <button class="time-btn active" onclick="loadChart(6)">6 Hours</button>
+                        <button class="time-btn" onclick="loadChart(24)">24 Hours</button>
+                        <button class="time-btn" onclick="loadChart(72)">3 Days</button>
+                        <button class="time-btn" onclick="loadChart(168)">1 Week</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Door Status -->
+                <div class="card" id="doorSection" style="display: none;">
+                    <h3>🚪 Door Status & Activity</h3>
+                    <div id="doorList"></div>
+                </div>
+
                     <!-- System Incidents -->
                 <div class="card">
-                    <h3>� System Incidents (Last 30 Days)</h3>
+                    <h3>🔧 System Incidents</h3>
                     
-                    <!-- Incident Severity Filter -->
+                    <!-- Time Period Filter -->
                     <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
-                        <label style="font-weight: bold; margin-right: 10px; color: #333;">Filter by Severity:</label>
-                        <select id="severityFilter" onchange="applyIncidentFilter()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                        <label style="font-weight: bold; margin-right: 10px; color: #333;">Time Period:</label>
+                        <select id="timePeriodFilter" onchange="applyIncidentFilters()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
+                            <option value="1">Last 24 Hours</option>
+                            <option value="7" selected>Last Week</option>
+                            <option value="30">Last 30 Days</option>
+                        </select>
+                        
+                        <label style="font-weight: bold; margin-right: 10px; color: #333;">Severity:</label>
+                        <select id="severityFilter" onchange="applyIncidentFilters()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white;">
                             <option value="all">All Incidents</option>
                             <option value="0">Critical Only</option>
                             <option value="1">High and Above</option>
@@ -473,26 +500,6 @@
                     <div id="incidentsSummary" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;">
                         Loading incident data...
                     </div>
-                </div>
-
-                <!-- Historical Charts -->
-                <div class="card">
-                    <h3>📈 Historical Data</h3>
-                    <div class="time-controls">
-                        <button class="time-btn active" onclick="loadChart(6)">6 Hours</button>
-                        <button class="time-btn" onclick="loadChart(24)">24 Hours</button>
-                        <button class="time-btn" onclick="loadChart(72)">3 Days</button>
-                        <button class="time-btn" onclick="loadChart(168)">1 Week</button>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="temperatureChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Door Status -->
-                <div class="card" id="doorSection" style="display: none;">
-                    <h3>🚪 Door Status & Activity</h3>
-                    <div id="doorList"></div>
                 </div>
 
                 <!-- Alerts -->
@@ -1013,17 +1020,19 @@
             // Store the valid incidents for filtering
             originalIncidentsData = validIncidents;
             
-            // Reset filter to "All Incidents" and apply it
+            // Reset filters to default values and apply them
+            document.getElementById('timePeriodFilter').value = '7'; // Default to last week
             document.getElementById('severityFilter').value = 'all';
-            applyIncidentFilter();
+            applyIncidentFilters();
         }
 
         // Global variable to store original incidents data for filtering
         let originalIncidentsData = [];
 
-        // Function to apply incident severity filter
-        function applyIncidentFilter() {
-            const filterValue = document.getElementById('severityFilter').value;
+        // Function to apply both time period and severity filters
+        function applyIncidentFilters() {
+            const timePeriodValue = document.getElementById('timePeriodFilter').value;
+            const severityValue = document.getElementById('severityFilter').value;
             const filterStatus = document.getElementById('filterStatus');
             
             if (!originalIncidentsData || originalIncidentsData.length === 0) {
@@ -1031,37 +1040,67 @@
                 return;
             }
             
-            let filteredIncidents;
-            let filterDescription;
+            // First filter by time period
+            const now = new Date();
+            const cutoffDays = parseInt(timePeriodValue);
+            const cutoffTime = new Date(now.getTime() - (cutoffDays * 24 * 60 * 60 * 1000));
+            const cutoffTimestamp = Math.floor(cutoffTime.getTime() / 1000);
             
-            if (filterValue === 'all') {
-                filteredIncidents = originalIncidentsData;
-                filterDescription = 'Showing all incidents';
+            let timeFilteredIncidents = originalIncidentsData.filter(incident => {
+                return incident.startTime >= cutoffTimestamp;
+            });
+            
+            // Then filter by severity
+            let filteredIncidents;
+            if (severityValue === 'all') {
+                filteredIncidents = timeFilteredIncidents;
             } else {
-                const maxSeverity = parseInt(filterValue);
-                filteredIncidents = originalIncidentsData.filter(incident => incident.severity <= maxSeverity);
-                
+                const maxSeverity = parseInt(severityValue);
+                filteredIncidents = timeFilteredIncidents.filter(incident => incident.severity <= maxSeverity);
+            }
+            
+            // Build filter description
+            let filterDescription = '';
+            
+            // Time period description
+            if (cutoffDays === 1) {
+                filterDescription += 'Last 24 hours';
+            } else if (cutoffDays === 7) {
+                filterDescription += 'Last week';
+            } else if (cutoffDays === 30) {
+                filterDescription += 'Last 30 days';
+            } else {
+                filterDescription += `Last ${cutoffDays} days`;
+            }
+            
+            // Severity description
+            if (severityValue !== 'all') {
                 const severityNames = ['Critical', 'High', 'Medium', 'Low'];
+                const maxSeverity = parseInt(severityValue);
                 if (maxSeverity === 0) {
-                    filterDescription = 'Showing Critical only';
+                    filterDescription += ' • Critical only';
                 } else {
-                    filterDescription = `Showing ${severityNames[maxSeverity]} and above`;
+                    filterDescription += ` • ${severityNames[maxSeverity]} and above`;
                 }
             }
             
-            filterStatus.textContent = `${filterDescription} (${filteredIncidents.length} of ${originalIncidentsData.length} incidents)`;
+            filterStatus.textContent = `${filterDescription} (${filteredIncidents.length} of ${originalIncidentsData.length} total incidents)`;
             
             // Re-render incidents with filtered data
-            renderFilteredIncidents(filteredIncidents);
+            renderFilteredIncidents(filteredIncidents, cutoffDays);
         }
 
         // Function to render filtered incidents (extracted from updateIncidents)
-        function renderFilteredIncidents(incidents) {
+        function renderFilteredIncidents(incidents, timePeriodDays = 30) {
             const incidentsList = document.getElementById('incidentsList');
             const incidentsSummary = document.getElementById('incidentsSummary');
             
             if (!incidents || incidents.length === 0) {
-                incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No incidents match the selected filter</div>';
+                const timePeriodText = timePeriodDays === 1 ? 'last 24 hours' : 
+                                     timePeriodDays === 7 ? 'last week' : 
+                                     timePeriodDays === 30 ? 'last 30 days' : 
+                                     `last ${timePeriodDays} days`;
+                incidentsList.innerHTML = `<div style="text-align: center; padding: 20px; color: #666;">No incidents found in ${timePeriodText} with current filters</div>`;
                 incidentsSummary.innerHTML = `<strong>Filtered results:</strong> No incidents`;
                 return;
             }
@@ -1181,7 +1220,12 @@
             if (severityCounts[2] > 0) summaryParts.push(`${severityCounts[2]} Medium`);
             if (severityCounts[3] > 0) summaryParts.push(`${severityCounts[3]} Low`);
             
-            incidentsSummary.innerHTML = `<strong>Filtered results:</strong> ${summaryParts.join(' | ')}`;
+            const timePeriodText = timePeriodDays === 1 ? 'last 24 hours' : 
+                                 timePeriodDays === 7 ? 'last week' : 
+                                 timePeriodDays === 30 ? 'last 30 days' : 
+                                 `last ${timePeriodDays} days`;
+            
+            incidentsSummary.innerHTML = `<strong>${timePeriodText.charAt(0).toUpperCase() + timePeriodText.slice(1)}:</strong> ${summaryParts.join(' | ')}`;
         }
 
         function checkAlerts(data) {
