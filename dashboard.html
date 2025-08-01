@@ -1377,53 +1377,113 @@
             // We need to reverse it to show oldest to newest (left to right)
             let sortedData = [...data].reverse();
             
+            // Filter out corrupted data with invalid timestamps (fix for chart showing years 1954, 1963, 1972, 1981)
+            function isValidTimestamp(timestamp) {
+                let date;
+                
+                if (typeof timestamp === 'string') {
+                    if (timestamp.includes('T') || timestamp.includes('-')) {
+                        date = new Date(timestamp);
+                    } else {
+                        const unixSeconds = parseInt(timestamp);
+                        if (!isNaN(unixSeconds) && unixSeconds > 1000000000 && unixSeconds < 2000000000) {
+                            date = new Date(unixSeconds * 1000);
+                        } else {
+                            return false;
+                        }
+                    }
+                } else if (typeof timestamp === 'number') {
+                    if (timestamp < 1000000000 || timestamp > 2000000000) {
+                        return false; // Invalid Unix timestamp range
+                    }
+                    date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+                } else {
+                    return false;
+                }
+                
+                // Reject timestamps before 2020 or after 2030 (likely corrupted)
+                const year = date.getFullYear();
+                return !isNaN(date.getTime()) && year >= 2020 && year <= 2030;
+            }
+            
+            // Filter out items with corrupted timestamps
+            sortedData = sortedData.filter(item => {
+                if (!item.timestamp) return false;
+                return isValidTimestamp(item.timestamp);
+            });
+            
+            console.log(`Chart data: ${data.length} total items, ${sortedData.length} valid items after timestamp filtering`);
+            
+            // Debug: Log sample timestamps from the API
+            if (data.length > 0) {
+                console.log('Sample raw timestamps from API:', data.slice(0, 3).map(item => ({
+                    timestamp: item.timestamp,
+                    type: typeof item.timestamp
+                })));
+            }
+            
+            if (sortedData.length > 0) {
+                console.log('Sample timestamps after filtering:', sortedData.slice(0, 3).map(item => item.timestamp));
+            }
+            
             // Prepare time-based data points for proper temporal spacing
             const timeBasedData = sortedData.map((item, index) => {
                 let date;
                 
-                // Handle different timestamp formats
+                // Handle different timestamp formats with enhanced validation
                 if (typeof item.timestamp === 'string') {
-                    // Try parsing as ISO date string first (2025-01-28T21:15:00.123456 format)
                     if (item.timestamp.includes('T') || item.timestamp.includes('-')) {
                         date = new Date(item.timestamp);
                     } else {
-                        // Try as Unix timestamp in seconds
                         const unixSeconds = parseInt(item.timestamp);
-                        if (!isNaN(unixSeconds) && unixSeconds > 1000000000) { // Valid Unix timestamp
-                            date = new Date(unixSeconds * 1000); // Convert seconds to milliseconds
+                        if (!isNaN(unixSeconds) && unixSeconds > 1000000000 && unixSeconds < 2000000000) {
+                            date = new Date(unixSeconds * 1000);
                         } else {
-                            date = new Date(item.timestamp); // Let Date constructor handle it
+                            console.warn('Invalid Unix timestamp:', item.timestamp);
+                            return null; // Skip this item
                         }
                     }
                 } else if (typeof item.timestamp === 'number') {
-                    // If it's already a number, check if it needs conversion
-                    const timestamp = item.timestamp;
-                    // If timestamp is in seconds (10 digits), convert to milliseconds
-                    date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+                    if (item.timestamp < 1000000000 || item.timestamp > 2000000000) {
+                        console.warn('Invalid numeric timestamp:', item.timestamp);
+                        return null; // Skip this item
+                    }
+                    date = item.timestamp < 10000000000 ? new Date(item.timestamp * 1000) : new Date(item.timestamp);
                 } else {
-                    date = new Date(item.timestamp);
+                    console.warn('Unknown timestamp format:', item.timestamp);
+                    return null; // Skip this item
                 }
                 
-                // If timestamp is still invalid, create a time-based fallback
+                // Final validation - reject if date is invalid or outside reasonable range
                 if (isNaN(date.getTime())) {
-                    // Try to use the table entity timestamp as a fallback
-                    if (item.Timestamp) {
-                        date = new Date(item.Timestamp);
-                    }
-                    
-                    // If still invalid, use index-based time estimate
-                    if (isNaN(date.getTime())) {
-                        // Estimate time based on index (assuming 30-second intervals)
-                        const now = new Date();
-                        date = new Date(now.getTime() - ((sortedData.length - index - 1) * 30000)); // 30 seconds per data point
-                    }
+                    console.warn('Failed to parse timestamp:', item.timestamp);
+                    return null;
+                }
+                
+                const year = date.getFullYear();
+                if (year < 2020 || year > 2030) {
+                    console.warn('Timestamp outside valid range (corrupted):', date.toISOString(), 'from:', item.timestamp);
+                    return null;
                 }
                 
                 return {
                     timestamp: date,
                     item: item
                 };
-            });
+            }).filter(dataPoint => dataPoint !== null); // Remove null entries
+
+            // Debug: Log the final timestamp range being sent to chart
+            if (timeBasedData.length > 0) {
+                const timestamps = timeBasedData.map(d => d.timestamp);
+                const minTime = new Date(Math.min(...timestamps));
+                const maxTime = new Date(Math.max(...timestamps));
+                console.log('Chart timestamp range:', {
+                    earliest: minTime.toISOString(),
+                    latest: maxTime.toISOString(),
+                    span: `${((maxTime - minTime) / (1000 * 60 * 60)).toFixed(1)} hours`,
+                    count: timeBasedData.length
+                });
+            }
 
             // Extract the actual sensor data with timestamps for Chart.js time scale
             const indoorTemps = timeBasedData.map(dataPoint => {
