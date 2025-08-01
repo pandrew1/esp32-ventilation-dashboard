@@ -1640,10 +1640,27 @@
                 if (fanCurrentlyOn) {
                     return 'Warming air';
                 } else {
-                    // Calculate and show today's cooling achievement
+                    // Calculate and show today's comprehensive performance summary
                     const fanHours = (fanMinutes / 60).toFixed(1);
                     const dutyCycle = ((fanMinutes / (24 * 60)) * 100).toFixed(1);
-                    return `${fanHours}h runtime (${dutyCycle}% duty cycle)`;
+                    
+                    // Estimate BTU savings during the day when cooling was beneficial
+                    // Use average beneficial temperature difference of 3°F during operating hours
+                    const avgBeneficialTempDiff = 3.0;
+                    const airMassFlowRate = FAN_CFM * AIR_DENSITY;
+                    const avgHeatTransferRate = airMassFlowRate * SPECIFIC_HEAT_AIR * avgBeneficialTempDiff * MINUTES_PER_HOUR;
+                    const totalBTUsTransferred = avgHeatTransferRate * fanHours;
+                    const btuDisplay = totalBTUsTransferred >= 1000 ? 
+                        `${(totalBTUsTransferred / 1000).toFixed(1)}k BTU` : 
+                        `${totalBTUsTransferred.toFixed(0)} BTU`;
+                    
+                    // Estimate temperature impact during beneficial periods
+                    const HOUSE_VOLUME_CF = 25000;
+                    const houseAirMass = HOUSE_VOLUME_CF * AIR_DENSITY;
+                    const theoreticalTempDrop = totalBTUsTransferred / (houseAirMass * SPECIFIC_HEAT_AIR);
+                    const practicalTempDrop = theoreticalTempDrop * 0.6 * 0.6; // Mixing & heat gain efficiency
+                    
+                    return `${fanHours}h runtime (${dutyCycle}% duty) • ~${btuDisplay} transferred • ~${practicalTempDrop.toFixed(1)}°F cooling achieved`;
                 }
             }
 
@@ -1682,10 +1699,20 @@
             if (fanCurrentlyOn) {
                 status = ` (${heatTransferKBTU}k BTU/hr)`;
             } else {
-                // Show daily performance summary when fan is off
+                // Show comprehensive daily performance summary when fan is off
                 const fanHours = (fanMinutes / 60).toFixed(1);
                 const totalCooling = (effectiveHourlyRate * (fanMinutes / 60)).toFixed(1);
-                status = ` (${fanHours}h today, ~${totalCooling}°F total cooling)`;
+                
+                // Calculate total BTUs transferred during operation
+                const totalBTUsTransferred = heatTransferRate * (fanMinutes / 60);
+                const btuDisplay = totalBTUsTransferred >= 1000 ? 
+                    `${(totalBTUsTransferred / 1000).toFixed(1)}k BTU` : 
+                    `${totalBTUsTransferred.toFixed(0)} BTU`;
+                
+                // Calculate current potential if fan were running now
+                const currentPotentialBTU = (heatTransferRate / 1000).toFixed(1);
+                
+                status = ` (${fanHours}h today • ${btuDisplay} transferred • ${totalCooling}°F achieved • ${currentPotentialBTU}k BTU/hr potential)`;
             }
 
             return `~${hourlyRate}°F/hr rate${status}`;
