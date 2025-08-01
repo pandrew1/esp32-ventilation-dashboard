@@ -964,8 +964,36 @@
                 return;
             }
 
+            // Filter out incidents with corrupted timestamps (same issue as chart data)
+            function isValidIncidentTimestamp(timestamp) {
+                if (!timestamp || timestamp === 0) return false;
+                
+                // Convert to Date object
+                const date = new Date(timestamp * 1000); // Incidents use Unix timestamps in seconds
+                
+                // Validate date and check year range
+                if (isNaN(date.getTime())) return false;
+                const year = date.getFullYear();
+                return year >= 2020 && year <= 2030;
+            }
+            
+            // Filter incidents with valid timestamps
+            const validIncidents = incidents.filter(incident => {
+                const validStart = isValidIncidentTimestamp(incident.startTime);
+                const validEnd = incident.endTime === 0 || isValidIncidentTimestamp(incident.endTime);
+                return validStart && validEnd;
+            });
+            
+            console.log(`Incidents: ${incidents.length} total, ${validIncidents.length} with valid timestamps`);
+            
+            if (validIncidents.length === 0) {
+                incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No valid incidents found in the last 30 days (some data may be corrupted)</div>';
+                incidentsSummary.innerHTML = '<strong>No valid incident data available</strong> - Check for data corruption';
+                return;
+            }
+
             // Sort incidents by start time (newest first)
-            const sortedIncidents = incidents.sort((a, b) => b.startTime - a.startTime);
+            const sortedIncidents = validIncidents.sort((a, b) => b.startTime - a.startTime);
             
             // Define incident type names and icons
             const incidentTypes = {
@@ -1035,10 +1063,10 @@
             
             incidentsList.innerHTML = incidentsHtml;
             
-            // Build summary
-            const totalIncidents = incidents.length;
+            // Build summary using filtered incidents
+            const totalIncidents = validIncidents.length;
             const severityCounts = [0, 0, 0, 0];
-            incidents.forEach(incident => {
+            validIncidents.forEach(incident => {
                 if (incident.severity >= 0 && incident.severity <= 3) {
                     severityCounts[incident.severity]++;
                 }
