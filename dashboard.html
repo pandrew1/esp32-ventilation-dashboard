@@ -2027,7 +2027,9 @@
                 // Get temperature data for monthly view overlays
                 let temperatureData = null;
                 if (viewType === 'monthly') {
+                    console.log('Monthly view detected - fetching temperature data for overlays');
                     temperatureData = await fetchTemperatureDataForTrends();
+                    console.log('Temperature data for monthly overlays:', temperatureData);
                 }
                 
                 // For now, we'll use the original incidents data if available
@@ -2272,6 +2274,12 @@
             
             console.log(`Converted ${monthlyStats.length} monthly stats to ${temperatureData.length} temperature data points`);
             console.log('Detailed monthly stats:', window.detailedMonthlyStats);
+            
+            // Debug: Log each month's detailed stats
+            Object.keys(window.detailedMonthlyStats).forEach(monthKey => {
+                console.log(`Month ${monthKey} stats:`, window.detailedMonthlyStats[monthKey]);
+            });
+            
             return temperatureData;
         }
 
@@ -2580,13 +2588,22 @@
                                     return null;
                                 },
                                 afterLabel: function(context) {
+                                    console.log('Tooltip afterLabel called:', context);
+                                    console.log('Dataset:', context.dataset);
+                                    console.log('Is temperature hover data:', context.dataset.isTemperatureHoverData);
+                                    
                                     // Show temperature data for temperature hover points
                                     if (context.dataset.isTemperatureHoverData) {
                                         const monthIndex = context.dataIndex;
                                         const chartLabels = context.chart.data.labels;
                                         const monthLabel = chartLabels[monthIndex];
+                                        console.log('Month index:', monthIndex, 'Month label:', monthLabel);
+                                        
                                         const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
                                         const detailedStats = window.detailedMonthlyStats ? window.detailedMonthlyStats[monthLabel] : null;
+                                        
+                                        console.log('Temp stats:', tempStats);
+                                        console.log('Detailed stats:', detailedStats);
                                         
                                         if (tempStats || detailedStats) {
                                             let tooltipLines = [];
