@@ -2210,40 +2210,50 @@
                 const monthLabel = monthDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'});
                 
                 console.log(`Storing detailed stats for: ${monthLabel} (from ${monthData.Year}-${monthData.Month})`);
+                console.log('Raw incident data from Azure:', {
+                    HighTempIncidents: monthData.HighTempIncidents, 
+                    type: typeof monthData.HighTempIncidents,
+                    FreezeTempIncidents: monthData.FreezeTempIncidents,
+                    type2: typeof monthData.FreezeTempIncidents,
+                    PowerOutageIncidents: monthData.PowerOutageIncidents,
+                    type3: typeof monthData.PowerOutageIncidents,
+                    WiFiDownIncidents: monthData.WiFiDownIncidents,
+                    type4: typeof monthData.WiFiDownIncidents
+                });
                 
-                // Store detailed monthly stats for tooltips
+                // Store detailed monthly stats for tooltips (ensure numbers are parsed)
                 window.detailedMonthlyStats[monthLabel] = {
-                    totalDataPoints: monthData.TotalDataPoints || 0,
-                    fanOnPercentage: monthData.FanOnPercentage || 0,
-                    totalFanMinutes: monthData.TotalFanMinutes || 0,
-                    highTempIncidents: monthData.HighTempIncidents || 0,
-                    freezeTempIncidents: monthData.FreezeTempIncidents || 0,
-                    powerOutageIncidents: monthData.PowerOutageIncidents || 0,
-                    wifiDownIncidents: monthData.WiFiDownIncidents || 0,
+                    totalDataPoints: parseInt(monthData.TotalDataPoints) || 0,
+                    fanOnPercentage: parseFloat(monthData.FanOnPercentage) || 0,
+                    totalFanMinutes: parseInt(monthData.TotalFanMinutes) || 0,
+                    highTempIncidents: parseInt(monthData.HighTempIncidents) || 0,
+                    freezeTempIncidents: parseInt(monthData.FreezeTempIncidents) || 0,
+                    powerOutageIncidents: parseInt(monthData.PowerOutageIncidents) || 0,
+                    wifiDownIncidents: parseInt(monthData.WiFiDownIncidents) || 0,
                     indoorHumidityRange: {
-                        min: monthData.IndoorHumidityMin || null,
-                        max: monthData.IndoorHumidityMax || null,
-                        avg: monthData.IndoorHumidityAvg || null
+                        min: parseFloat(monthData.IndoorHumidityMin) || null,
+                        max: parseFloat(monthData.IndoorHumidityMax) || null,
+                        avg: parseFloat(monthData.IndoorHumidityAvg) || null
                     },
                     outdoorHumidityRange: {
-                        min: monthData.OutdoorHumidityMin || null,
-                        max: monthData.OutdoorHumidityMax || null,
-                        avg: monthData.OutdoorHumidityAvg || null
+                        min: parseFloat(monthData.OutdoorHumidityMin) || null,
+                        max: parseFloat(monthData.OutdoorHumidityMax) || null,
+                        avg: parseFloat(monthData.OutdoorHumidityAvg) || null
                     },
                     indoorTempRange: {
-                        min: monthData.IndoorTempMin || null,
-                        max: monthData.IndoorTempMax || null,
-                        avg: monthData.IndoorTempAvg || null
+                        min: parseFloat(monthData.IndoorTempMin) || null,
+                        max: parseFloat(monthData.IndoorTempMax) || null,
+                        avg: parseFloat(monthData.IndoorTempAvg) || null
                     },
                     outdoorTempRange: {
-                        min: monthData.OutdoorTempMin || null,
-                        max: monthData.OutdoorTempMax || null,
-                        avg: monthData.OutdoorTempAvg || null
+                        min: parseFloat(monthData.OutdoorTempMin) || null,
+                        max: parseFloat(monthData.OutdoorTempMax) || null,
+                        avg: parseFloat(monthData.OutdoorTempAvg) || null
                     },
                     garageTempRange: {
-                        min: monthData.GarageTempMin || null,
-                        max: monthData.GarageTempMax || null,
-                        avg: monthData.GarageTempAvg || null
+                        min: parseFloat(monthData.GarageTempMin) || null,
+                        max: parseFloat(monthData.GarageTempMax) || null,
+                        avg: parseFloat(monthData.GarageTempAvg) || null
                     }
                 };
                 
@@ -2666,7 +2676,19 @@
                                                 }
                                                 
                                                 // Incident summary
+                                                console.log('Calculating incidents for tooltip:', {
+                                                    highTempIncidents: detailedStats.highTempIncidents, 
+                                                    type1: typeof detailedStats.highTempIncidents,
+                                                    freezeTempIncidents: detailedStats.freezeTempIncidents,
+                                                    type2: typeof detailedStats.freezeTempIncidents,
+                                                    powerOutageIncidents: detailedStats.powerOutageIncidents,
+                                                    type3: typeof detailedStats.powerOutageIncidents,
+                                                    wifiDownIncidents: detailedStats.wifiDownIncidents,
+                                                    type4: typeof detailedStats.wifiDownIncidents
+                                                });
+                                                
                                                 const totalIncidents = detailedStats.highTempIncidents + detailedStats.freezeTempIncidents + detailedStats.powerOutageIncidents + detailedStats.wifiDownIncidents;
+                                                console.log('Total incidents calculated:', totalIncidents, 'type:', typeof totalIncidents);
                                                 if (totalIncidents > 0) {
                                                     tooltipLines.push(`⚠️ Incidents: ${totalIncidents} total`);
                                                     if (detailedStats.highTempIncidents > 0) tooltipLines.push(`   🔥 High Temp: ${detailedStats.highTempIncidents}`);
