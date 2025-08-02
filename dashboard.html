@@ -2317,6 +2317,42 @@
                             grid: {
                                 drawOnChartArea: false,
                             },
+                            min: function(context) {
+                                // Calculate dynamic minimum based on actual data
+                                const tempData = context.chart.data.datasets.filter(ds => ds.yAxisID === 'yTemp');
+                                if (tempData.length === 0) return 0;
+                                
+                                let allValues = [];
+                                tempData.forEach(dataset => {
+                                    dataset.data.forEach(value => {
+                                        if (value !== null && value !== undefined) {
+                                            allValues.push(value);
+                                        }
+                                    });
+                                });
+                                
+                                if (allValues.length === 0) return 0;
+                                const minValue = Math.min(...allValues);
+                                return Math.floor(minValue - 5); // 5°F padding below minimum
+                            },
+                            max: function(context) {
+                                // Calculate dynamic maximum based on actual data
+                                const tempData = context.chart.data.datasets.filter(ds => ds.yAxisID === 'yTemp');
+                                if (tempData.length === 0) return 100;
+                                
+                                let allValues = [];
+                                tempData.forEach(dataset => {
+                                    dataset.data.forEach(value => {
+                                        if (value !== null && value !== undefined) {
+                                            allValues.push(value);
+                                        }
+                                    });
+                                });
+                                
+                                if (allValues.length === 0) return 100;
+                                const maxValue = Math.max(...allValues);
+                                return Math.ceil(maxValue + 5); // 5°F padding above maximum
+                            }
                         } : undefined
                     },
                     plugins: {
