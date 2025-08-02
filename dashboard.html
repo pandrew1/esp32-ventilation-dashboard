@@ -2100,7 +2100,18 @@
                                 label: function(context) {
                                     // Handle temperature hover data points
                                     if (context.dataset.isTemperatureHoverData) {
-                                        return 'Temperature Data - hover for details';
+                                        console.log('Temperature hover detected:', context);
+                                        const monthIndex = context.dataIndex;
+                                        const chartLabels = context.chart.data.labels;
+                                        const monthLabel = chartLabels[monthIndex];
+                                        const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
+                                        console.log('Temperature stats for', monthLabel, ':', tempStats);
+                                        
+                                        if (tempStats) {
+                                            return `🌡️ ${monthLabel}: ${tempStats.min}°F to ${tempStats.max}°F (avg ${tempStats.avg}°F)`;
+                                        } else {
+                                            return `🌡️ ${monthLabel}: No temperature data available`;
+                                        }
                                     }
                                     
                                     const incidentType = incidentTypes[context.dataset.incidentType];
@@ -2440,18 +2451,18 @@
                 // Add invisible hover points for temperature data access
                 datasets.push({
                     label: 'Temperature Data (hover for details)',
-                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 0.5 : null), // Small visible value to help with hovering
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 1.0 : null), // More visible value
                     type: 'bar',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)', // Very light blue for visibility
-                    borderColor: 'rgba(52, 152, 219, 0.3)',
+                    backgroundColor: 'rgba(52, 152, 219, 0.2)', // More visible light blue
+                    borderColor: 'rgba(52, 152, 219, 0.5)',
                     borderWidth: 1,
                     yAxisID: 'y',
-                    barThickness: 20, // Fixed width for easier hovering
-                    categoryPercentage: 0.8,
-                    barPercentage: 0.5,
+                    barThickness: 30, // Wider for easier hovering
+                    categoryPercentage: 1.0,
+                    barPercentage: 0.8,
                     // Custom tooltip data for temperature access
                     isTemperatureHoverData: true,
-                    order: 10 // Render on top for easier hovering
+                    order: 5 // Render above incident bars but below lines
                 });
             }
             
