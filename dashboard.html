@@ -2179,6 +2179,9 @@
                 const monthLabel = monthDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'});
                 
                 console.log(`Storing detailed stats for: ${monthLabel} (from ${monthData.Year}-${monthData.Month})`);
+                console.log('Available fields in monthData:', Object.keys(monthData));
+                console.log('WiFiDownIncidents field value:', monthData.WiFiDownIncidents);
+                console.log('incidents_by_type field value:', monthData.incidents_by_type);
                 
                 // Store detailed monthly stats for tooltips (ensure numbers are parsed)
                 window.detailedMonthlyStats[monthLabel] = {
