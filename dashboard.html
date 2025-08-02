@@ -1638,26 +1638,19 @@
 
                 // If we can't parse the timestamp, refresh anyway to be safe
                 if (!newLatestTimestamp || isNaN(newLatestTimestamp.getTime())) {
-                    console.log('Chart refresh: Unable to parse timestamp, refreshing anyway');
                     updateChart(data.data, hours);
                     return;
                 }
 
                 // Check if this is newer than our stored latest timestamp
                 if (!latestChartDataTimestamp || newLatestTimestamp > latestChartDataTimestamp) {
-                    console.log(`Chart refresh: New data available (${newLatestTimestamp.toLocaleTimeString()})`, {
-                        previous: latestChartDataTimestamp ? latestChartDataTimestamp.toLocaleTimeString() : 'none',
-                        new: newLatestTimestamp.toLocaleTimeString()
-                    });
+                    console.log(`Chart refresh: New data available`);
                     
                     // Update our stored timestamp and refresh the chart
                     latestChartDataTimestamp = newLatestTimestamp;
                     updateChart(data.data, hours);
                 } else {
-                    console.log('Chart refresh: No new data, skipping refresh', {
-                        latest: latestChartDataTimestamp.toLocaleTimeString(),
-                        checked: newLatestTimestamp.toLocaleTimeString()
-                    });
+                    // No new data, skip refresh to avoid unnecessary animations
                 }
 
             } catch (error) {
@@ -1790,18 +1783,6 @@
             
             console.log(`Chart data: ${data.length} total items, ${sortedData.length} valid items after timestamp filtering`);
             
-            // Debug: Log sample timestamps from the API
-            if (data.length > 0) {
-                console.log('Sample raw timestamps from API:', data.slice(0, 3).map(item => ({
-                    timestamp: item.timestamp,
-                    type: typeof item.timestamp
-                })));
-            }
-            
-            if (sortedData.length > 0) {
-                console.log('Sample timestamps after filtering:', sortedData.slice(0, 3).map(item => item.timestamp));
-            }
-            
             // Prepare time-based data points for proper temporal spacing
             const timeBasedData = sortedData.map((item, index) => {
                 let date;
@@ -1850,15 +1831,8 @@
 
             // Debug: Log the final timestamp range being sent to chart
             if (timeBasedData.length > 0) {
-                const timestamps = timeBasedData.map(d => d.timestamp);
-                const minTime = new Date(Math.min(...timestamps));
-                const maxTime = new Date(Math.max(...timestamps));
-                console.log('Chart timestamp range:', {
-                    earliest: minTime.toISOString(),
-                    latest: maxTime.toISOString(),
-                    span: `${((maxTime - minTime) / (1000 * 60 * 60)).toFixed(1)} hours`,
-                    count: timeBasedData.length
-                });
+                // Only essential debugging - removed verbose timestamp range logging
+                console.log(`Chart prepared ${timeBasedData.length} data points`);
             }
 
             // Extract the actual sensor data with timestamps for Chart.js time scale
@@ -1905,9 +1879,6 @@
 
             // Debug fan status data
             console.log('Fan status data points:', fanStatus.length);
-            if (fanStatus.length > 0) {
-                console.log('Sample fan status data:', fanStatus.slice(0, 3));
-            }
 
             // Create new chart with time-based data
             temperatureChart = new Chart(ctx, {
@@ -2027,9 +1998,7 @@
                 // Get temperature data for monthly view overlays
                 let temperatureData = null;
                 if (viewType === 'monthly') {
-                    console.log('Monthly view detected - fetching temperature data for overlays');
                     temperatureData = await fetchTemperatureDataForTrends();
-                    console.log('Temperature data for monthly overlays:', temperatureData);
                 }
                 
                 // For now, we'll use the original incidents data if available
@@ -2210,16 +2179,6 @@
                 const monthLabel = monthDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'});
                 
                 console.log(`Storing detailed stats for: ${monthLabel} (from ${monthData.Year}-${monthData.Month})`);
-                console.log('Raw incident data from Azure:', {
-                    HighTempIncidents: monthData.HighTempIncidents, 
-                    type: typeof monthData.HighTempIncidents,
-                    FreezeTempIncidents: monthData.FreezeTempIncidents,
-                    type2: typeof monthData.FreezeTempIncidents,
-                    PowerOutageIncidents: monthData.PowerOutageIncidents,
-                    type3: typeof monthData.PowerOutageIncidents,
-                    WiFiDownIncidents: monthData.WiFiDownIncidents,
-                    type4: typeof monthData.WiFiDownIncidents
-                });
                 
                 // Store detailed monthly stats for tooltips (ensure numbers are parsed)
                 window.detailedMonthlyStats[monthLabel] = {
@@ -2286,12 +2245,6 @@
             });
             
             console.log(`Converted ${monthlyStats.length} monthly stats to ${temperatureData.length} temperature data points`);
-            console.log('Detailed monthly stats:', window.detailedMonthlyStats);
-            
-            // Debug: Log each month's detailed stats
-            Object.keys(window.detailedMonthlyStats).forEach(monthKey => {
-                console.log(`Month ${monthKey} stats:`, window.detailedMonthlyStats[monthKey]);
-            });
             
             return temperatureData;
         }
@@ -2601,29 +2554,19 @@
                                     return null;
                                 },
                                 afterLabel: function(context) {
-                                    console.log('Tooltip afterLabel called:', context);
-                                    console.log('Dataset:', context.dataset);
-                                    console.log('Is temperature hover data:', context.dataset.isTemperatureHoverData);
-                                    
                                     // Show temperature data for temperature hover points
                                     if (context.dataset.isTemperatureHoverData) {
                                         const monthIndex = context.dataIndex;
                                         const chartLabels = context.chart.data.labels;
                                         const monthLabel = chartLabels[monthIndex];
-                                        console.log('Month index:', monthIndex, 'Month label:', monthLabel);
                                         
                                         const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
                                         const detailedStats = window.detailedMonthlyStats ? window.detailedMonthlyStats[monthLabel] : null;
-                                        
-                                        console.log('Temp stats:', tempStats);
-                                        console.log('Detailed stats:', detailedStats);
-                                        console.log('Available detailed stats keys:', Object.keys(window.detailedMonthlyStats || {}));
                                         
                                         if (tempStats || detailedStats) {
                                             let tooltipLines = [];
                                             
                                             if (detailedStats) {
-                                                console.log('Using detailed stats for enhanced tooltip');
                                                 tooltipLines.push(`🌡️ Temperature Statistics for ${monthLabel}:`);
                                                 
                                                 // Indoor temperature details
@@ -2676,19 +2619,7 @@
                                                 }
                                                 
                                                 // Incident summary
-                                                console.log('Calculating incidents for tooltip:', {
-                                                    highTempIncidents: detailedStats.highTempIncidents, 
-                                                    type1: typeof detailedStats.highTempIncidents,
-                                                    freezeTempIncidents: detailedStats.freezeTempIncidents,
-                                                    type2: typeof detailedStats.freezeTempIncidents,
-                                                    powerOutageIncidents: detailedStats.powerOutageIncidents,
-                                                    type3: typeof detailedStats.powerOutageIncidents,
-                                                    wifiDownIncidents: detailedStats.wifiDownIncidents,
-                                                    type4: typeof detailedStats.wifiDownIncidents
-                                                });
-                                                
                                                 const totalIncidents = detailedStats.highTempIncidents + detailedStats.freezeTempIncidents + detailedStats.powerOutageIncidents + detailedStats.wifiDownIncidents;
-                                                console.log('Total incidents calculated:', totalIncidents, 'type:', typeof totalIncidents);
                                                 if (totalIncidents > 0) {
                                                     tooltipLines.push(`⚠️ Incidents: ${totalIncidents} total`);
                                                     if (detailedStats.highTempIncidents > 0) tooltipLines.push(`   🔥 High Temp: ${detailedStats.highTempIncidents}`);
@@ -3111,7 +3042,6 @@
                 }
             });
             
-            console.log('Monthly temperature stats:', monthlyStats);
             return monthlyStats;
         }
 
