@@ -2100,12 +2100,10 @@
                                 label: function(context) {
                                     // Handle temperature hover data points
                                     if (context.dataset.isTemperatureHoverData) {
-                                        console.log('Temperature hover detected:', context);
                                         const monthIndex = context.dataIndex;
                                         const chartLabels = context.chart.data.labels;
                                         const monthLabel = chartLabels[monthIndex];
                                         const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
-                                        console.log('Temperature stats for', monthLabel, ':', tempStats);
                                         
                                         if (tempStats) {
                                             return `🌡️ ${monthLabel}: ${tempStats.min}°F to ${tempStats.max}°F (avg ${tempStats.avg}°F)`;
@@ -2454,13 +2452,13 @@
                 // Add invisible hover points for temperature data access
                 datasets.push({
                     label: 'Temperature Data (hover for details)',
-                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 1.0 : null), // More visible value
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 0.1 : null), // Very small invisible value
                     type: 'bar',
-                    backgroundColor: 'rgba(52, 152, 219, 0.2)', // More visible light blue
-                    borderColor: 'rgba(52, 152, 219, 0.5)',
-                    borderWidth: 1,
+                    backgroundColor: 'rgba(0, 0, 0, 0)', // Completely transparent
+                    borderColor: 'rgba(0, 0, 0, 0)', // Completely transparent
+                    borderWidth: 0,
                     yAxisID: 'y',
-                    barThickness: 30, // Wider for easier hovering
+                    barThickness: 30, // Wide for easier hovering
                     categoryPercentage: 1.0,
                     barPercentage: 0.8,
                     // Custom tooltip data for temperature access
