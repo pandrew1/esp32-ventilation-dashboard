@@ -2098,6 +2098,11 @@
                                     return context[0].label;
                                 },
                                 label: function(context) {
+                                    // Handle temperature hover data points
+                                    if (context.dataset.isTemperatureHoverData) {
+                                        return null; // Don't show the invisible bar value
+                                    }
+                                    
                                     const incidentType = incidentTypes[context.dataset.incidentType];
                                     const severity = context.dataset.severity;
                                     const count = context.parsed.y;
@@ -2106,17 +2111,44 @@
                                     }
                                     return null;
                                 },
+                                afterLabel: function(context) {
+                                    // Show temperature data for temperature hover points
+                                    if (context.dataset.isTemperatureHoverData && viewType === 'monthly' && temperatureData) {
+                                        const monthIndex = context.dataIndex;
+                                        const monthLabel = chartLabels[monthIndex];
+                                        const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
+                                        if (tempStats) {
+                                            return [
+                                                `🌡️ Temperature Statistics:`,
+                                                `   Min: ${tempStats.min}°F`,
+                                                `   Max: ${tempStats.max}°F`, 
+                                                `   Avg: ${tempStats.avg}°F`,
+                                                `   Data Points: ${tempStats.count}`
+                                            ];
+                                        }
+                                    }
+                                    return [];
+                                },
                                 footer: function(context) {
-                                    const totalIncidents = context.reduce((sum, item) => sum + item.parsed.y, 0);
+                                    const totalIncidents = context.reduce((sum, item) => {
+                                        // Don't count temperature hover data in incident totals
+                                        if (item.dataset.isTemperatureHoverData) return sum;
+                                        return sum + item.parsed.y;
+                                    }, 0);
+                                    
                                     let footer = totalIncidents > 0 ? `Total: ${totalIncidents} incidents` : '';
                                     
-                                    // Add temperature stats for monthly view
+                                    // Add temperature stats for monthly view (only if not already shown in afterLabel)
                                     if (viewType === 'monthly' && temperatureData && context.length > 0) {
-                                        const monthIndex = context[0].dataIndex;
-                                        const tempStats = getTemperatureStatsForTooltip(monthIndex, chartLabels);
-                                        if (tempStats) {
-                                            footer += footer ? '\n' : '';
-                                            footer += `Temp: ${tempStats.min}°F - ${tempStats.max}°F (avg ${tempStats.avg}°F)`;
+                                        const hasTemperatureHoverPoint = context.some(item => item.dataset.isTemperatureHoverData);
+                                        
+                                        if (!hasTemperatureHoverPoint) {
+                                            const monthIndex = context[0].dataIndex;
+                                            const tempStats = getTemperatureStatsForTooltip(monthIndex, chartLabels);
+                                            if (tempStats) {
+                                                footer += footer ? '\n' : '';
+                                                footer += `Temp: ${tempStats.min}°F - ${tempStats.max}°F (avg ${tempStats.avg}°F)`;
+                                            }
                                         }
                                     }
                                     
@@ -2400,6 +2432,22 @@
                     yAxisID: 'yTemp',
                     tension: 0.4,
                     borderDash: [5, 5]
+                });
+                
+                // Add invisible hover points for temperature data access
+                datasets.push({
+                    label: 'Temperature Data (hover for details)',
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 0.1 : null), // Very small value on incident axis
+                    type: 'bar',
+                    backgroundColor: 'rgba(0, 0, 0, 0)', // Completely transparent
+                    borderColor: 'rgba(0, 0, 0, 0)',
+                    borderWidth: 0,
+                    yAxisID: 'y',
+                    barThickness: 'flex',
+                    categoryPercentage: 1.0,
+                    barPercentage: 1.0,
+                    // Custom tooltip data for temperature access
+                    isTemperatureHoverData: true
                 });
             }
             
