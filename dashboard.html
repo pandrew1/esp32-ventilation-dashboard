@@ -2100,7 +2100,7 @@
                                 label: function(context) {
                                     // Handle temperature hover data points
                                     if (context.dataset.isTemperatureHoverData) {
-                                        return null; // Don't show the invisible bar value
+                                        return 'Temperature Data - hover for details';
                                     }
                                     
                                     const incidentType = incidentTypes[context.dataset.incidentType];
@@ -2113,13 +2113,14 @@
                                 },
                                 afterLabel: function(context) {
                                     // Show temperature data for temperature hover points
-                                    if (context.dataset.isTemperatureHoverData && viewType === 'monthly' && temperatureData) {
+                                    if (context.dataset.isTemperatureHoverData) {
                                         const monthIndex = context.dataIndex;
+                                        const chartLabels = context.chart.data.labels;
                                         const monthLabel = chartLabels[monthIndex];
                                         const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
                                         if (tempStats) {
                                             return [
-                                                `🌡️ Temperature Statistics:`,
+                                                `🌡️ Temperature Statistics for ${monthLabel}:`,
                                                 `   Min: ${tempStats.min}°F`,
                                                 `   Max: ${tempStats.max}°F`, 
                                                 `   Avg: ${tempStats.avg}°F`,
@@ -2138,13 +2139,15 @@
                                     
                                     let footer = totalIncidents > 0 ? `Total: ${totalIncidents} incidents` : '';
                                     
-                                    // Add temperature stats for monthly view (only if not already shown in afterLabel)
-                                    if (viewType === 'monthly' && temperatureData && context.length > 0) {
+                                    // Add temperature stats for monthly view (only if not temperature hover point)
+                                    if (context.length > 0) {
                                         const hasTemperatureHoverPoint = context.some(item => item.dataset.isTemperatureHoverData);
                                         
-                                        if (!hasTemperatureHoverPoint) {
+                                        if (!hasTemperatureHoverPoint && window.monthlyTemperatureStats) {
                                             const monthIndex = context[0].dataIndex;
-                                            const tempStats = getTemperatureStatsForTooltip(monthIndex, chartLabels);
+                                            const chartLabels = context[0].chart.data.labels;
+                                            const monthLabel = chartLabels[monthIndex];
+                                            const tempStats = window.monthlyTemperatureStats[monthLabel];
                                             if (tempStats) {
                                                 footer += footer ? '\n' : '';
                                                 footer += `Temp: ${tempStats.min}°F - ${tempStats.max}°F (avg ${tempStats.avg}°F)`;
@@ -2437,17 +2440,18 @@
                 // Add invisible hover points for temperature data access
                 datasets.push({
                     label: 'Temperature Data (hover for details)',
-                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 0.1 : null), // Very small value on incident axis
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? 0.5 : null), // Small visible value to help with hovering
                     type: 'bar',
-                    backgroundColor: 'rgba(0, 0, 0, 0)', // Completely transparent
-                    borderColor: 'rgba(0, 0, 0, 0)',
-                    borderWidth: 0,
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)', // Very light blue for visibility
+                    borderColor: 'rgba(52, 152, 219, 0.3)',
+                    borderWidth: 1,
                     yAxisID: 'y',
-                    barThickness: 'flex',
-                    categoryPercentage: 1.0,
-                    barPercentage: 1.0,
+                    barThickness: 20, // Fixed width for easier hovering
+                    categoryPercentage: 0.8,
+                    barPercentage: 0.5,
                     // Custom tooltip data for temperature access
-                    isTemperatureHoverData: true
+                    isTemperatureHoverData: true,
+                    order: 10 // Render on top for easier hovering
                 });
             }
             
