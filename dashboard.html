@@ -2114,11 +2114,14 @@
                                         }
                                     }
                                     
-                                    const incidentType = incidentTypes[context.dataset.incidentType];
-                                    const severity = context.dataset.severity;
-                                    const count = context.parsed.y;
-                                    if (count > 0) {
-                                        return `${incidentType.icon} ${count} ${severity} ${incidentType.name}`;
+                                    // Only process incident data if it has the required properties
+                                    if (context.dataset.incidentType !== undefined && context.dataset.severity !== undefined) {
+                                        const incidentType = incidentTypes[context.dataset.incidentType];
+                                        const severity = context.dataset.severity;
+                                        const count = context.parsed.y;
+                                        if (incidentType && count > 0) {
+                                            return `${incidentType.icon} ${count} ${severity} ${incidentType.name}`;
+                                        }
                                     }
                                     return null;
                                 },
