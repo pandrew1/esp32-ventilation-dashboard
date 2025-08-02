@@ -453,6 +453,13 @@
                         <button class="time-btn" onclick="loadChart(72)">3 Days</button>
                         <button class="time-btn" onclick="loadChart(168)">1 Week</button>
                     </div>
+                    
+                    <!-- Data Source Indicator -->
+                    <div id="dataSourceIndicator" style="margin: 10px 0; padding: 8px 12px; background: #e8f4f8; border-left: 4px solid #17a2b8; border-radius: 4px; font-size: 0.85em; color: #0c5460; display: none;">
+                        <strong>📊 Data Source Information:</strong>
+                        <div id="dataSourceDetails" style="margin-top: 5px; font-family: monospace; font-size: 0.9em;"></div>
+                    </div>
+                    
                     <div class="chart-container">
                         <canvas id="temperatureChart"></canvas>
                     </div>
@@ -486,6 +493,13 @@
                         </select>
                         <span id="trendsStatus" style="margin-left: 10px; font-size: 0.85em; color: #666;"></span>
                     </div>
+                    
+                    <!-- Monthly Aggregation Data Source Indicator -->
+                    <div id="monthlyDataSourceIndicator" style="margin: 10px 0; padding: 8px 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; font-size: 0.85em; color: #856404; display: none;">
+                        <strong>🗄️ Monthly Data Sources:</strong>
+                        <div id="monthlyDataSourceDetails" style="margin-top: 5px; font-family: monospace; font-size: 0.9em;"></div>
+                    </div>
+                    
                     <div class="chart-container" style="height: 400px;">
                         <canvas id="incidentTrendsChart"></canvas>
                     </div>
@@ -677,6 +691,11 @@
 
         // Initialize dashboard
         async function initializeDashboard() {
+            // Clear any previous data source tracking
+            if (window.dataSourceTracker) {
+                window.dataSourceTracker.clearAll();
+            }
+            
             await refreshData();
             // Load default 6-hour chart
             await loadChart(6); // Load 6-hour chart by default
@@ -1347,6 +1366,7 @@
                 // If no authentication method is available, show empty chart
                 if (!token && !CONFIG.apiSecret) {
                     // No authentication available, show empty chart
+                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'No Auth', 'Authentication required');
                     updateChart([], hours);
                     return;
                 }
@@ -1368,6 +1388,7 @@
                         // Using Bearer token but got 401 - functions may not support it yet
                         // Bearer token chart authentication failed, show empty chart
                         showApiFailureNotice('History API returned 401 Unauthorized. Chart data is currently unavailable.', 'warning');
+                        window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Auth Failed', '401 Unauthorized');
                         updateChart([], hours);
                         return;
                     }
@@ -1377,12 +1398,16 @@
                     // Show empty chart if API fails
                     // Chart API call failed, show empty chart
                     showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart data is currently unavailable.`, 'warning');
+                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'API Error', `${response.status} ${response.statusText}`);
                     updateChart([], hours);
                     return;
                 }
                 
                 const data = await response.json();
                 if (data.data && data.data.length > 0) {
+                    // Track successful hourly data fetch
+                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Raw Sensor Data', `${data.data.length} data points`);
+                    
                     try {
                         const firstTimestamp = new Date(data.data[0].timestamp);
                         const lastTimestamp = new Date(data.data[data.data.length - 1].timestamp);
@@ -1395,6 +1420,8 @@
                     } catch (timestampError) {
                         // Error parsing timestamps for logging, proceeding with chart update
                     }
+                } else {
+                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'No Data', 'API returned empty data set');
                 }
                 updateChart(data.data || [], hours);
                 
@@ -1402,6 +1429,7 @@
                 console.error('Error loading chart data:', error);
                 // Show empty chart instead of mock data
                 showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
+                window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Network Error', error.message);
                 updateChart([], hours);
             }
         }
@@ -1893,13 +1921,181 @@
             }
         }
 
-        // Fetch temperature data for trends overlay
+        // Global tracking for data sources
+        window.dataSourceTracker = {
+            temperatureDataSources: {},
+            monthlyDataSources: {},
+            
+            trackTemperatureSource: function(timeRange, source, details) {
+                this.temperatureDataSources[timeRange] = {
+                    source: source,
+                    details: details,
+                    timestamp: new Date().toISOString()
+                };
+                this.updateTemperatureDataSourceDisplay();
+            },
+            
+            trackMonthlySource: function(yearMonth, source, details) {
+                this.monthlyDataSources[yearMonth] = {
+                    source: source,
+                    details: details,
+                    timestamp: new Date().toISOString()
+                };
+                this.updateMonthlyDataSourceDisplay();
+            },
+            
+            updateTemperatureDataSourceDisplay: function() {
+                const indicator = document.getElementById('dataSourceIndicator');
+                const details = document.getElementById('dataSourceDetails');
+                
+                if (Object.keys(this.temperatureDataSources).length === 0) {
+                    indicator.style.display = 'none';
+                    return;
+                }
+                
+                let displayText = '';
+                Object.entries(this.temperatureDataSources).forEach(([timeRange, info]) => {
+                    displayText += `${timeRange}: ${info.source} (${info.details})\n`;
+                });
+                
+                details.textContent = displayText.trim();
+                indicator.style.display = 'block';
+            },
+            
+            updateMonthlyDataSourceDisplay: function() {
+                const indicator = document.getElementById('monthlyDataSourceIndicator');
+                const details = document.getElementById('monthlyDataSourceDetails');
+                
+                if (Object.keys(this.monthlyDataSources).length === 0) {
+                    indicator.style.display = 'none';
+                    return;
+                }
+                
+                const preCalculatedMonths = [];
+                const jsCalculatedMonths = [];
+                
+                Object.entries(this.monthlyDataSources).forEach(([yearMonth, info]) => {
+                    if (info.source === 'Azure Table') {
+                        preCalculatedMonths.push(yearMonth);
+                    } else if (info.source === 'JavaScript') {
+                        jsCalculatedMonths.push(yearMonth);
+                    }
+                });
+                
+                let displayText = '';
+                if (preCalculatedMonths.length > 0) {
+                    displayText += `📊 Pre-calculated (Azure): ${preCalculatedMonths.join(', ')}\n`;
+                }
+                if (jsCalculatedMonths.length > 0) {
+                    displayText += `🔄 JavaScript calculated: ${jsCalculatedMonths.join(', ')}\n`;
+                }
+                
+                details.textContent = displayText.trim();
+                indicator.style.display = 'block';
+            },
+            
+            clearAll: function() {
+                this.temperatureDataSources = {};
+                this.monthlyDataSources = {};
+                this.updateTemperatureDataSourceDisplay();
+                this.updateMonthlyDataSourceDisplay();
+            }
+        };
+
+        // Fetch temperature data for trends overlay - now uses server-side aggregation
         async function fetchTemperatureDataForTrends() {
             try {
                 const token = localStorage.getItem('ventilation_auth_token');
                 
                 // If no authentication method is available, return null
                 if (!token && !CONFIG.apiSecret) {
+                    window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'No Auth', 'Authentication required');
+                    return null;
+                }
+
+                // Use new monthly aggregation endpoint for better performance
+                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&aggregation=monthly&months=12`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    console.error('Monthly aggregation API failed, falling back to raw data');
+                    window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Fallback to Legacy', 'API failed, using raw data');
+                    return await fetchTemperatureDataForTrendsLegacy();
+                }
+                
+                const data = await response.json();
+                if (data.data && data.data.length > 0) {
+                    // Track successful use of server-side aggregation
+                    window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Azure Functions API', `${data.data.length} pre-calculated months`);
+                    
+                    // Track each month's data source
+                    data.data.forEach(monthData => {
+                        const yearMonth = `${monthData.Year}-${String(monthData.Month).padStart(2, '0')}`;
+                        window.dataSourceTracker.trackMonthlySource(yearMonth, 'Azure Table', `${monthData.TotalDataPoints} data points`);
+                    });
+                    
+                    // Convert monthly aggregated data to format expected by existing functions
+                    return convertMonthlyStatsToTemperatureData(data.data);
+                }
+                
+                console.log('No monthly aggregated data available');
+                window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'No Data', 'No pre-calculated data available');
+                return null;
+                
+            } catch (error) {
+                console.error('Error fetching monthly aggregated temperature data:', error);
+                window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Error - Fallback', error.message);
+                // Fallback to legacy method
+                return await fetchTemperatureDataForTrendsLegacy();
+            }
+        }
+
+        // Convert monthly aggregated statistics to temperature data format
+        function convertMonthlyStatsToTemperatureData(monthlyStats) {
+            const temperatureData = [];
+            
+            monthlyStats.forEach(monthData => {
+                // Create representative data points for each month
+                if (monthData.IndoorTempAvg || monthData.OutdoorTempAvg || monthData.GarageTempAvg) {
+                    // Use middle of month as timestamp
+                    const year = monthData.Year;
+                    const month = monthData.Month;
+                    const midMonthDate = new Date(year, month - 1, 15); // 15th of month
+                    const timestamp = Math.floor(midMonthDate.getTime() / 1000);
+                    
+                    // Create data point with monthly averages
+                    const dataPoint = {
+                        timestamp: timestamp.toString(),
+                        sensors: {}
+                    };
+                    
+                    if (monthData.IndoorTempAvg) {
+                        dataPoint.sensors.indoor = { temp: monthData.IndoorTempAvg };
+                    }
+                    if (monthData.OutdoorTempAvg) {
+                        dataPoint.sensors.outdoor = { temp: monthData.OutdoorTempAvg };
+                    }
+                    if (monthData.GarageTempAvg) {
+                        dataPoint.sensors.garage = { temp: monthData.GarageTempAvg };
+                    }
+                    
+                    temperatureData.push(dataPoint);
+                }
+            });
+            
+            console.log(`Converted ${monthlyStats.length} monthly stats to ${temperatureData.length} temperature data points`);
+            return temperatureData;
+        }
+
+        // Legacy temperature data fetching (fallback)
+        async function fetchTemperatureDataForTrendsLegacy() {
+            try {
+                const token = localStorage.getItem('ventilation_auth_token');
+                
+                if (!token && !CONFIG.apiSecret) {
+                    window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'No Auth', 'Authentication required');
                     return null;
                 }
 
@@ -1942,11 +2138,49 @@
                     }
                 });
                 
-                console.log(`Temperature data for trends: ${uniqueData.length} unique data points`);
+                console.log(`Legacy temperature data: ${uniqueData.length} unique data points`);
+                
+                // Track legacy data usage and analyze months
+                if (uniqueData.length > 0) {
+                    // Group data by month to show which months are JavaScript calculated
+                    const monthlyGroups = {};
+                    uniqueData.forEach(item => {
+                        let date;
+                        if (typeof item.timestamp === 'string') {
+                            if (item.timestamp.includes('T') || item.timestamp.includes('-')) {
+                                date = new Date(item.timestamp);
+                            } else {
+                                const unixSeconds = parseInt(item.timestamp);
+                                date = new Date(unixSeconds * 1000);
+                            }
+                        } else {
+                            date = new Date(item.timestamp * 1000);
+                        }
+                        
+                        if (!isNaN(date.getTime())) {
+                            const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                            if (!monthlyGroups[yearMonth]) {
+                                monthlyGroups[yearMonth] = 0;
+                            }
+                            monthlyGroups[yearMonth]++;
+                        }
+                    });
+                    
+                    // Track each month as JavaScript calculated
+                    Object.entries(monthlyGroups).forEach(([yearMonth, count]) => {
+                        window.dataSourceTracker.trackMonthlySource(yearMonth, 'JavaScript', `${count} raw data points`);
+                    });
+                    
+                    window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'Raw Data Processing', `${uniqueData.length} points from ${Object.keys(monthlyGroups).length} months`);
+                } else {
+                    window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'No Data', 'No valid temperature data found');
+                }
+                
                 return uniqueData;
                 
             } catch (error) {
-                console.error('Error fetching temperature data for trends:', error);
+                console.error('Error fetching legacy temperature data:', error);
+                window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'Error', error.message);
                 return null;
             }
         }
