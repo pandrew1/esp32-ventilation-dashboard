@@ -470,8 +470,8 @@
                     <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
                         <label style="font-weight: bold; margin-right: 10px; color: #333;">View:</label>
                         <select id="trendsViewFilter" onchange="loadIncidentTrends()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
-                            <option value="weekly" selected>Weekly View</option>
-                            <option value="monthly">Monthly Summary</option>
+                            <option value="weekly">Weekly View</option>
+                            <option value="monthly" selected>Monthly Summary</option>
                         </select>
                         
                         <label style="font-weight: bold; margin-right: 10px; color: #333;">Severity:</label>
@@ -479,6 +479,10 @@
                             <option value="critical-high" selected>Critical & High</option>
                             <option value="critical">Critical Only</option>
                             <option value="high">High Only</option>
+                            <option value="critical-high-medium">Critical, High & Medium</option>
+                            <option value="all">All Severities (Critical, High, Medium, Low)</option>
+                            <option value="medium">Medium Only</option>
+                            <option value="low">Low Only</option>
                         </select>
                         <span id="trendsStatus" style="margin-left: 10px; font-size: 0.85em; color: #666;"></span>
                     </div>
@@ -1861,7 +1865,11 @@
                 let filteredIncidents = originalIncidentsData.filter(incident => {
                     if (severityFilter === 'critical') return incident.severity === 0;
                     if (severityFilter === 'high') return incident.severity === 1;
+                    if (severityFilter === 'medium') return incident.severity === 2;
+                    if (severityFilter === 'low') return incident.severity === 3;
                     if (severityFilter === 'critical-high') return incident.severity <= 1;
+                    if (severityFilter === 'critical-high-medium') return incident.severity <= 2;
+                    if (severityFilter === 'all') return incident.severity >= 0 && incident.severity <= 3;
                     return false;
                 });
                 
@@ -1889,13 +1897,13 @@
             
             // Define all incident types with colors and icons
             const incidentTypes = {
-                0: { name: 'Power Loss', icon: '⚡', criticalColor: '#8B0000', highColor: '#FF6B6B' },
-                1: { name: 'WiFi Down', icon: '📶', criticalColor: '#FF4500', highColor: '#FFA500' },
-                2: { name: 'Internet Down', icon: '🌐', criticalColor: '#000080', highColor: '#6495ED' },
-                3: { name: 'API Down', icon: '☁️', criticalColor: '#4682B4', highColor: '#87CEEB' },
-                4: { name: 'Storm Event', icon: '🌩️', criticalColor: '#483D8B', highColor: '#9370DB' },
-                5: { name: 'Heat Event', icon: '🔥', criticalColor: '#DC143C', highColor: '#FF69B4' },
-                6: { name: 'Freeze Event', icon: '🧊', criticalColor: '#00CED1', highColor: '#20B2AA' }
+                0: { name: 'Power Loss', icon: '⚡', criticalColor: '#8B0000', highColor: '#FF6B6B', mediumColor: '#FFB347', lowColor: '#FFDD99' },
+                1: { name: 'WiFi Down', icon: '📶', criticalColor: '#FF4500', highColor: '#FFA500', mediumColor: '#FFD700', lowColor: '#FFFF99' },
+                2: { name: 'Internet Down', icon: '🌐', criticalColor: '#000080', highColor: '#6495ED', mediumColor: '#87CEEB', lowColor: '#B0E0E6' },
+                3: { name: 'API Down', icon: '☁️', criticalColor: '#4682B4', highColor: '#87CEEB', mediumColor: '#ADD8E6', lowColor: '#E0F6FF' },
+                4: { name: 'Storm Event', icon: '🌩️', criticalColor: '#483D8B', highColor: '#9370DB', mediumColor: '#BA55D3', lowColor: '#DDA0DD' },
+                5: { name: 'Heat Event', icon: '🔥', criticalColor: '#DC143C', highColor: '#FF69B4', mediumColor: '#FFB6C1', lowColor: '#FFCCCB' },
+                6: { name: 'Freeze Event', icon: '🧊', criticalColor: '#00CED1', highColor: '#20B2AA', mediumColor: '#48CAE4', lowColor: '#90E0EF' }
             };
             
             if (!incidents || incidents.length === 0) {
@@ -2026,7 +2034,7 @@
                 weeklyData[weekLabel] = {};
                 // Initialize all incident types and severities to 0
                 Object.keys(incidentTypes).forEach(type => {
-                    weeklyData[weekLabel][type] = { critical: 0, high: 0 };
+                    weeklyData[weekLabel][type] = { critical: 0, high: 0, medium: 0, low: 0 };
                 });
             }
             
@@ -2037,9 +2045,15 @@
                 );
                 
                 if (incidentWeek) {
-                    const severity = incident.severity === 0 ? 'critical' : 'high';
+                    let severityKey;
+                    if (incident.severity === 0) severityKey = 'critical';
+                    else if (incident.severity === 1) severityKey = 'high';
+                    else if (incident.severity === 2) severityKey = 'medium';
+                    else if (incident.severity === 3) severityKey = 'low';
+                    else severityKey = 'low'; // Default fallback for unknown severity levels
+                    
                     if (weeklyData[incidentWeek.label][incident.type]) {
-                        weeklyData[incidentWeek.label][incident.type][severity]++;
+                        weeklyData[incidentWeek.label][incident.type][severityKey]++;
                     }
                 }
             });
@@ -2051,7 +2065,7 @@
             Object.keys(incidentTypes).forEach(typeId => {
                 const type = incidentTypes[typeId];
                 
-                if (severityFilter === 'critical' || severityFilter === 'critical-high') {
+                if (severityFilter === 'critical' || severityFilter === 'critical-high' || severityFilter === 'critical-high-medium' || severityFilter === 'all') {
                     datasets.push({
                         label: `Critical ${type.name} ${type.icon}`,
                         data: weeks.map(week => weeklyData[week.label][typeId]?.critical || 0),
@@ -2063,7 +2077,7 @@
                     });
                 }
                 
-                if (severityFilter === 'high' || severityFilter === 'critical-high') {
+                if (severityFilter === 'high' || severityFilter === 'critical-high' || severityFilter === 'critical-high-medium' || severityFilter === 'all') {
                     datasets.push({
                         label: `High ${type.name} ${type.icon}`,
                         data: weeks.map(week => weeklyData[week.label][typeId]?.high || 0),
@@ -2072,6 +2086,30 @@
                         borderWidth: 1,
                         incidentType: typeId,
                         severity: 'High'
+                    });
+                }
+                
+                if (severityFilter === 'medium' || severityFilter === 'critical-high-medium' || severityFilter === 'all') {
+                    datasets.push({
+                        label: `Medium ${type.name} ${type.icon}`,
+                        data: weeks.map(week => weeklyData[week.label][typeId]?.medium || 0),
+                        backgroundColor: type.mediumColor,
+                        borderColor: type.mediumColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'Medium'
+                    });
+                }
+                
+                if (severityFilter === 'low' || severityFilter === 'all') {
+                    datasets.push({
+                        label: `Low ${type.name} ${type.icon}`,
+                        data: weeks.map(week => weeklyData[week.label][typeId]?.low || 0),
+                        backgroundColor: type.lowColor,
+                        borderColor: type.lowColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'Low'
                     });
                 }
             });
@@ -2101,7 +2139,7 @@
                 
                 monthlyData[monthLabel] = {};
                 Object.keys(incidentTypes).forEach(type => {
-                    monthlyData[monthLabel][type] = { critical: 0, high: 0 };
+                    monthlyData[monthLabel][type] = { critical: 0, high: 0, medium: 0, low: 0 };
                 });
             }
             
@@ -2112,9 +2150,15 @@
                 );
                 
                 if (incidentMonth) {
-                    const severity = incident.severity === 0 ? 'critical' : 'high';
+                    let severityKey;
+                    if (incident.severity === 0) severityKey = 'critical';
+                    else if (incident.severity === 1) severityKey = 'high';
+                    else if (incident.severity === 2) severityKey = 'medium';
+                    else if (incident.severity === 3) severityKey = 'low';
+                    else severityKey = 'low'; // Default fallback for unknown severity levels
+                    
                     if (monthlyData[incidentMonth.label][incident.type]) {
-                        monthlyData[incidentMonth.label][incident.type][severity]++;
+                        monthlyData[incidentMonth.label][incident.type][severityKey]++;
                     }
                 }
             });
@@ -2126,7 +2170,7 @@
             Object.keys(incidentTypes).forEach(typeId => {
                 const type = incidentTypes[typeId];
                 
-                if (severityFilter === 'critical' || severityFilter === 'critical-high') {
+                if (severityFilter === 'critical' || severityFilter === 'critical-high' || severityFilter === 'critical-high-medium' || severityFilter === 'all') {
                     datasets.push({
                         label: `Critical ${type.name} ${type.icon}`,
                         data: months.map(month => monthlyData[month.label][typeId]?.critical || 0),
@@ -2138,7 +2182,7 @@
                     });
                 }
                 
-                if (severityFilter === 'high' || severityFilter === 'critical-high') {
+                if (severityFilter === 'high' || severityFilter === 'critical-high' || severityFilter === 'critical-high-medium' || severityFilter === 'all') {
                     datasets.push({
                         label: `High ${type.name} ${type.icon}`,
                         data: months.map(month => monthlyData[month.label][typeId]?.high || 0),
@@ -2147,6 +2191,30 @@
                         borderWidth: 1,
                         incidentType: typeId,
                         severity: 'High'
+                    });
+                }
+                
+                if (severityFilter === 'medium' || severityFilter === 'critical-high-medium' || severityFilter === 'all') {
+                    datasets.push({
+                        label: `Medium ${type.name} ${type.icon}`,
+                        data: months.map(month => monthlyData[month.label][typeId]?.medium || 0),
+                        backgroundColor: type.mediumColor,
+                        borderColor: type.mediumColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'Medium'
+                    });
+                }
+                
+                if (severityFilter === 'low' || severityFilter === 'all') {
+                    datasets.push({
+                        label: `Low ${type.name} ${type.icon}`,
+                        data: months.map(month => monthlyData[month.label][typeId]?.low || 0),
+                        backgroundColor: type.lowColor,
+                        borderColor: type.lowColor,
+                        borderWidth: 1,
+                        incidentType: typeId,
+                        severity: 'Low'
                     });
                 }
             });
