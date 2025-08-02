@@ -2206,7 +2206,7 @@
                 // Create month label for indexing
                 const monthLabel = `${monthData.Year}-${String(monthData.Month).padStart(2, '0')}`;
                 
-                // Store detailed stats for tooltips
+                // Store detailed monthly stats for tooltips
                 window.detailedMonthlyStats[monthLabel] = {
                     totalDataPoints: monthData.TotalDataPoints || 0,
                     fanOnPercentage: monthData.FanOnPercentage || 0,
@@ -2215,8 +2215,16 @@
                     freezeTempIncidents: monthData.FreezeTempIncidents || 0,
                     powerOutageIncidents: monthData.PowerOutageIncidents || 0,
                     wifiDownIncidents: monthData.WiFiDownIncidents || 0,
-                    indoorHumidityAvg: monthData.IndoorHumidityAvg || null,
-                    outdoorHumidityAvg: monthData.OutdoorHumidityAvg || null,
+                    indoorHumidityRange: {
+                        min: monthData.IndoorHumidityMin || null,
+                        max: monthData.IndoorHumidityMax || null,
+                        avg: monthData.IndoorHumidityAvg || null
+                    },
+                    outdoorHumidityRange: {
+                        min: monthData.OutdoorHumidityMin || null,
+                        max: monthData.OutdoorHumidityMax || null,
+                        avg: monthData.OutdoorHumidityAvg || null
+                    },
                     indoorTempRange: {
                         min: monthData.IndoorTempMin || null,
                         max: monthData.IndoorTempMax || null,
@@ -2603,16 +2611,35 @@
                                                 
                                                 tooltipLines.push(`📊 Monthly Summary:`);
                                                 tooltipLines.push(`   Data Points: ${detailedStats.totalDataPoints}`);
-                                                tooltipLines.push(`   Fan Runtime: ${Math.round(detailedStats.totalFanMinutes / 60 * 10) / 10} hours (${detailedStats.fanOnPercentage}%)`);
                                                 
-                                                // Humidity information
-                                                if (detailedStats.indoorHumidityAvg !== null || detailedStats.outdoorHumidityAvg !== null) {
-                                                    tooltipLines.push(`💧 Humidity:`);
-                                                    if (detailedStats.indoorHumidityAvg !== null) {
-                                                        tooltipLines.push(`   Indoor: ${detailedStats.indoorHumidityAvg}%`);
+                                                // Enhanced fan runtime information
+                                                const fanHours = Math.round(detailedStats.totalFanMinutes / 60 * 10) / 10;
+                                                const fanDays = Math.round(fanHours / 24 * 100) / 100;
+                                                tooltipLines.push(`🌀 Fan Runtime: ${fanHours} hours (${detailedStats.fanOnPercentage}%)`);
+                                                if (fanHours >= 24) {
+                                                    tooltipLines.push(`   Equivalent: ${fanDays} days`);
+                                                }
+                                                tooltipLines.push(`   Total Minutes: ${detailedStats.totalFanMinutes}`);
+                                                
+                                                // Enhanced humidity information with ranges
+                                                if (detailedStats.indoorHumidityRange.avg !== null || detailedStats.outdoorHumidityRange.avg !== null) {
+                                                    tooltipLines.push(`💧 Humidity Ranges:`);
+                                                    if (detailedStats.indoorHumidityRange.avg !== null) {
+                                                        tooltipLines.push(`   Indoor: ${detailedStats.indoorHumidityRange.min}% to ${detailedStats.indoorHumidityRange.max}% (avg ${detailedStats.indoorHumidityRange.avg}%)`);
                                                     }
-                                                    if (detailedStats.outdoorHumidityAvg !== null) {
-                                                        tooltipLines.push(`   Outdoor: ${detailedStats.outdoorHumidityAvg}%`);
+                                                    if (detailedStats.outdoorHumidityRange.avg !== null) {
+                                                        tooltipLines.push(`   Outdoor: ${detailedStats.outdoorHumidityRange.min}% to ${detailedStats.outdoorHumidityRange.max}% (avg ${detailedStats.outdoorHumidityRange.avg}%)`);
+                                                    }
+                                                    
+                                                    // Add humidity comfort analysis
+                                                    if (detailedStats.indoorHumidityRange.avg !== null) {
+                                                        const indoorHumidity = detailedStats.indoorHumidityRange.avg;
+                                                        let comfortLevel = '';
+                                                        if (indoorHumidity < 30) comfortLevel = 'Too Dry';
+                                                        else if (indoorHumidity <= 50) comfortLevel = 'Optimal';
+                                                        else if (indoorHumidity <= 60) comfortLevel = 'Good';
+                                                        else comfortLevel = 'Too Humid';
+                                                        tooltipLines.push(`   Indoor Comfort: ${comfortLevel}`);
                                                     }
                                                 }
                                                 
@@ -2620,12 +2647,25 @@
                                                 const totalIncidents = detailedStats.highTempIncidents + detailedStats.freezeTempIncidents + detailedStats.powerOutageIncidents + detailedStats.wifiDownIncidents;
                                                 if (totalIncidents > 0) {
                                                     tooltipLines.push(`⚠️ Incidents: ${totalIncidents} total`);
-                                                    if (detailedStats.highTempIncidents > 0) tooltipLines.push(`   High Temp: ${detailedStats.highTempIncidents}`);
-                                                    if (detailedStats.freezeTempIncidents > 0) tooltipLines.push(`   Freeze: ${detailedStats.freezeTempIncidents}`);
-                                                    if (detailedStats.powerOutageIncidents > 0) tooltipLines.push(`   Power: ${detailedStats.powerOutageIncidents}`);
-                                                    if (detailedStats.wifiDownIncidents > 0) tooltipLines.push(`   WiFi: ${detailedStats.wifiDownIncidents}`);
+                                                    if (detailedStats.highTempIncidents > 0) tooltipLines.push(`   🔥 High Temp: ${detailedStats.highTempIncidents}`);
+                                                    if (detailedStats.freezeTempIncidents > 0) tooltipLines.push(`   🧊 Freeze: ${detailedStats.freezeTempIncidents}`);
+                                                    if (detailedStats.powerOutageIncidents > 0) tooltipLines.push(`   ⚡ Power: ${detailedStats.powerOutageIncidents}`);
+                                                    if (detailedStats.wifiDownIncidents > 0) tooltipLines.push(`   📶 WiFi: ${detailedStats.wifiDownIncidents}`);
                                                 } else {
                                                     tooltipLines.push(`✅ No incidents this month`);
+                                                }
+                                                
+                                                // Environmental insights
+                                                if (detailedStats.indoorTempRange.avg !== null && detailedStats.outdoorTempRange.avg !== null) {
+                                                    const tempDiff = Math.abs(detailedStats.indoorTempRange.avg - detailedStats.outdoorTempRange.avg);
+                                                    tooltipLines.push(`🌡️ Climate Control:`);
+                                                    tooltipLines.push(`   Indoor-Outdoor Diff: ${tempDiff.toFixed(1)}°F`);
+                                                    
+                                                    // Effectiveness analysis
+                                                    if (detailedStats.fanOnPercentage > 0) {
+                                                        const effectiveness = tempDiff < 5 ? 'Excellent' : tempDiff < 10 ? 'Good' : tempDiff < 15 ? 'Fair' : 'Needs Attention';
+                                                        tooltipLines.push(`   Control Effectiveness: ${effectiveness}`);
+                                                    }
                                                 }
                                                 
                                             } else if (tempStats) {
