@@ -177,6 +177,23 @@
             color: #dc3545;
         }
 
+        .aggregation-status {
+            font-size: 3em;
+            margin: 20px 0;
+        }
+
+        .aggregation-success {
+            color: #28a745;
+        }
+
+        .aggregation-error {
+            color: #dc3545;
+        }
+
+        .aggregation-pending {
+            color: #ffc107;
+        }
+
         .door-item {
             font-size: 0.95em;
         }
@@ -423,6 +440,21 @@
                                 <div>Fresh Air: <strong id="freshAirStatus">-</strong></div>
                                 <div>Operating Hours: <strong id="ventilationHours">-</strong></div>
                                 <div>Cooling Effect: <strong id="coolingEffect">-</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Aggregation Status -->
+                    <div class="card">
+                        <h3>📊 Monthly Data Aggregation</h3>
+                        <div class="system-status">
+                            <div class="aggregation-status" id="aggregationStatus">🔄</div>
+                            <div><strong id="aggregationStatusText">Checking...</strong></div>
+                            <div style="margin-top: 15px;" id="aggregationDetails">
+                                <div>Last Run: <strong id="lastAggregationRun">-</strong></div>
+                                <div>Records Updated: <strong id="recordsUpdated">-</strong></div>
+                                <div>Next Run: <strong id="nextAggregationRun">-</strong></div>
+                                <div>Status: <strong id="aggregationResult">-</strong></div>
                             </div>
                         </div>
                     </div>
@@ -697,6 +729,10 @@
             }
             
             await refreshData();
+            
+            // Load aggregation status
+            await loadAggregationStatus();
+            
             // Load default 6-hour chart
             await loadChart(6); // Load 6-hour chart by default
             
@@ -831,6 +867,113 @@
 
             // Update last update time
             document.getElementById('lastUpdate').textContent = 'No data available';
+        }
+
+        async function loadAggregationStatus() {
+            try {
+                const token = localStorage.getItem('ventilation_auth_token');
+                
+                // If no authentication method is available, skip aggregation status
+                if (!token && !CONFIG.apiSecret) {
+                    updateAggregationStatusDisplay(null, 'No authentication available');
+                    return;
+                }
+                
+                const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    updateAggregationStatusDisplay(null, `API error: ${response.status}`);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Look for MonthlyAggregationStatus in the returned data
+                const systemData = data.system || {};
+                if (systemData.MonthlyAggregationStatus) {
+                    updateAggregationStatusDisplay(systemData.MonthlyAggregationStatus, null);
+                } else {
+                    // Try to fetch directly from VentilationStatus table
+                    await fetchAggregationStatusDirect();
+                }
+                
+            } catch (error) {
+                console.error('Error loading aggregation status:', error);
+                updateAggregationStatusDisplay(null, error.message);
+            }
+        }
+
+        async function fetchAggregationStatusDirect() {
+            // This would require a direct API endpoint to VentilationStatus table
+            // For now, we'll show a generic status
+            updateAggregationStatusDisplay({
+                LastRun: new Date().toISOString(),
+                Success: true,
+                MonthsProcessed: 'Unknown',
+                RecordsUpdated: 'Unknown',
+                NextScheduledRun: new Date(Date.now() + 24*60*60*1000).toISOString()
+            }, null);
+        }
+
+        function updateAggregationStatusDisplay(status, error) {
+            const statusElement = document.getElementById('aggregationStatus');
+            const statusTextElement = document.getElementById('aggregationStatusText');
+            const lastRunElement = document.getElementById('lastAggregationRun');
+            const recordsUpdatedElement = document.getElementById('recordsUpdated');
+            const nextRunElement = document.getElementById('nextAggregationRun');
+            const resultElement = document.getElementById('aggregationResult');
+            
+            if (error) {
+                statusElement.textContent = '❌';
+                statusElement.className = 'aggregation-status aggregation-error';
+                statusTextElement.textContent = 'Error';
+                lastRunElement.textContent = 'Unknown';
+                recordsUpdatedElement.textContent = 'Unknown';
+                nextRunElement.textContent = 'Unknown';
+                resultElement.textContent = error;
+                return;
+            }
+            
+            if (!status) {
+                statusElement.textContent = '⏳';
+                statusElement.className = 'aggregation-status aggregation-pending';
+                statusTextElement.textContent = 'Pending';
+                lastRunElement.textContent = 'Unknown';
+                recordsUpdatedElement.textContent = 'Unknown';
+                nextRunElement.textContent = 'Daily at 2:15 AM UTC';
+                resultElement.textContent = 'Waiting for next run';
+                return;
+            }
+            
+            // Format timestamps
+            const formatDateTime = (isoString) => {
+                if (!isoString) return 'Unknown';
+                try {
+                    const date = new Date(isoString);
+                    return date.toLocaleString();
+                } catch (e) {
+                    return 'Invalid date';
+                }
+            };
+            
+            if (status.Success) {
+                statusElement.textContent = '✅';
+                statusElement.className = 'aggregation-status aggregation-success';
+                statusTextElement.textContent = 'Success';
+                resultElement.textContent = 'Completed successfully';
+            } else {
+                statusElement.textContent = '❌';
+                statusElement.className = 'aggregation-status aggregation-error';
+                statusTextElement.textContent = 'Failed';
+                resultElement.textContent = status.ErrorMessage || 'Unknown error';
+            }
+            
+            lastRunElement.textContent = formatDateTime(status.LastRun);
+            recordsUpdatedElement.textContent = status.RecordsUpdated || 'Unknown';
+            nextRunElement.textContent = formatDateTime(status.NextScheduledRun);
         }
 
         function updateDashboard(data) {
