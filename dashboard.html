@@ -2056,7 +2056,41 @@
         function convertMonthlyStatsToTemperatureData(monthlyStats) {
             const temperatureData = [];
             
+            // Store detailed monthly stats for tooltips
+            window.detailedMonthlyStats = {};
+            
             monthlyStats.forEach(monthData => {
+                // Create month label for indexing
+                const monthLabel = `${monthData.Year}-${String(monthData.Month).padStart(2, '0')}`;
+                
+                // Store detailed stats for tooltips
+                window.detailedMonthlyStats[monthLabel] = {
+                    totalDataPoints: monthData.TotalDataPoints || 0,
+                    fanOnPercentage: monthData.FanOnPercentage || 0,
+                    totalFanMinutes: monthData.TotalFanMinutes || 0,
+                    highTempIncidents: monthData.HighTempIncidents || 0,
+                    freezeTempIncidents: monthData.FreezeTempIncidents || 0,
+                    powerOutageIncidents: monthData.PowerOutageIncidents || 0,
+                    wifiDownIncidents: monthData.WiFiDownIncidents || 0,
+                    indoorHumidityAvg: monthData.IndoorHumidityAvg || null,
+                    outdoorHumidityAvg: monthData.OutdoorHumidityAvg || null,
+                    indoorTempRange: {
+                        min: monthData.IndoorTempMin || null,
+                        max: monthData.IndoorTempMax || null,
+                        avg: monthData.IndoorTempAvg || null
+                    },
+                    outdoorTempRange: {
+                        min: monthData.OutdoorTempMin || null,
+                        max: monthData.OutdoorTempMax || null,
+                        avg: monthData.OutdoorTempAvg || null
+                    },
+                    garageTempRange: {
+                        min: monthData.GarageTempMin || null,
+                        max: monthData.GarageTempMax || null,
+                        avg: monthData.GarageTempAvg || null
+                    }
+                };
+                
                 // Create representative data points for each month
                 if (monthData.IndoorTempAvg || monthData.OutdoorTempAvg || monthData.GarageTempAvg) {
                     // Use middle of month as timestamp
@@ -2086,6 +2120,7 @@
             });
             
             console.log(`Converted ${monthlyStats.length} monthly stats to ${temperatureData.length} temperature data points`);
+            console.log('Detailed monthly stats:', window.detailedMonthlyStats);
             return temperatureData;
         }
 
@@ -2400,14 +2435,68 @@
                                         const chartLabels = context.chart.data.labels;
                                         const monthLabel = chartLabels[monthIndex];
                                         const tempStats = window.monthlyTemperatureStats ? window.monthlyTemperatureStats[monthLabel] : null;
-                                        if (tempStats) {
-                                            return [
-                                                `🌡️ Temperature Statistics for ${monthLabel}:`,
-                                                `   Min: ${tempStats.min}°F`,
-                                                `   Max: ${tempStats.max}°F`, 
-                                                `   Avg: ${tempStats.avg}°F`,
-                                                `   Data Points: ${tempStats.count}`
-                                            ];
+                                        const detailedStats = window.detailedMonthlyStats ? window.detailedMonthlyStats[monthLabel] : null;
+                                        
+                                        if (tempStats || detailedStats) {
+                                            let tooltipLines = [];
+                                            
+                                            if (detailedStats) {
+                                                tooltipLines.push(`🌡️ Temperature Statistics for ${monthLabel}:`);
+                                                
+                                                // Indoor temperature details
+                                                if (detailedStats.indoorTempRange.avg !== null) {
+                                                    tooltipLines.push(`   Indoor: ${detailedStats.indoorTempRange.min}°F to ${detailedStats.indoorTempRange.max}°F (avg ${detailedStats.indoorTempRange.avg}°F)`);
+                                                }
+                                                
+                                                // Outdoor temperature details  
+                                                if (detailedStats.outdoorTempRange.avg !== null) {
+                                                    tooltipLines.push(`   Outdoor: ${detailedStats.outdoorTempRange.min}°F to ${detailedStats.outdoorTempRange.max}°F (avg ${detailedStats.outdoorTempRange.avg}°F)`);
+                                                }
+                                                
+                                                // Garage temperature details
+                                                if (detailedStats.garageTempRange.avg !== null) {
+                                                    tooltipLines.push(`   Garage: ${detailedStats.garageTempRange.min}°F to ${detailedStats.garageTempRange.max}°F (avg ${detailedStats.garageTempRange.avg}°F)`);
+                                                }
+                                                
+                                                tooltipLines.push(`📊 Monthly Summary:`);
+                                                tooltipLines.push(`   Data Points: ${detailedStats.totalDataPoints}`);
+                                                tooltipLines.push(`   Fan Runtime: ${Math.round(detailedStats.totalFanMinutes / 60 * 10) / 10} hours (${detailedStats.fanOnPercentage}%)`);
+                                                
+                                                // Humidity information
+                                                if (detailedStats.indoorHumidityAvg !== null || detailedStats.outdoorHumidityAvg !== null) {
+                                                    tooltipLines.push(`💧 Humidity:`);
+                                                    if (detailedStats.indoorHumidityAvg !== null) {
+                                                        tooltipLines.push(`   Indoor: ${detailedStats.indoorHumidityAvg}%`);
+                                                    }
+                                                    if (detailedStats.outdoorHumidityAvg !== null) {
+                                                        tooltipLines.push(`   Outdoor: ${detailedStats.outdoorHumidityAvg}%`);
+                                                    }
+                                                }
+                                                
+                                                // Incident summary
+                                                const totalIncidents = detailedStats.highTempIncidents + detailedStats.freezeTempIncidents + detailedStats.powerOutageIncidents + detailedStats.wifiDownIncidents;
+                                                if (totalIncidents > 0) {
+                                                    tooltipLines.push(`⚠️ Incidents: ${totalIncidents} total`);
+                                                    if (detailedStats.highTempIncidents > 0) tooltipLines.push(`   High Temp: ${detailedStats.highTempIncidents}`);
+                                                    if (detailedStats.freezeTempIncidents > 0) tooltipLines.push(`   Freeze: ${detailedStats.freezeTempIncidents}`);
+                                                    if (detailedStats.powerOutageIncidents > 0) tooltipLines.push(`   Power: ${detailedStats.powerOutageIncidents}`);
+                                                    if (detailedStats.wifiDownIncidents > 0) tooltipLines.push(`   WiFi: ${detailedStats.wifiDownIncidents}`);
+                                                } else {
+                                                    tooltipLines.push(`✅ No incidents this month`);
+                                                }
+                                                
+                                            } else if (tempStats) {
+                                                // Fallback to basic temperature stats
+                                                tooltipLines = [
+                                                    `🌡️ Temperature Statistics for ${monthLabel}:`,
+                                                    `   Min: ${tempStats.min}°F`,
+                                                    `   Max: ${tempStats.max}°F`, 
+                                                    `   Avg: ${tempStats.avg}°F`,
+                                                    `   Data Points: ${tempStats.count}`
+                                                ];
+                                            }
+                                            
+                                            return tooltipLines;
                                         }
                                     }
                                     return [];
@@ -2419,7 +2508,9 @@
                                         return sum + item.parsed.y;
                                     }, 0);
                                     
-                                    let footer = totalIncidents > 0 ? `Total: ${totalIncidents} incidents` : '';
+                                    // Ensure incidents are always whole numbers
+                                    const roundedIncidents = Math.round(totalIncidents);
+                                    let footer = roundedIncidents > 0 ? `Total: ${roundedIncidents} incidents` : '';
                                     
                                     // Add temperature stats for monthly view (only if not temperature hover point)
                                     if (context.length > 0) {
