@@ -2205,8 +2205,11 @@
             window.detailedMonthlyStats = {};
             
             monthlyStats.forEach(monthData => {
-                // Create month label for indexing
-                const monthLabel = `${monthData.Year}-${String(monthData.Month).padStart(2, '0')}`;
+                // Create month label matching chart format (e.g., "Aug 25")
+                const monthDate = new Date(monthData.Year, monthData.Month - 1, 1);
+                const monthLabel = monthDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'});
+                
+                console.log(`Storing detailed stats for: ${monthLabel} (from ${monthData.Year}-${monthData.Month})`);
                 
                 // Store detailed monthly stats for tooltips
                 window.detailedMonthlyStats[monthLabel] = {
@@ -2604,11 +2607,13 @@
                                         
                                         console.log('Temp stats:', tempStats);
                                         console.log('Detailed stats:', detailedStats);
+                                        console.log('Available detailed stats keys:', Object.keys(window.detailedMonthlyStats || {}));
                                         
                                         if (tempStats || detailedStats) {
                                             let tooltipLines = [];
                                             
                                             if (detailedStats) {
+                                                console.log('Using detailed stats for enhanced tooltip');
                                                 tooltipLines.push(`🌡️ Temperature Statistics for ${monthLabel}:`);
                                                 
                                                 // Indoor temperature details
