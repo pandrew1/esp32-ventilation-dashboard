@@ -1853,11 +1853,17 @@
                 const now = new Date();
                 const oneYearAgo = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
                 
+                // Get temperature data for monthly view overlays
+                let temperatureData = null;
+                if (viewType === 'monthly') {
+                    temperatureData = await fetchTemperatureDataForTrends();
+                }
+                
                 // For now, we'll use the original incidents data if available
                 // In a real implementation, you'd fetch data with a longer time range
                 if (!originalIncidentsData || originalIncidentsData.length === 0) {
                     trendsStatus.textContent = 'No incident data available for trends analysis';
-                    updateIncidentTrendsChart([], viewType, severityFilter);
+                    updateIncidentTrendsChart([], viewType, severityFilter, temperatureData);
                     return;
                 }
                 
@@ -1878,16 +1884,115 @@
                 filteredIncidents = filteredIncidents.filter(incident => incident.startTime >= cutoffTimestamp);
                 
                 trendsStatus.textContent = `Showing ${filteredIncidents.length} incidents over last 12 months`;
-                updateIncidentTrendsChart(filteredIncidents, viewType, severityFilter);
+                updateIncidentTrendsChart(filteredIncidents, viewType, severityFilter, temperatureData);
                 
             } catch (error) {
                 console.error('Error loading incident trends:', error);
                 trendsStatus.textContent = 'Error loading incident trends data';
-                updateIncidentTrendsChart([], viewType, severityFilter);
+                updateIncidentTrendsChart([], viewType, severityFilter, null);
             }
         }
 
-        function updateIncidentTrendsChart(incidents, viewType, severityFilter) {
+        // Fetch temperature data for trends overlay
+        async function fetchTemperatureDataForTrends() {
+            try {
+                const token = localStorage.getItem('ventilation_auth_token');
+                
+                // If no authentication method is available, return null
+                if (!token && !CONFIG.apiSecret) {
+                    return null;
+                }
+
+                // Fetch temperature data from multiple time windows to get broader coverage
+                const responses = await Promise.all([
+                    fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=48`, {
+                        method: 'GET',
+                        headers: getAuthHeaders()
+                    }),
+                    fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=168`, { // 7 days
+                        method: 'GET',
+                        headers: getAuthHeaders()
+                    }),
+                    fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=720`, { // 30 days
+                        method: 'GET',
+                        headers: getAuthHeaders()
+                    })
+                ]);
+                
+                // Combine all valid responses
+                let allTemperatureData = [];
+                for (const response of responses) {
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.data && data.data.length > 0) {
+                            allTemperatureData = allTemperatureData.concat(data.data);
+                        }
+                    }
+                }
+                
+                // Remove duplicates based on timestamp and filter valid data
+                const uniqueData = [];
+                const seenTimestamps = new Set();
+                
+                allTemperatureData.forEach(item => {
+                    const timestampKey = item.timestamp;
+                    if (!seenTimestamps.has(timestampKey) && isValidTemperatureReading(item)) {
+                        seenTimestamps.add(timestampKey);
+                        uniqueData.push(item);
+                    }
+                });
+                
+                console.log(`Temperature data for trends: ${uniqueData.length} unique data points`);
+                return uniqueData;
+                
+            } catch (error) {
+                console.error('Error fetching temperature data for trends:', error);
+                return null;
+            }
+        }
+
+        // Helper function to validate temperature readings
+        function isValidTemperatureReading(item) {
+            if (!item.timestamp || !item.sensors) return false;
+            
+            // Validate timestamp (same logic as chart)
+            let date;
+            if (typeof item.timestamp === 'string') {
+                if (item.timestamp.includes('T') || item.timestamp.includes('-')) {
+                    date = new Date(item.timestamp);
+                } else {
+                    const unixSeconds = parseInt(item.timestamp);
+                    if (!isNaN(unixSeconds) && unixSeconds > 1000000000 && unixSeconds < 2000000000) {
+                        date = new Date(unixSeconds * 1000);
+                    } else {
+                        return false;
+                    }
+                }
+            } else if (typeof item.timestamp === 'number') {
+                if (item.timestamp < 1000000000 || item.timestamp > 2000000000) {
+                    return false;
+                }
+                date = item.timestamp < 10000000000 ? new Date(item.timestamp * 1000) : new Date(item.timestamp);
+            } else {
+                return false;
+            }
+            
+            const year = date.getFullYear();
+            if (isNaN(date.getTime()) || year < 2020 || year > 2030) {
+                return false;
+            }
+            
+            // Check for valid temperature readings
+            const indoor = item.sensors.indoor;
+            const outdoor = item.sensors.outdoor;
+            const garage = item.sensors.garage;
+            
+            return (indoor && typeof indoor.temp === 'number') ||
+                   (outdoor && typeof outdoor.temp === 'number') ||
+                   (garage && typeof garage.temp === 'number');
+        }
+
+        function updateIncidentTrendsChart(incidents, viewType, severityFilter, temperatureData = null) {
             const ctx = document.getElementById('incidentTrendsChart').getContext('2d');
             
             // Destroy existing chart
@@ -1935,7 +2040,7 @@
             if (viewType === 'weekly') {
                 [chartData, chartLabels] = processWeeklyIncidentData(incidents, incidentTypes, severityFilter);
             } else {
-                [chartData, chartLabels] = processMonthlyIncidentData(incidents, incidentTypes, severityFilter);
+                [chartData, chartLabels] = processMonthlyIncidentData(incidents, incidentTypes, severityFilter, temperatureData);
             }
             
             // Create the chart
@@ -1966,7 +2071,19 @@
                             ticks: {
                                 stepSize: 1
                             }
-                        }
+                        },
+                        yTemp: viewType === 'monthly' && temperatureData ? {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°F)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        } : undefined
                     },
                     plugins: {
                         legend: {
@@ -1991,7 +2108,19 @@
                                 },
                                 footer: function(context) {
                                     const totalIncidents = context.reduce((sum, item) => sum + item.parsed.y, 0);
-                                    return totalIncidents > 0 ? `Total: ${totalIncidents} incidents` : '';
+                                    let footer = totalIncidents > 0 ? `Total: ${totalIncidents} incidents` : '';
+                                    
+                                    // Add temperature stats for monthly view
+                                    if (viewType === 'monthly' && temperatureData && context.length > 0) {
+                                        const monthIndex = context[0].dataIndex;
+                                        const tempStats = getTemperatureStatsForTooltip(monthIndex, chartLabels);
+                                        if (tempStats) {
+                                            footer += footer ? '\n' : '';
+                                            footer += `Temp: ${tempStats.min}°F - ${tempStats.max}°F (avg ${tempStats.avg}°F)`;
+                                        }
+                                    }
+                                    
+                                    return footer;
                                 }
                             }
                         }
@@ -2117,7 +2246,7 @@
             return [datasets, chartLabels];
         }
 
-        function processMonthlyIncidentData(incidents, incidentTypes, severityFilter) {
+        function processMonthlyIncidentData(incidents, incidentTypes, severityFilter, temperatureData = null) {
             // Create monthly buckets for the last 12 months
             const now = new Date();
             const months = [];
@@ -2142,6 +2271,15 @@
                     monthlyData[monthLabel][type] = { critical: 0, high: 0, medium: 0, low: 0 };
                 });
             }
+            
+            // Process temperature data if available
+            let monthlyTemperatureStats = {};
+            if (temperatureData) {
+                monthlyTemperatureStats = aggregateTemperatureByMonth(temperatureData, months);
+            }
+            
+            // Store temperature stats globally for tooltip access
+            window.monthlyTemperatureStats = monthlyTemperatureStats;
             
             // Categorize incidents into monthly buckets
             incidents.forEach(incident => {
@@ -2219,7 +2357,119 @@
                 }
             });
             
+            // Add temperature overlay datasets for monthly view
+            if (temperatureData && Object.keys(monthlyTemperatureStats).length > 0) {
+                // Min temperature line
+                datasets.push({
+                    label: 'Min Temperature',
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? monthlyTemperatureStats[label].min : null),
+                    type: 'line',
+                    borderColor: '#3498db',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    yAxisID: 'yTemp',
+                    tension: 0.4
+                });
+                
+                // Max temperature line
+                datasets.push({
+                    label: 'Max Temperature',
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? monthlyTemperatureStats[label].max : null),
+                    type: 'line',
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    yAxisID: 'yTemp',
+                    tension: 0.4
+                });
+                
+                // Average temperature line
+                datasets.push({
+                    label: 'Avg Temperature',
+                    data: chartLabels.map(label => monthlyTemperatureStats[label] ? monthlyTemperatureStats[label].avg : null),
+                    type: 'line',
+                    borderColor: '#f39c12',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    yAxisID: 'yTemp',
+                    tension: 0.4,
+                    borderDash: [5, 5]
+                });
+            }
+            
             return [datasets, chartLabels];
+        }
+
+        // Aggregate temperature data by month
+        function aggregateTemperatureByMonth(temperatureData, months) {
+            const monthlyStats = {};
+            
+            months.forEach(month => {
+                const monthData = temperatureData.filter(item => {
+                    let timestamp;
+                    
+                    // Parse timestamp (same logic as chart validation)
+                    if (typeof item.timestamp === 'string') {
+                        if (item.timestamp.includes('T') || item.timestamp.includes('-')) {
+                            timestamp = Math.floor(new Date(item.timestamp).getTime() / 1000);
+                        } else {
+                            timestamp = parseInt(item.timestamp);
+                        }
+                    } else if (typeof item.timestamp === 'number') {
+                        timestamp = item.timestamp < 10000000000 ? item.timestamp : Math.floor(item.timestamp / 1000);
+                    } else {
+                        return false;
+                    }
+                    
+                    return timestamp >= month.start && timestamp <= month.end;
+                });
+                
+                if (monthData.length > 0) {
+                    // Collect all valid temperature readings (indoor, outdoor, garage)
+                    let allTemps = [];
+                    
+                    monthData.forEach(item => {
+                        if (item.sensors) {
+                            if (item.sensors.indoor && typeof item.sensors.indoor.temp === 'number') {
+                                allTemps.push(item.sensors.indoor.temp);
+                            }
+                            if (item.sensors.outdoor && typeof item.sensors.outdoor.temp === 'number') {
+                                allTemps.push(item.sensors.outdoor.temp);
+                            }
+                            if (item.sensors.garage && typeof item.sensors.garage.temp === 'number') {
+                                allTemps.push(item.sensors.garage.temp);
+                            }
+                        }
+                    });
+                    
+                    if (allTemps.length > 0) {
+                        monthlyStats[month.label] = {
+                            min: Math.round(Math.min(...allTemps) * 10) / 10,
+                            max: Math.round(Math.max(...allTemps) * 10) / 10,
+                            avg: Math.round((allTemps.reduce((sum, temp) => sum + temp, 0) / allTemps.length) * 10) / 10,
+                            count: allTemps.length
+                        };
+                    }
+                }
+            });
+            
+            console.log('Monthly temperature stats:', monthlyStats);
+            return monthlyStats;
+        }
+
+        // Helper function to get temperature stats for tooltip
+        function getTemperatureStatsForTooltip(monthIndex, chartLabels) {
+            if (window.monthlyTemperatureStats && chartLabels[monthIndex]) {
+                const monthLabel = chartLabels[monthIndex];
+                return window.monthlyTemperatureStats[monthLabel] || null;
+            }
+            return null;
         }
 
         function updateConnectionStatus(status) {
