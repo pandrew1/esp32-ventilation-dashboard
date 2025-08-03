@@ -529,18 +529,18 @@
 
                         <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
                             <strong>How Effectiveness is Calculated:</strong><br>
-                            • Completed sessions: 30+ minutes of operation | Ongoing sessions: 15+ minutes<br>
-                            • Effectiveness = (Actual Temperature Reduction ÷ Theoretical Maximum) × 100%<br>
-                            • Theoretical maximum assumes 80% efficiency based on indoor-outdoor temperature difference<br>
-                            • Bonuses applied for extreme heat (+10%) and sustained operation (+5%)<br>
-                            • Heat gain prevention credit given for temperature maintenance during hot periods<br>
+                            • Adaptive thresholds: 25+ minutes standard, 20+ for long sessions, 10+ for ongoing<br>
+                            • Effectiveness = (Actual + Baseline Credit) ÷ Theoretical Maximum × 100%<br>
+                            • Theoretical maximum: 90% efficiency based on indoor-outdoor temperature difference<br>
+                            • Baseline credits: 1-2°F for heat gain prevention based on conditions and duration<br>
+                            • Generous bonuses: Up to +35% for extreme heat and marathon sessions (3+ hours)<br>
                             • Ratings: 80%+ Excellent, 60-79% Good, 40-59% Fair, <40% Poor
                         </div>
                     </div>
                     
                     <div id="noEffectivenessData" style="text-align: center; padding: 20px; color: #666;">
                         <p>📊 No substantial ventilation sessions detected in current time period.</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 30+ minutes of operation (15+ for ongoing sessions).</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 25+ minutes of operation (10+ for ongoing sessions).</p>
                     </div>
                 </div>
 
@@ -1931,9 +1931,22 @@
             // Debug fan status data
             console.log('Fan status data points:', fanStatus.length);
 
-            // Calculate ventilation effectiveness for substantial sessions (45+ minutes)
+            // Calculate ventilation effectiveness for substantial sessions (30+ minutes)
             const effectivenessData = calculateVentilationEffectiveness(timeBasedData);
             console.log('Effectiveness data points:', effectivenessData.length);
+            
+            // Debug logging for ongoing sessions
+            if (timeBasedData.length > 0) {
+                const recentDataPoints = timeBasedData.slice(-5);
+                const fanCurrentlyOn = recentDataPoints.some(point => 
+                    point.item.system && point.item.system.fanOn === true
+                );
+                console.log('Recent fan status check:', {
+                    recentDataPoints: recentDataPoints.length,
+                    fanCurrentlyOn: fanCurrentlyOn,
+                    latestTimestamp: recentDataPoints[recentDataPoints.length - 1]?.timestamp
+                });
+            }
 
             // Update effectiveness analysis section
             updateEffectivenessAnalysis(effectivenessData);
@@ -3304,19 +3317,52 @@
             currentHour.setMinutes(0, 0, 0);
             const currentHourKey = currentHour.toISOString();
             
+            // Also check the previous hour for ongoing sessions that might span multiple hours
+            const previousHour = new Date(now.getTime() - (60 * 60 * 1000));
+            previousHour.setMinutes(0, 0, 0);
+            const previousHourKey = previousHour.toISOString();
+            
+            // Check current hour
             if (hourlyGroups[currentHourKey]) {
                 const currentHourData = hourlyGroups[currentHourKey];
                 
-                // Check if fan is currently running in recent data
-                const recentData = currentHourData.slice(-5); // Last 5 data points
+                // Check if fan is currently running in recent data (more lenient check)
+                const recentData = currentHourData.slice(-10); // Last 10 data points instead of 5
                 const fanCurrentlyOn = recentData.some(point => 
                     point.item.system && point.item.system.fanOn === true
                 );
                 
-                if (fanCurrentlyOn) {
-                    // Mark this as an ongoing session for special handling
+                if (fanCurrentlyOn && recentData.length >= 3) { // Need at least 3 data points
                     hourlyGroups[currentHourKey].isOngoingSession = true;
                     console.log('Detected ongoing ventilation session in current hour');
+                }
+            }
+            
+            // Also check if we have a long-running session that started in the previous hour
+            if (hourlyGroups[previousHourKey] && hourlyGroups[currentHourKey]) {
+                const prevHourData = hourlyGroups[previousHourKey];
+                const currentHourData = hourlyGroups[currentHourKey];
+                
+                // Check if fan was running at end of previous hour and start of current hour
+                const prevHourEnd = prevHourData.slice(-5);
+                const currentHourStart = currentHourData.slice(0, 5);
+                
+                const fanWasRunning = prevHourEnd.some(point => 
+                    point.item.system && point.item.system.fanOn === true
+                );
+                const fanStillRunning = currentHourStart.some(point => 
+                    point.item.system && point.item.system.fanOn === true
+                );
+                
+                if (fanWasRunning && fanStillRunning) {
+                    // Mark both hours as part of ongoing session for long-running analysis
+                    if (!hourlyGroups[previousHourKey].isOngoingSession) {
+                        hourlyGroups[previousHourKey].isOngoingSession = true;
+                        console.log('Detected extended ventilation session spanning multiple hours');
+                    }
+                    if (!hourlyGroups[currentHourKey].isOngoingSession) {
+                        hourlyGroups[currentHourKey].isOngoingSession = true;
+                    }
                 }
             }
 
@@ -3335,9 +3381,17 @@
             
             const fanMinutes = (fanOnCount / hourData.length) * 60;
             
-            // Dynamic threshold: 30+ minutes for completed sessions, 15+ for ongoing
+            // Dynamic threshold: more inclusive for longer sessions and ongoing sessions
             const isOngoing = hourData.isOngoingSession;
-            const minimumMinutes = isOngoing ? 15 : 30;
+            let minimumMinutes;
+            
+            if (isOngoing) {
+                minimumMinutes = 10; // Very low threshold for ongoing sessions
+            } else if (fanMinutes >= 120) {
+                minimumMinutes = 20; // Lower threshold for long sessions (2+ hours)
+            } else {
+                minimumMinutes = 25; // Standard threshold for regular sessions
+            }
             
             if (fanMinutes < minimumMinutes) {
                 return null;
@@ -3369,36 +3423,63 @@
             }
 
             // More generous effectiveness calculation:
-            // 1. Use 80% efficiency factor (was 60%) - more realistic for good ventilation systems
-            // 2. Add minimum baseline credit for any temperature maintenance during hot periods
+            // 1. Use 90% efficiency factor (was 80%) - very generous for whole house ventilation
+            // 2. Add substantial baseline credit for any cooling or temperature maintenance
             // 3. Account for heat gain prevention (cooling load reduction)
+            // 4. Give extra credit for long sessions and challenging conditions
             
-            let theoreticalMax = tempDifferential * 0.8; // Increased from 0.6 to 0.8
+            let theoreticalMax = tempDifferential * 0.9; // Increased from 0.8 to 0.9
             
-            // If actual reduction is small but positive, give credit for heat gain prevention
-            if (actualReduction >= 0 && actualReduction < 2) {
-                // During hot periods, preventing temperature rise is valuable
-                // Give credit equivalent to 1°F reduction for temperature maintenance
-                const heatGainPrevention = Math.min(1.5, tempDifferential * 0.1);
-                const adjustedReduction = actualReduction + heatGainPrevention;
+            // Enhanced heat gain prevention and baseline effectiveness
+            if (actualReduction >= -0.5) { // Even allow slight temperature rise
+                // During any outdoor cooling conditions, give substantial baseline credit
+                // This recognizes that ventilation provides value even with minimal temp change
+                let baselineCredit = 0;
+                
+                if (tempDifferential >= 10) {
+                    baselineCredit = 2.0; // Large differential gets 2°F baseline credit
+                } else if (tempDifferential >= 5) {
+                    baselineCredit = 1.5; // Medium differential gets 1.5°F credit
+                } else if (tempDifferential >= 2) {
+                    baselineCredit = 1.0; // Small differential gets 1°F credit
+                }
+                
+                // Additional credit for long sessions (heat gain prevention over time)
+                if (fanMinutes >= 120) { // 2+ hours
+                    baselineCredit += 1.0;
+                } else if (fanMinutes >= 60) { // 1+ hours  
+                    baselineCredit += 0.5;
+                }
+                
+                const adjustedReduction = Math.max(actualReduction, 0) + baselineCredit;
                 var effectiveness = (adjustedReduction / theoreticalMax) * 100;
             } else {
-                // Normal calculation for significant cooling
-                var effectiveness = (actualReduction / theoreticalMax) * 100;
+                // Significant heating occurred - this should be rare
+                var effectiveness = 0;
             }
             
             // Apply bonus factors for challenging conditions:
-            // - High outdoor temps: Give 10% bonus for operating in extreme heat
-            // - Long runtime: Give 5% bonus for sustained operation
+            // - High outdoor temps: Give 15% bonus for operating in extreme heat  
+            // - Long runtime: Give 10% bonus for sustained operation
+            // - Very long runtime: Give additional 10% bonus for marathon sessions
             let bonusMultiplier = 1.0;
             
-            if (outdoorAvg >= 85) {
-                bonusMultiplier += 0.10; // 10% bonus for extreme heat
+            if (outdoorAvg >= 90) {
+                bonusMultiplier += 0.20; // 20% bonus for extreme heat (90°F+)
+            } else if (outdoorAvg >= 85) {
+                bonusMultiplier += 0.15; // 15% bonus for very hot (85-89°F)
             } else if (outdoorAvg >= 80) {
-                bonusMultiplier += 0.05; // 5% bonus for hot conditions
+                bonusMultiplier += 0.10; // 10% bonus for hot conditions (80-84°F)
+            } else if (outdoorAvg >= 75) {
+                bonusMultiplier += 0.05; // 5% bonus for warm conditions (75-79°F)
             }
             
-            if (fanMinutes >= 50) {
+            // Runtime bonuses
+            if (fanMinutes >= 180) { // 3+ hours
+                bonusMultiplier += 0.15; // 15% bonus for marathon sessions
+            } else if (fanMinutes >= 120) { // 2+ hours
+                bonusMultiplier += 0.10; // 10% bonus for extended sessions
+            } else if (fanMinutes >= 60) { // 1+ hours
                 bonusMultiplier += 0.05; // 5% bonus for sustained operation
             }
             
