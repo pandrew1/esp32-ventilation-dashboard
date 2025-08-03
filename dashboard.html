@@ -529,16 +529,18 @@
 
                         <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
                             <strong>How Effectiveness is Calculated:</strong><br>
-                            • Only sessions with 45+ minutes of continuous operation are analyzed<br>
+                            • Completed sessions: 30+ minutes of operation | Ongoing sessions: 15+ minutes<br>
                             • Effectiveness = (Actual Temperature Reduction ÷ Theoretical Maximum) × 100%<br>
-                            • Theoretical maximum assumes 60% efficiency based on indoor-outdoor temperature difference<br>
+                            • Theoretical maximum assumes 80% efficiency based on indoor-outdoor temperature difference<br>
+                            • Bonuses applied for extreme heat (+10%) and sustained operation (+5%)<br>
+                            • Heat gain prevention credit given for temperature maintenance during hot periods<br>
                             • Ratings: 80%+ Excellent, 60-79% Good, 40-59% Fair, <40% Poor
                         </div>
                     </div>
                     
                     <div id="noEffectivenessData" style="text-align: center; padding: 20px; color: #666;">
                         <p>📊 No substantial ventilation sessions detected in current time period.</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 45+ minutes of continuous fan operation.</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 30+ minutes of operation (15+ for ongoing sessions).</p>
                     </div>
                 </div>
 
@@ -2090,15 +2092,22 @@
                                     if (datasetLabel === 'Ventilation Effectiveness (%)') {
                                         const sessionData = context.raw.sessionData;
                                         if (sessionData) {
-                                            return [
+                                            const lines = [
                                                 `🔄 Effectiveness: ${sessionData.percentage}%`,
-                                                `⏱️ Fan Runtime: ${sessionData.fanMinutes} minutes`,
+                                                `⏱️ Fan Runtime: ${sessionData.fanMinutes} minutes${sessionData.isOngoing ? ' (ongoing)' : ''}`,
                                                 `🌡️ Temp Change: ${sessionData.startTemp}°F → ${sessionData.endTemp}°F`,
                                                 `📉 Actual Reduction: ${sessionData.actualReduction}°F`,
                                                 `📊 Theoretical Max: ${sessionData.theoreticalMax}°F`,
                                                 `🌤️ Outdoor Average: ${sessionData.outdoorAvg}°F`,
                                                 `📋 Performance: ${getEffectivenessRating(sessionData.percentage)}`
                                             ];
+                                            
+                                            // Add bonus information if applied
+                                            if (sessionData.bonusApplied && sessionData.bonusApplied > 0) {
+                                                lines.push(`🎯 Bonus Applied: +${sessionData.bonusApplied}% (challenging conditions)`);
+                                            }
+                                            
+                                            return lines;
                                         }
                                         return `Effectiveness: ${value}%`;
                                     }
@@ -3248,12 +3257,21 @@
             for (const [hourKey, hourData] of Object.entries(hourlyGroups)) {
                 const effectiveness = calculateHourlyEffectiveness(hourData);
                 if (effectiveness !== null) {
-                    // Use the middle of the hour as the timestamp
+                    // Use the middle of the hour as the timestamp, unless it's ongoing
                     const hourStart = new Date(hourKey);
-                    const hourMiddle = new Date(hourStart.getTime() + (30 * 60 * 1000)); // Add 30 minutes
+                    let timestamp;
+                    
+                    if (hourData.isOngoingSession) {
+                        // For ongoing sessions, use current time
+                        timestamp = new Date();
+                        effectiveness.isOngoing = true;
+                    } else {
+                        // For completed sessions, use middle of hour
+                        timestamp = new Date(hourStart.getTime() + (30 * 60 * 1000)); // Add 30 minutes
+                    }
                     
                     effectivenessPoints.push({
-                        x: hourMiddle,
+                        x: timestamp,
                         y: effectiveness.percentage,
                         // Store additional data for tooltips
                         sessionData: effectiveness
@@ -3266,6 +3284,7 @@
 
         function groupDataByHour(timeBasedData) {
             const hourlyGroups = {};
+            const now = new Date();
 
             timeBasedData.forEach(dataPoint => {
                 // Round timestamp to hour
@@ -3278,6 +3297,28 @@
                 }
                 hourlyGroups[hourKey].push(dataPoint);
             });
+
+            // For the current hour, if we have data and the fan is running,
+            // treat it as an ongoing session for effectiveness analysis
+            const currentHour = new Date(now);
+            currentHour.setMinutes(0, 0, 0);
+            const currentHourKey = currentHour.toISOString();
+            
+            if (hourlyGroups[currentHourKey]) {
+                const currentHourData = hourlyGroups[currentHourKey];
+                
+                // Check if fan is currently running in recent data
+                const recentData = currentHourData.slice(-5); // Last 5 data points
+                const fanCurrentlyOn = recentData.some(point => 
+                    point.item.system && point.item.system.fanOn === true
+                );
+                
+                if (fanCurrentlyOn) {
+                    // Mark this as an ongoing session for special handling
+                    hourlyGroups[currentHourKey].isOngoingSession = true;
+                    console.log('Detected ongoing ventilation session in current hour');
+                }
+            }
 
             return hourlyGroups;
         }
@@ -3294,8 +3335,11 @@
             
             const fanMinutes = (fanOnCount / hourData.length) * 60;
             
-            // Only calculate effectiveness for substantial sessions (45+ minutes)
-            if (fanMinutes < 45) {
+            // Dynamic threshold: 30+ minutes for completed sessions, 15+ for ongoing
+            const isOngoing = hourData.isOngoingSession;
+            const minimumMinutes = isOngoing ? 15 : 30;
+            
+            if (fanMinutes < minimumMinutes) {
                 return null;
             }
 
@@ -3324,10 +3368,44 @@
                 return null; // No cooling potential
             }
 
-            // Calculate theoretical maximum reduction
-            // Use 60% efficiency factor for realistic whole-house ventilation
-            const theoreticalMax = tempDifferential * 0.6;
-            const effectiveness = Math.max(0, Math.min(100, (actualReduction / theoreticalMax) * 100));
+            // More generous effectiveness calculation:
+            // 1. Use 80% efficiency factor (was 60%) - more realistic for good ventilation systems
+            // 2. Add minimum baseline credit for any temperature maintenance during hot periods
+            // 3. Account for heat gain prevention (cooling load reduction)
+            
+            let theoreticalMax = tempDifferential * 0.8; // Increased from 0.6 to 0.8
+            
+            // If actual reduction is small but positive, give credit for heat gain prevention
+            if (actualReduction >= 0 && actualReduction < 2) {
+                // During hot periods, preventing temperature rise is valuable
+                // Give credit equivalent to 1°F reduction for temperature maintenance
+                const heatGainPrevention = Math.min(1.5, tempDifferential * 0.1);
+                const adjustedReduction = actualReduction + heatGainPrevention;
+                var effectiveness = (adjustedReduction / theoreticalMax) * 100;
+            } else {
+                // Normal calculation for significant cooling
+                var effectiveness = (actualReduction / theoreticalMax) * 100;
+            }
+            
+            // Apply bonus factors for challenging conditions:
+            // - High outdoor temps: Give 10% bonus for operating in extreme heat
+            // - Long runtime: Give 5% bonus for sustained operation
+            let bonusMultiplier = 1.0;
+            
+            if (outdoorAvg >= 85) {
+                bonusMultiplier += 0.10; // 10% bonus for extreme heat
+            } else if (outdoorAvg >= 80) {
+                bonusMultiplier += 0.05; // 5% bonus for hot conditions
+            }
+            
+            if (fanMinutes >= 50) {
+                bonusMultiplier += 0.05; // 5% bonus for sustained operation
+            }
+            
+            effectiveness *= bonusMultiplier;
+            
+            // Cap at 100% but allow the bonus to help reach higher scores
+            effectiveness = Math.max(0, Math.min(100, effectiveness));
 
             return {
                 percentage: Math.round(effectiveness * 10) / 10, // Round to 1 decimal
@@ -3337,7 +3415,8 @@
                 startTemp: Math.round(startTemp * 10) / 10,
                 endTemp: Math.round(endTemp * 10) / 10,
                 outdoorAvg: Math.round(outdoorAvg * 10) / 10,
-                tempDifferential: Math.round(tempDifferential * 10) / 10
+                tempDifferential: Math.round(tempDifferential * 10) / 10,
+                bonusApplied: Math.round((bonusMultiplier - 1) * 100) // Show bonus percentage
             };
         }
 
