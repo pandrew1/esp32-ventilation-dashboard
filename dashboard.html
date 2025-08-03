@@ -497,6 +497,51 @@
                     </div>
                 </div>
 
+                <!-- Ventilation Effectiveness Summary -->
+                <div class="card">
+                    <h3>🎯 Ventilation Effectiveness Analysis</h3>
+                    <div id="effectivenessAnalysis" style="display: none;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                            <div class="sensor-reading">
+                                <span>Recent Sessions</span>
+                                <span class="sensor-value" id="recentSessions">-</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Average Effectiveness</span>
+                                <span class="sensor-value" id="avgEffectiveness">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Best Performance</span>
+                                <span class="sensor-value" id="bestEffectiveness">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Total Cooling</span>
+                                <span class="sensor-value" id="totalCooling">-°F</span>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
+                            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">💡 Effectiveness Insights</h4>
+                            <div id="effectivenessInsights">
+                                <p style="margin: 5px 0; color: #666;">Analyzing ventilation patterns...</p>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                            <strong>How Effectiveness is Calculated:</strong><br>
+                            • Only sessions with 45+ minutes of continuous operation are analyzed<br>
+                            • Effectiveness = (Actual Temperature Reduction ÷ Theoretical Maximum) × 100%<br>
+                            • Theoretical maximum assumes 60% efficiency based on indoor-outdoor temperature difference<br>
+                            • Ratings: 80%+ Excellent, 60-79% Good, 40-59% Fair, <40% Poor
+                        </div>
+                    </div>
+                    
+                    <div id="noEffectivenessData" style="text-align: center; padding: 20px; color: #666;">
+                        <p>📊 No substantial ventilation sessions detected in current time period.</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 45+ minutes of continuous fan operation.</p>
+                    </div>
+                </div>
+
                 <!-- Door Status -->
                 <div class="card" id="doorSection" style="display: none;">
                     <h3>🚪 Door Status & Activity</h3>
@@ -1698,6 +1743,10 @@
 
             // If no data, create a simple "no data" chart
             if (!data || data.length === 0) {
+                // Hide effectiveness analysis when no data
+                document.getElementById('effectivenessAnalysis').style.display = 'none';
+                document.getElementById('noEffectivenessData').style.display = 'block';
+                
                 temperatureChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -1880,6 +1929,13 @@
             // Debug fan status data
             console.log('Fan status data points:', fanStatus.length);
 
+            // Calculate ventilation effectiveness for substantial sessions (45+ minutes)
+            const effectivenessData = calculateVentilationEffectiveness(timeBasedData);
+            console.log('Effectiveness data points:', effectivenessData.length);
+
+            // Update effectiveness analysis section
+            updateEffectivenessAnalysis(effectivenessData);
+
             // Create new chart with time-based data
             temperatureChart = new Chart(ctx, {
                 type: 'line',
@@ -1920,6 +1976,21 @@
                             pointRadius: 4,
                             pointHoverRadius: 6,
                             yAxisID: 'fan'
+                        },
+                        {
+                            label: 'Ventilation Effectiveness (%)',
+                            data: effectivenessData,
+                            borderColor: '#9932cc',
+                            backgroundColor: '#9932cc',
+                            type: 'line',
+                            tension: 0.2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: effectivenessData.map(point => getEffectivenessColor(point.y)),
+                            pointBorderColor: effectivenessData.map(point => getEffectivenessColor(point.y)),
+                            pointBorderWidth: 2,
+                            yAxisID: 'effectiveness',
+                            fill: false
                         }
                     ]
                 },
@@ -1948,7 +2019,30 @@
                                 callback: function(value) {
                                     return value === 1 ? 'ON' : 'OFF';
                                 }
+                            },
+                            grid: {
+                                drawOnChartArea: false,
                             }
+                        },
+                        effectiveness: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Effectiveness (%)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            // Offset to avoid overlapping with fan axis
+                            offset: true
                         },
                         x: {
                             type: 'time',
@@ -1976,6 +2070,51 @@
                         legend: {
                             display: true,
                             position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: function(context) {
+                                    if (context.length > 0) {
+                                        const timestamp = context[0].parsed.x;
+                                        return new Date(timestamp).toLocaleString();
+                                    }
+                                    return '';
+                                },
+                                label: function(context) {
+                                    const datasetLabel = context.dataset.label;
+                                    const value = context.parsed.y;
+                                    
+                                    // Special handling for effectiveness data
+                                    if (datasetLabel === 'Ventilation Effectiveness (%)') {
+                                        const sessionData = context.raw.sessionData;
+                                        if (sessionData) {
+                                            return [
+                                                `🔄 Effectiveness: ${sessionData.percentage}%`,
+                                                `⏱️ Fan Runtime: ${sessionData.fanMinutes} minutes`,
+                                                `🌡️ Temp Change: ${sessionData.startTemp}°F → ${sessionData.endTemp}°F`,
+                                                `📉 Actual Reduction: ${sessionData.actualReduction}°F`,
+                                                `📊 Theoretical Max: ${sessionData.theoreticalMax}°F`,
+                                                `🌤️ Outdoor Average: ${sessionData.outdoorAvg}°F`,
+                                                `📋 Performance: ${getEffectivenessRating(sessionData.percentage)}`
+                                            ];
+                                        }
+                                        return `Effectiveness: ${value}%`;
+                                    }
+                                    
+                                    // Handle other datasets
+                                    if (datasetLabel === 'Fan Status') {
+                                        return `Fan: ${value === 1 ? 'ON' : 'OFF'}`;
+                                    }
+                                    
+                                    if (datasetLabel.includes('Temperature')) {
+                                        return `${datasetLabel}: ${value}°F`;
+                                    }
+                                    
+                                    return `${datasetLabel}: ${value}`;
+                                }
+                            }
                         }
                     }
                 }
@@ -3095,6 +3234,195 @@
 
         // Manual refresh function
         window.refreshData = refreshData;
+
+        // Ventilation effectiveness calculation functions
+        function calculateVentilationEffectiveness(timeBasedData) {
+            if (!timeBasedData || timeBasedData.length === 0) {
+                return [];
+            }
+
+            // Group data by hour and calculate effectiveness for substantial ventilation sessions
+            const hourlyGroups = groupDataByHour(timeBasedData);
+            const effectivenessPoints = [];
+
+            for (const [hourKey, hourData] of Object.entries(hourlyGroups)) {
+                const effectiveness = calculateHourlyEffectiveness(hourData);
+                if (effectiveness !== null) {
+                    // Use the middle of the hour as the timestamp
+                    const hourStart = new Date(hourKey);
+                    const hourMiddle = new Date(hourStart.getTime() + (30 * 60 * 1000)); // Add 30 minutes
+                    
+                    effectivenessPoints.push({
+                        x: hourMiddle,
+                        y: effectiveness.percentage,
+                        // Store additional data for tooltips
+                        sessionData: effectiveness
+                    });
+                }
+            }
+
+            return effectivenessPoints;
+        }
+
+        function groupDataByHour(timeBasedData) {
+            const hourlyGroups = {};
+
+            timeBasedData.forEach(dataPoint => {
+                // Round timestamp to hour
+                const hour = new Date(dataPoint.timestamp);
+                hour.setMinutes(0, 0, 0);
+                const hourKey = hour.toISOString();
+
+                if (!hourlyGroups[hourKey]) {
+                    hourlyGroups[hourKey] = [];
+                }
+                hourlyGroups[hourKey].push(dataPoint);
+            });
+
+            return hourlyGroups;
+        }
+
+        function calculateHourlyEffectiveness(hourData) {
+            if (!hourData || hourData.length < 2) {
+                return null; // Need at least start and end data points
+            }
+
+            // Calculate fan runtime for this hour
+            const fanOnCount = hourData.filter(point => 
+                point.item.system && point.item.system.fanOn === true
+            ).length;
+            
+            const fanMinutes = (fanOnCount / hourData.length) * 60;
+            
+            // Only calculate effectiveness for substantial sessions (45+ minutes)
+            if (fanMinutes < 45) {
+                return null;
+            }
+
+            // Get temperature data for the hour
+            const validTemps = hourData.filter(point => 
+                point.item.sensors &&
+                point.item.sensors.indoor && typeof point.item.sensors.indoor.temp === 'number' &&
+                point.item.sensors.outdoor && typeof point.item.sensors.outdoor.temp === 'number'
+            );
+
+            if (validTemps.length < 2) {
+                return null; // Need temperature data
+            }
+
+            // Calculate temperature changes
+            const startTemp = validTemps[0].item.sensors.indoor.temp;
+            const endTemp = validTemps[validTemps.length - 1].item.sensors.indoor.temp;
+            const outdoorTemps = validTemps.map(p => p.item.sensors.outdoor.temp);
+            const outdoorAvg = outdoorTemps.reduce((sum, temp) => sum + temp, 0) / outdoorTemps.length;
+
+            const actualReduction = startTemp - endTemp;
+            const tempDifferential = startTemp - outdoorAvg;
+
+            // Only calculate if conditions favor cooling (outdoor cooler than indoor)
+            if (tempDifferential <= 0) {
+                return null; // No cooling potential
+            }
+
+            // Calculate theoretical maximum reduction
+            // Use 60% efficiency factor for realistic whole-house ventilation
+            const theoreticalMax = tempDifferential * 0.6;
+            const effectiveness = Math.max(0, Math.min(100, (actualReduction / theoreticalMax) * 100));
+
+            return {
+                percentage: Math.round(effectiveness * 10) / 10, // Round to 1 decimal
+                actualReduction: Math.round(actualReduction * 10) / 10,
+                theoreticalMax: Math.round(theoreticalMax * 10) / 10,
+                fanMinutes: Math.round(fanMinutes),
+                startTemp: Math.round(startTemp * 10) / 10,
+                endTemp: Math.round(endTemp * 10) / 10,
+                outdoorAvg: Math.round(outdoorAvg * 10) / 10,
+                tempDifferential: Math.round(tempDifferential * 10) / 10
+            };
+        }
+
+        function getEffectivenessColor(effectiveness) {
+            if (effectiveness >= 80) return '#228B22'; // Dark green - Excellent
+            if (effectiveness >= 60) return '#32CD32'; // Light green - Good  
+            if (effectiveness >= 40) return '#FFD700'; // Yellow - Fair
+            return '#FF6347'; // Red - Poor
+        }
+
+        function getEffectivenessRating(effectiveness) {
+            if (effectiveness >= 80) return 'Excellent 🌟';
+            if (effectiveness >= 60) return 'Good ✅';
+            if (effectiveness >= 40) return 'Fair ⚠️';
+            return 'Poor ❌';
+        }
+
+        function updateEffectivenessAnalysis(effectivenessData) {
+            const analysisSection = document.getElementById('effectivenessAnalysis');
+            const noDataSection = document.getElementById('noEffectivenessData');
+            
+            if (!effectivenessData || effectivenessData.length === 0) {
+                analysisSection.style.display = 'none';
+                noDataSection.style.display = 'block';
+                return;
+            }
+            
+            analysisSection.style.display = 'block';
+            noDataSection.style.display = 'none';
+            
+            // Calculate summary statistics
+            const sessions = effectivenessData.map(point => point.sessionData);
+            const effectivenessValues = sessions.map(s => s.percentage);
+            const avgEffectiveness = effectivenessValues.reduce((sum, val) => sum + val, 0) / effectivenessValues.length;
+            const bestEffectiveness = Math.max(...effectivenessValues);
+            const totalCooling = sessions.reduce((sum, s) => sum + s.actualReduction, 0);
+            
+            // Update summary values
+            document.getElementById('recentSessions').textContent = sessions.length;
+            document.getElementById('avgEffectiveness').textContent = `${Math.round(avgEffectiveness)}%`;
+            document.getElementById('bestEffectiveness').textContent = `${Math.round(bestEffectiveness)}%`;
+            document.getElementById('totalCooling').textContent = `${Math.round(totalCooling * 10) / 10}°F`;
+            
+            // Generate insights
+            const insights = generateEffectivenessInsights(sessions, avgEffectiveness, bestEffectiveness);
+            document.getElementById('effectivenessInsights').innerHTML = insights;
+        }
+
+        function generateEffectivenessInsights(sessions, avgEffectiveness, bestEffectiveness) {
+            const insights = [];
+            
+            // Performance assessment
+            if (avgEffectiveness >= 70) {
+                insights.push(`🌟 <strong>Excellent Performance:</strong> Your ventilation system is performing very well with ${Math.round(avgEffectiveness)}% average effectiveness.`);
+            } else if (avgEffectiveness >= 50) {
+                insights.push(`✅ <strong>Good Performance:</strong> System effectiveness of ${Math.round(avgEffectiveness)}% shows solid cooling performance.`);
+            } else {
+                insights.push(`⚠️ <strong>Improvement Opportunity:</strong> Average effectiveness of ${Math.round(avgEffectiveness)}% suggests room for optimization.`);
+            }
+            
+            // Runtime analysis
+            const avgRuntime = sessions.reduce((sum, s) => sum + s.fanMinutes, 0) / sessions.length;
+            if (avgRuntime >= 55) {
+                insights.push(`⏱️ <strong>Optimal Runtime:</strong> Sessions averaging ${Math.round(avgRuntime)} minutes provide thorough air exchange.`);
+            } else {
+                insights.push(`⏱️ <strong>Runtime Pattern:</strong> Sessions averaging ${Math.round(avgRuntime)} minutes show efficient targeted cooling.`);
+            }
+            
+            // Temperature differential analysis
+            const avgTempDiff = sessions.reduce((sum, s) => sum + s.tempDifferential, 0) / sessions.length;
+            if (avgTempDiff >= 8) {
+                insights.push(`🌡️ <strong>Great Conditions:</strong> Average ${Math.round(avgTempDiff)}°F indoor-outdoor difference provides excellent cooling potential.`);
+            } else if (avgTempDiff >= 4) {
+                insights.push(`🌡️ <strong>Moderate Conditions:</strong> ${Math.round(avgTempDiff)}°F average temperature difference allows for effective cooling.`);
+            } else {
+                insights.push(`🌡️ <strong>Limited Potential:</strong> Small ${Math.round(avgTempDiff)}°F temperature differences reduce cooling effectiveness.`);
+            }
+            
+            // Best practices recommendation
+            if (bestEffectiveness - avgEffectiveness > 20) {
+                insights.push(`📈 <strong>Optimization Tip:</strong> Your best session achieved ${Math.round(bestEffectiveness)}% effectiveness. Focus on similar outdoor conditions for maximum efficiency.`);
+            }
+            
+            return insights.map(insight => `<p style="margin: 8px 0;">${insight}</p>`).join('');
+        }
 
         // Cooling effect calculation function
         function calculateCoolingEffect(indoorTemp, outdoorTemp, fanMinutes, fanCurrentlyOn) {
