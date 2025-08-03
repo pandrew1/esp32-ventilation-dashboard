@@ -3609,6 +3609,42 @@
                 insights.push(`📈 <strong>Optimization Tip:</strong> Your best session achieved ${Math.round(bestEffectiveness)}% effectiveness. Focus on similar outdoor conditions for maximum efficiency.`);
             }
             
+            // Add improvement suggestions based on performance analysis
+            insights.push('<br><strong>💡 Ways to Improve Effectiveness:</strong>');
+            
+            // Timing-based suggestions
+            if (avgEffectiveness < 50) {
+                insights.push(`⏰ <strong>Better Timing:</strong> Run ventilation when outdoor temps are 8°F+ cooler than indoor for maximum benefit.`);
+            }
+            
+            // Runtime optimization
+            if (avgRuntime < 45) {
+                insights.push(`⏱️ <strong>Extend Runtime:</strong> Longer sessions (45+ minutes) allow better air exchange and temperature equalization.`);
+            } else if (avgRuntime > 120) {
+                insights.push(`⏱️ <strong>Runtime Efficiency:</strong> Consider shorter, more frequent sessions during optimal conditions instead of marathon runs.`);
+            }
+            
+            // Condition-based advice
+            if (avgTempDiff < 6) {
+                insights.push(`🌡️ <strong>Wait for Better Conditions:</strong> Target 6°F+ temperature differences for meaningful cooling impact.`);
+            }
+            
+            // Seasonal and time-of-day suggestions
+            insights.push(`🌙 <strong>Optimal Windows:</strong> Early morning (5-7 AM) and evening (8-10 PM) typically offer best outdoor cooling potential.`);
+            
+            // System efficiency tips
+            if (performanceRange > 25) {
+                insights.push(`🔧 <strong>Consistency Tips:</strong> Check for air leaks, clean filters, and ensure unobstructed airflow for consistent performance.`);
+            }
+            
+            // Advanced strategies
+            insights.push(`📊 <strong>Smart Strategy:</strong> Monitor weather forecasts - start ventilation before cool fronts arrive for maximum effectiveness.`);
+            
+            // House-specific optimizations
+            if (avgEffectiveness < 40) {
+                insights.push(`🏠 <strong>House Optimization:</strong> Consider ceiling fans to improve air circulation and thermal mass pre-cooling during peak effectiveness periods.`);
+            }
+            
             return insights.map(insight => `<p style="margin: 8px 0;">${insight}</p>`).join('');
         }
 
