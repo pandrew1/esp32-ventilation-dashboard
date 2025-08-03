@@ -534,7 +534,7 @@
                             • Theoretical maximum: 70% efficiency based on indoor-outdoor temperature difference<br>
                             • Baseline credits: 0.5-2.3°F based on conditions and duration (creates differentiation)<br>
                             • Performance bonuses: Up to +30% for challenging conditions and actual cooling achieved<br>
-                            • Balanced ratings: 75%+ Excellent, 60-74% Good, 45-59% Fair, <45% Poor
+                            • Adjusted ratings: 70%+ Excellent, 50-69% Good, 30-49% Fair, <30% Poor
                         </div>
                     </div>
                     
@@ -3516,16 +3516,16 @@
         }
 
         function getEffectivenessColor(effectiveness) {
-            if (effectiveness >= 75) return '#228B22'; // Dark green - Excellent
-            if (effectiveness >= 60) return '#32CD32'; // Light green - Good  
-            if (effectiveness >= 45) return '#FFD700'; // Yellow - Fair
+            if (effectiveness >= 70) return '#228B22'; // Dark green - Excellent
+            if (effectiveness >= 50) return '#32CD32'; // Light green - Good  
+            if (effectiveness >= 30) return '#FFD700'; // Yellow - Fair
             return '#FF6347'; // Red - Poor
         }
 
         function getEffectivenessRating(effectiveness) {
-            if (effectiveness >= 75) return 'Excellent 🌟';
-            if (effectiveness >= 60) return 'Good ✅';
-            if (effectiveness >= 45) return 'Fair ⚠️';
+            if (effectiveness >= 70) return 'Excellent 🌟';
+            if (effectiveness >= 50) return 'Good ✅';
+            if (effectiveness >= 30) return 'Fair ⚠️';
             return 'Poor ❌';
         }
 
