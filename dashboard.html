@@ -530,11 +530,11 @@
                         <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
                             <strong>How Effectiveness is Calculated:</strong><br>
                             • Adaptive thresholds: 25+ minutes standard, 20+ for long sessions, 10+ for ongoing<br>
-                            • Effectiveness = (Actual + Baseline Credit) ÷ Theoretical Maximum × 100%<br>
-                            • Theoretical maximum: 90% efficiency based on indoor-outdoor temperature difference<br>
-                            • Baseline credits: 1-2°F for heat gain prevention based on conditions and duration<br>
-                            • Generous bonuses: Up to +35% for extreme heat and marathon sessions (3+ hours)<br>
-                            • Ratings: 80%+ Excellent, 60-79% Good, 40-59% Fair, <40% Poor
+                            • Effectiveness = (Actual + Generous Baseline Credits) ÷ Theoretical Maximum × 100%<br>
+                            • Theoretical maximum: 60% efficiency based on indoor-outdoor temperature difference<br>
+                            • Generous baseline credits: 2-5°F for heat gain prevention and session duration<br>
+                            • Substantial bonuses: Up to +70% for any outdoor conditions and long sessions<br>
+                            • Realistic ratings: 70%+ Excellent, 50-69% Good, 35-49% Fair, <35% Poor
                         </div>
                     </div>
                     
@@ -3422,65 +3422,81 @@
                 return null; // No cooling potential
             }
 
-            // More generous effectiveness calculation:
-            // 1. Use 90% efficiency factor (was 80%) - very generous for whole house ventilation
-            // 2. Add substantial baseline credit for any cooling or temperature maintenance
+            // Much more realistic effectiveness calculation:
+            // 1. Use 60% efficiency factor - realistic for whole house ventilation (90% was too optimistic)
+            // 2. Add very generous baseline credit for ANY ventilation effort
             // 3. Account for heat gain prevention (cooling load reduction)
-            // 4. Give extra credit for long sessions and challenging conditions
+            // 4. Give substantial credit for long sessions and any cooling conditions
             
-            let theoreticalMax = tempDifferential * 0.9; // Increased from 0.8 to 0.9
+            let theoreticalMax = tempDifferential * 0.6; // Back to 60% but with much more generous baseline
             
-            // Enhanced heat gain prevention and baseline effectiveness
-            if (actualReduction >= -0.5) { // Even allow slight temperature rise
-                // During any outdoor cooling conditions, give substantial baseline credit
-                // This recognizes that ventilation provides value even with minimal temp change
-                let baselineCredit = 0;
-                
-                if (tempDifferential >= 10) {
-                    baselineCredit = 2.0; // Large differential gets 2°F baseline credit
-                } else if (tempDifferential >= 5) {
-                    baselineCredit = 1.5; // Medium differential gets 1.5°F credit
-                } else if (tempDifferential >= 2) {
-                    baselineCredit = 1.0; // Small differential gets 1°F credit
-                }
-                
-                // Additional credit for long sessions (heat gain prevention over time)
-                if (fanMinutes >= 120) { // 2+ hours
-                    baselineCredit += 1.0;
-                } else if (fanMinutes >= 60) { // 1+ hours  
-                    baselineCredit += 0.5;
-                }
-                
-                const adjustedReduction = Math.max(actualReduction, 0) + baselineCredit;
-                var effectiveness = (adjustedReduction / theoreticalMax) * 100;
+            // Very generous baseline effectiveness for any ventilation effort
+            let baselineCredit = 0;
+            let adjustedReduction = Math.max(actualReduction, 0); // Don't penalize for slight temperature rise
+            
+            // Substantial baseline credits - ventilation always provides value
+            if (tempDifferential >= 8) {
+                baselineCredit = 3.0; // Large differential gets 3°F baseline credit
+            } else if (tempDifferential >= 5) {
+                baselineCredit = 2.5; // Medium differential gets 2.5°F credit
+            } else if (tempDifferential >= 2) {
+                baselineCredit = 2.0; // Even small differential gets 2°F credit
             } else {
-                // Significant heating occurred - this should be rare
-                var effectiveness = 0;
+                baselineCredit = 1.5; // Always get at least 1.5°F credit for trying
             }
             
-            // Apply bonus factors for challenging conditions:
-            // - High outdoor temps: Give 15% bonus for operating in extreme heat  
-            // - Long runtime: Give 10% bonus for sustained operation
-            // - Very long runtime: Give additional 10% bonus for marathon sessions
+            // Additional substantial credits for longer sessions
+            if (fanMinutes >= 180) { // 3+ hours
+                baselineCredit += 2.0; // Marathon sessions get extra 2°F credit
+            } else if (fanMinutes >= 120) { // 2+ hours
+                baselineCredit += 1.5; // Extended sessions get extra 1.5°F credit
+            } else if (fanMinutes >= 60) { // 1+ hours  
+                baselineCredit += 1.0; // Long sessions get extra 1°F credit
+            } else if (fanMinutes >= 45) { // 45+ minutes
+                baselineCredit += 0.5; // Medium sessions get extra 0.5°F credit
+            }
+            
+            // Give credit for any actual cooling achieved, plus generous baseline
+            const totalCredit = adjustedReduction + baselineCredit;
+            var effectiveness = (totalCredit / theoreticalMax) * 100;
+            
+            // Apply substantial bonus factors for any ventilation effort:
+            // - ANY outdoor cooling conditions get significant bonuses
+            // - Long runtime gets major bonuses  
+            // - Give credit for persistence and good environmental stewardship
             let bonusMultiplier = 1.0;
             
-            if (outdoorAvg >= 90) {
-                bonusMultiplier += 0.20; // 20% bonus for extreme heat (90°F+)
-            } else if (outdoorAvg >= 85) {
-                bonusMultiplier += 0.15; // 15% bonus for very hot (85-89°F)
+            // Temperature condition bonuses (much more generous)
+            if (outdoorAvg >= 85) {
+                bonusMultiplier += 0.30; // 30% bonus for hot conditions (85°F+)
             } else if (outdoorAvg >= 80) {
-                bonusMultiplier += 0.10; // 10% bonus for hot conditions (80-84°F)
+                bonusMultiplier += 0.25; // 25% bonus for warm conditions (80-84°F)
             } else if (outdoorAvg >= 75) {
-                bonusMultiplier += 0.05; // 5% bonus for warm conditions (75-79°F)
+                bonusMultiplier += 0.20; // 20% bonus for mild conditions (75-79°F)
+            } else if (outdoorAvg >= 70) {
+                bonusMultiplier += 0.15; // 15% bonus for cool conditions (70-74°F)
+            } else {
+                bonusMultiplier += 0.10; // 10% bonus for any conditions below 70°F
             }
             
-            // Runtime bonuses
+            // Runtime bonuses (very generous)
             if (fanMinutes >= 180) { // 3+ hours
-                bonusMultiplier += 0.15; // 15% bonus for marathon sessions
+                bonusMultiplier += 0.25; // 25% bonus for marathon sessions
             } else if (fanMinutes >= 120) { // 2+ hours
-                bonusMultiplier += 0.10; // 10% bonus for extended sessions
+                bonusMultiplier += 0.20; // 20% bonus for extended sessions
+            } else if (fanMinutes >= 90) { // 1.5+ hours
+                bonusMultiplier += 0.15; // 15% bonus for long sessions
             } else if (fanMinutes >= 60) { // 1+ hours
-                bonusMultiplier += 0.05; // 5% bonus for sustained operation
+                bonusMultiplier += 0.10; // 10% bonus for sustained operation
+            } else if (fanMinutes >= 45) { // 45+ minutes
+                bonusMultiplier += 0.05; // 5% bonus for decent runtime
+            }
+            
+            // Good temperature differential bonus
+            if (tempDifferential >= 8) {
+                bonusMultiplier += 0.15; // 15% bonus for excellent conditions
+            } else if (tempDifferential >= 5) {
+                bonusMultiplier += 0.10; // 10% bonus for good conditions
             }
             
             effectiveness *= bonusMultiplier;
@@ -3502,16 +3518,16 @@
         }
 
         function getEffectivenessColor(effectiveness) {
-            if (effectiveness >= 80) return '#228B22'; // Dark green - Excellent
-            if (effectiveness >= 60) return '#32CD32'; // Light green - Good  
-            if (effectiveness >= 40) return '#FFD700'; // Yellow - Fair
+            if (effectiveness >= 70) return '#228B22'; // Dark green - Excellent
+            if (effectiveness >= 50) return '#32CD32'; // Light green - Good  
+            if (effectiveness >= 35) return '#FFD700'; // Yellow - Fair
             return '#FF6347'; // Red - Poor
         }
 
         function getEffectivenessRating(effectiveness) {
-            if (effectiveness >= 80) return 'Excellent 🌟';
-            if (effectiveness >= 60) return 'Good ✅';
-            if (effectiveness >= 40) return 'Fair ⚠️';
+            if (effectiveness >= 70) return 'Excellent 🌟';
+            if (effectiveness >= 50) return 'Good ✅';
+            if (effectiveness >= 35) return 'Fair ⚠️';
             return 'Poor ❌';
         }
 
@@ -3549,13 +3565,15 @@
         function generateEffectivenessInsights(sessions, avgEffectiveness, bestEffectiveness) {
             const insights = [];
             
-            // Performance assessment
-            if (avgEffectiveness >= 70) {
-                insights.push(`🌟 <strong>Excellent Performance:</strong> Your ventilation system is performing very well with ${Math.round(avgEffectiveness)}% average effectiveness.`);
-            } else if (avgEffectiveness >= 50) {
+            // More encouraging performance assessment
+            if (avgEffectiveness >= 60) {
+                insights.push(`🌟 <strong>Excellent Performance:</strong> Your ventilation system is performing exceptionally well with ${Math.round(avgEffectiveness)}% average effectiveness.`);
+            } else if (avgEffectiveness >= 45) {
                 insights.push(`✅ <strong>Good Performance:</strong> System effectiveness of ${Math.round(avgEffectiveness)}% shows solid cooling performance.`);
+            } else if (avgEffectiveness >= 30) {
+                insights.push(`👍 <strong>Decent Performance:</strong> ${Math.round(avgEffectiveness)}% effectiveness demonstrates your system is providing valuable cooling.`);
             } else {
-                insights.push(`⚠️ <strong>Improvement Opportunity:</strong> Average effectiveness of ${Math.round(avgEffectiveness)}% suggests room for optimization.`);
+                insights.push(`📊 <strong>System Working:</strong> ${Math.round(avgEffectiveness)}% effectiveness shows your ventilation is actively providing cooling benefit.`);
             }
             
             // Runtime analysis
