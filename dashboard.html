@@ -474,6 +474,38 @@
                             Storm risk status will be explained here.
                         </div>
                     </div>
+
+                    <!-- System Reliability -->
+                    <div class="card" id="systemReliabilityCard">
+                        <h3 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <span>🛡️ System Reliability</span>
+                            <button type="button" onclick="exportReliabilityDoc()" title="Export to Word" style="background:#17a2b8; border:none; color:#fff; padding:6px 10px; border-radius:5px; cursor:pointer; font-size:12px; line-height:1;">Export</button>
+                        </h3>
+                        <div class="sensor-reading">
+                            <span>Uptime</span>
+                            <span class="sensor-value" id="reliabilityUptime">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Reboots</span>
+                            <span class="sensor-value" id="reliabilityReboots">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>WiFi Outages</span>
+                            <span class="sensor-value" id="reliabilityWifiOutages">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>WiFi Uptime</span>
+                            <span class="sensor-value" id="reliabilityWifiUptime">-</span>
+                        </div>
+                        <div class="sensor-reading">
+                            <span>Longest WiFi Outage</span>
+                            <span class="sensor-value" id="reliabilityLongestWifiOutage">-</span>
+                        </div>
+                        <div style="margin-top:10px; font-size:0.85em; line-height:1.3; background:#f8f9fa; padding:8px 10px; border-radius:6px; border-left:4px solid #3498db;">
+                            <strong>Incident Summary:</strong>
+                            <div id="reliabilityIncidentSummary" style="margin-top:4px; font-family: monospace;">No data</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Historical Charts -->
@@ -1104,6 +1136,38 @@
             document.getElementById('rebootCount').textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
             document.getElementById('wifiOutageCount').textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
 
+            // Populate System Reliability widget
+            const formatMinutes = (mins) => {
+                if (mins == null || isNaN(mins)) return 'No data';
+                if (mins < 60) return `${mins}m`;
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                return m > 0 ? `${h}h ${m}m` : `${h}h`;
+            };
+            const uptimeMinutes = reliability.uptimeMinutes != null ? reliability.uptimeMinutes : (system.uptime != null ? Math.floor(system.uptime / 60) : null);
+            document.getElementById('reliabilityUptime').textContent = uptimeMinutes != null ? formatMinutes(uptimeMinutes) : 'No data';
+            document.getElementById('reliabilityReboots').textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
+            document.getElementById('reliabilityWifiOutages').textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
+            document.getElementById('reliabilityWifiUptime').textContent = reliability.wifiUptimePercentage != null ? `${reliability.wifiUptimePercentage}%` : 'No data';
+            document.getElementById('reliabilityLongestWifiOutage').textContent = reliability.longestWifiOutageMinutes != null ? formatMinutes(reliability.longestWifiOutageMinutes) : 'No data';
+
+            // Incident summary (counts by severity) using data.incidents if present
+            if (data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0) {
+                const counts = { critical:0, high:0, medium:0, low:0 };
+                data.incidents.forEach(i => {
+                    switch(i.severity) {
+                        case 0: counts.critical++; break;
+                        case 1: counts.high++; break;
+                        case 2: counts.medium++; break;
+                        case 3: counts.low++; break;
+                    }
+                });
+                const total = counts.critical + counts.high + counts.medium + counts.low;
+                document.getElementById('reliabilityIncidentSummary').textContent = `T:${total} C:${counts.critical} H:${counts.high} M:${counts.medium} L:${counts.low}`;
+            } else {
+                document.getElementById('reliabilityIncidentSummary').textContent = 'No incidents';
+            }
+
             // Update incidents if available
             if (data.incidents) {
                 updateIncidents(data.incidents);
@@ -1536,6 +1600,67 @@
                 alertDiv.textContent = alert.message;
                 alertList.appendChild(alertDiv);
             });
+        }
+
+        // Export System Reliability widget to a Word-compatible .doc file
+        function exportReliabilityDoc() {
+            try {
+                const card = document.getElementById('systemReliabilityCard');
+                if (!card) {
+                    alert('System Reliability card not found');
+                    return;
+                }
+                // Clone to avoid mutating live DOM
+                const clone = card.cloneNode(true);
+                // Remove the export button from exported content
+                const btn = clone.querySelector('button');
+                if (btn) btn.remove();
+                // Simple timestamp
+                const ts = new Date().toISOString().replace(/[:.]/g,'-');
+                // Wrap in minimal Word-friendly HTML
+                const html = `<!DOCTYPE html><html><head><meta charset='UTF-8'><title>System Reliability</title>
+                <style>
+                body{font-family:Segoe UI,Arial,sans-serif;}
+                h3{margin-bottom:8px;}
+                table{border-collapse:collapse; width:100%; margin-top:6px;}
+                td,th{border:1px solid #ccc; padding:6px 8px; font-size:12px;}
+                .summary{margin-top:10px; font-family:Consolas,monospace; background:#f5f7fa; padding:8px; border-left:4px solid #3498db;}
+                </style></head><body>`+
+                `<h2>System Reliability Snapshot</h2>`+
+                `<p>Generated: ${new Date().toLocaleString()}</p>`+
+                convertReliabilityToTable(clone)+`</body></html>`;
+                const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `System_Reliability_${ts}.doc`;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(()=>{
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+            } catch (e) {
+                console.error('Export failed', e);
+                alert('Export failed: '+ e.message);
+            }
+        }
+
+        function convertReliabilityToTable(cardClone){
+            // Extract label/value pairs
+            const rows = [];
+            cardClone.querySelectorAll('.sensor-reading').forEach(sr=>{
+                const spans = sr.querySelectorAll('span');
+                if (spans.length===2){
+                    rows.push({label: spans[0].textContent.trim(), value: spans[1].textContent.trim()});
+                }
+            });
+            const incidentSummary = cardClone.querySelector('#reliabilityIncidentSummary')?.textContent.trim() || 'No data';
+            let table = '<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
+            rows.forEach(r=>{ table += `<tr><td>${r.label}</td><td>${r.value}</td></tr>`; });
+            table += '</tbody></table>';
+            table += `<div class='summary'><strong>Incident Summary:</strong><br>${incidentSummary}</div>`;
+            return table;
         }
 
         async function loadChart(hours) {
