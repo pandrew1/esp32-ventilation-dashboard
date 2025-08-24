@@ -1887,21 +1887,30 @@
                 
                 // Generate realistic pressure data with some storm patterns
                 const baseTime = i / 100;
-                let pressure = 30.00 + Math.sin(baseTime * Math.PI * 2) * 0.3; // Base seasonal variation
+                // Use hPa units (like other sensors) instead of inHg - typical range 980-1040 hPa
+                let pressure = 1013.25 + Math.sin(baseTime * Math.PI * 2) * 15; // Base seasonal variation
                 
-                // Add some storm patterns (pressure drops)
+                // Add storm patterns based on time period
+                const timeVariation = Math.sin(baseTime * Math.PI * 6) * 10; // More variation
+                pressure += timeVariation;
+                
+                // Add some storm patterns (pressure drops) that vary with hours selected
                 if (baseTime > 0.3 && baseTime < 0.5) {
-                    pressure -= (0.5 - Math.abs(baseTime - 0.4)) * 0.8; // Storm pattern
+                    pressure -= (0.5 - Math.abs(baseTime - 0.4)) * 25; // Storm pattern
                 }
                 if (baseTime > 0.7 && baseTime < 0.8) {
-                    pressure -= (0.1 - Math.abs(baseTime - 0.75)) * 1.2; // Stronger storm
+                    pressure -= (0.1 - Math.abs(baseTime - 0.75)) * 35; // Stronger storm
                 }
                 
-                // Add some random variation
-                pressure += (Math.random() - 0.5) * 0.05;
+                // Add variation based on selected time period
+                const periodVariation = Math.sin(baseTime * Math.PI * (hours / 12)) * 8;
+                pressure += periodVariation;
                 
-                // Clamp to reasonable range
-                pressure = Math.max(28.5, Math.min(31.0, pressure));
+                // Add some random variation
+                pressure += (Math.random() - 0.5) * 3;
+                
+                // Clamp to reasonable range (hPa)
+                pressure = Math.max(970, Math.min(1050, pressure));
                 
                 // Calculate pressure change (would come from your API in production)
                 let pressureChange = 0;
@@ -1909,10 +1918,13 @@
                     pressureChange = pressure - data[i-1].pressure;
                 }
                 
-                // Add forecast temperature for some future data points
+                // Add forecast temperature for future data points - extend based on time period
                 let forecastTemp = undefined;
-                if (timestamp > now/1000 - 3600) { // Last hour gets forecast overlay
+                const forecastHours = Math.min(hours * 0.3, 24); // Show forecast for 30% of time range, max 24h
+                if (timestamp > now/1000 - (forecastHours * 3600)) {
                     forecastTemp = 75 + Math.sin(baseTime * Math.PI * 4) * 10 + Math.random() * 5;
+                    // Vary forecast based on time period
+                    forecastTemp += Math.sin(baseTime * Math.PI * (hours / 24)) * 8;
                 }
                 
                 data.push({
@@ -2015,7 +2027,7 @@
                 // Barometric Pressure data (primary y-axis)
                 const pressureData = data.map(point => ({
                     x: new Date(point.timestamp * 1000),
-                    y: point.pressure || 29.92, // Default to standard pressure if not available
+                    y: point.pressure || 1013.25, // Default to standard pressure (hPa) if not available
                     pressureChange: point.pressureChange || 0
                 }));
                 
@@ -2037,17 +2049,17 @@
                     let riskLevel = 0;
                     let pressureChange = 0;
                     
-                    // Calculate pressure change over last few hours
+                    // Calculate pressure change over last few hours (adjusted for hPa units)
                     if (index >= 3) { // Need at least 3 points for trend
                         const currentPressure = point.y;
                         const pastPressure = pressureData[index - 3].y;
                         pressureChange = currentPressure - pastPressure;
                         
-                        // Determine storm risk based on pressure drop rate
-                        if (pressureChange <= -0.15) riskLevel = 4; // Severe storm risk (>0.15" drop)
-                        else if (pressureChange <= -0.10) riskLevel = 3; // High storm risk
-                        else if (pressureChange <= -0.05) riskLevel = 2; // Moderate storm risk
-                        else if (pressureChange <= -0.02) riskLevel = 1; // Low storm risk
+                        // Determine storm risk based on pressure drop rate (hPa thresholds)
+                        if (pressureChange <= -8) riskLevel = 4; // Severe storm risk (>8 hPa drop)
+                        else if (pressureChange <= -5) riskLevel = 3; // High storm risk
+                        else if (pressureChange <= -3) riskLevel = 2; // Moderate storm risk  
+                        else if (pressureChange <= -1) riskLevel = 1; // Low storm risk
                     }
                     
                     return {
@@ -2143,7 +2155,7 @@
                             position: 'left',
                             title: {
                                 display: true,
-                                text: 'Pressure (inHg)',
+                                text: 'Pressure (hPa)',
                                 color: '#666',
                                 font: {
                                     size: 12,
@@ -2152,7 +2164,7 @@
                             },
                             ticks: {
                                 callback: function(value) {
-                                    return value.toFixed(2) + '"';
+                                    return value.toFixed(1) + ' hPa';
                                 },
                                 color: '#666'
                             },
@@ -2277,12 +2289,12 @@
                                     
                                     if (datasetLabel === 'Barometric Pressure') {
                                         const dataPoint = context.raw;
-                                        let tooltip = `🌡️ Pressure: ${value.toFixed(2)}"`;
+                                        let tooltip = `🌡️ Pressure: ${value.toFixed(1)} hPa`;
                                         if (dataPoint && dataPoint.pressureChange !== undefined) {
-                                            const trend = dataPoint.pressureChange > 0.01 ? '↗️' : 
-                                                         dataPoint.pressureChange < -0.01 ? '↘️' : '→';
-                                            const changeText = Math.abs(dataPoint.pressureChange) < 0.001 ? 
-                                                              'Stable' : `${dataPoint.pressureChange.toFixed(3)}"`;
+                                            const trend = dataPoint.pressureChange > 0.1 ? '↗️' : 
+                                                         dataPoint.pressureChange < -0.1 ? '↘️' : '→';
+                                            const changeText = Math.abs(dataPoint.pressureChange) < 0.01 ? 
+                                                              'Stable' : `${dataPoint.pressureChange.toFixed(1)} hPa`;
                                             tooltip += `\n📈 3-hr Change: ${changeText} ${trend}`;
                                         }
                                         return tooltip;
@@ -2297,8 +2309,8 @@
                                         
                                         // Add pressure change info if available
                                         const dataPoint = context.raw;
-                                        if (dataPoint && dataPoint.pressureChange !== undefined && Math.abs(dataPoint.pressureChange) > 0.001) {
-                                            tooltip += `\n📉 Pressure Drop: ${Math.abs(dataPoint.pressureChange).toFixed(3)}"`;
+                                        if (dataPoint && dataPoint.pressureChange !== undefined && Math.abs(dataPoint.pressureChange) > 0.1) {
+                                            tooltip += `\n📉 Pressure Drop: ${Math.abs(dataPoint.pressureChange).toFixed(1)} hPa`;
                                         }
                                         
                                         return tooltip;
