@@ -1875,84 +1875,8 @@
         }
 
         // Fetch pressure data from API or generate sample data for demonstration
-        async function fetchPressureData(hours) {
-            // For demonstration purposes, generate sample pressure data with storm patterns
-            // In production, this would fetch from your actual pressure sensor API
-            const now = Date.now();
-            const totalTimespan = hours * 60 * 60 * 1000;
-            
-            // Generate 100 historical data points spanning the full requested timespan
-            const data = [];
-            
-            for (let i = 0; i < 100; i++) {
-                const timestamp = Math.floor((now - totalTimespan + (i * totalTimespan / 100)) / 1000);
-                const baseTime = i / 100;
-                
-                // Generate realistic pressure data with some storm patterns
-                // Use hPa units (like other sensors) instead of inHg - typical range 980-1040 hPa
-                let pressure = 1013.25 + Math.sin(baseTime * Math.PI * 2) * 15; // Base seasonal variation
-                
-                // Add storm patterns based on time period
-                const timeVariation = Math.sin(baseTime * Math.PI * 6) * 10; // More variation
-                pressure += timeVariation;
-                
-                // Add some storm patterns (pressure drops) that vary with hours selected
-                if (baseTime > 0.3 && baseTime < 0.5) {
-                    pressure -= (0.5 - Math.abs(baseTime - 0.4)) * 25; // Storm pattern
-                }
-                if (baseTime > 0.7 && baseTime < 0.8) {
-                    pressure -= (0.1 - Math.abs(baseTime - 0.75)) * 35; // Stronger storm
-                }
-                
-                // Add variation based on selected time period
-                const periodVariation = Math.sin(baseTime * Math.PI * (hours / 12)) * 8;
-                pressure += periodVariation;
-                
-                // Add some random variation
-                pressure += (Math.random() - 0.5) * 3;
-                
-                // Clamp to reasonable range (hPa)
-                pressure = Math.max(970, Math.min(1050, pressure));
-                
-                // Calculate pressure change (would come from your API in production)
-                let pressureChange = 0;
-                if (i > 0) {
-                    pressureChange = pressure - data[i-1].pressure;
-                }
-                
-                // Generate historical forecast temperature readings
-                // This represents what the forecast high was when this data point was recorded
-                // Base forecast temperature that varies realistically over time
-                let forecastTemp = 78 + Math.sin(baseTime * Math.PI * 2) * 12; // Seasonal variation
-                
-                // Add daily forecast variations - forecasts change throughout the day
-                forecastTemp += Math.sin(baseTime * Math.PI * 8) * 4; // Daily forecast updates
-                
-                // Add some variation based on time period (longer periods show more forecast changes)
-                if (hours > 24) {
-                    // For longer periods, show more forecast variation
-                    forecastTemp += Math.sin(baseTime * Math.PI * (hours / 6)) * 6;
-                } else {
-                    // For shorter periods, show more stable forecasts with small adjustments
-                    forecastTemp += Math.sin(baseTime * Math.PI * (hours / 3)) * 2;
-                }
-                
-                // Add some realistic randomness to forecast readings
-                forecastTemp += (Math.random() - 0.5) * 2;
-                
-                // Clamp to reasonable forecast temperature range
-                forecastTemp = Math.max(45, Math.min(105, forecastTemp));
-                
-                data.push({
-                    timestamp: timestamp,
-                    pressure: Math.round(pressure * 100) / 100, // Round to 2 decimal places
-                    pressureChange: Math.round(pressureChange * 1000) / 1000, // Round to 3 decimal places
-                    forecastTemp: Math.round(forecastTemp) // Historical forecast reading for this timestamp
-                });
-            }
-            
-            return data;
-        }
+        // Pressure chart now uses real data from Azure Functions API
+        // The fetchPressureData sample function has been removed
 
         async function loadPressureChart(hours) {
             // Track the current pressure chart time period
@@ -1970,46 +1894,48 @@
             });
 
             try {
-                // For now, use sample data. In production, you would fetch from your pressure sensor API
-                // Replace this with actual API call when pressure sensor data is available
-                const pressureData = await fetchPressureData(hours);
-                updatePressureChart(pressureData, hours);
-                
-                // Uncomment and modify this section when you have actual pressure sensor API:
-                /*
+                // Fetch real pressure and forecast data from Azure Functions API
                 const token = localStorage.getItem('ventilation_auth_token');
                 
                 if (!token && !CONFIG.apiSecret) {
+                    console.log('No authentication available for pressure data');
                     updatePressureChart([], hours);
                     return;
                 }
 
-                const response = await fetch(`${CONFIG.pressureApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
+                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
                     method: 'GET',
                     headers: getAuthHeaders()
                 });
                 
                 if (response.status === 401) {
-                    const token = localStorage.getItem('ventilation_auth_token');
-                    if (!token && CONFIG.apiSecret) {
-                        logout();
-                        return;
-                    } else if (token) {
-                        showApiFailureNotice('Pressure API returned 401 Unauthorized. Pressure chart data is currently unavailable.', 'warning');
-                        updatePressureChart([], hours);
-                        return;
-                    }
-                }
-                
-                if (!response.ok) {
-                    showApiFailureNotice(`Pressure API returned ${response.status} ${response.statusText}. Pressure chart data is currently unavailable.`, 'warning');
+                    console.log('Pressure API returned 401 Unauthorized');
+                    showApiFailureNotice('API returned 401 Unauthorized. Pressure chart data is currently unavailable.', 'warning');
                     updatePressureChart([], hours);
                     return;
                 }
                 
-                const data = await response.json();
-                updatePressureChart(data.data || [], hours);
-                */
+                if (!response.ok) {
+                    console.error(`Pressure API error: ${response.status} ${response.statusText}`);
+                    showApiFailureNotice(`API returned ${response.status} ${response.statusText}. Pressure chart data is currently unavailable.`, 'warning');
+                    updatePressureChart([], hours);
+                    return;
+                }
+                
+                const apiData = await response.json();
+                console.log('Received pressure/forecast data from API:', apiData);
+                
+                // Transform API data into pressure chart format
+                // Assuming your API returns data with timestamp, pressure, and forecastTemp fields
+                const pressureData = (apiData.data || []).map(point => ({
+                    timestamp: point.timestamp || Math.floor(Date.now() / 1000),
+                    pressure: point.outdoorPressure || point.pressure || 1013.25, // Use outdoor pressure in hPa
+                    pressureChange: point.pressureChange || 0,
+                    forecastTemp: point.forecastHigh || point.forecastTemp || undefined // Real forecast data from ESP32
+                })).filter(point => point.pressure && point.timestamp);
+                
+                console.log(`Processed ${pressureData.length} pressure data points`);
+                updatePressureChart(pressureData, hours);
                 
             } catch (error) {
                 console.error('Error loading pressure chart data:', error);
