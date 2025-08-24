@@ -1879,14 +1879,16 @@
             // For demonstration purposes, generate sample pressure data with storm patterns
             // In production, this would fetch from your actual pressure sensor API
             const now = Date.now();
-            const interval = (hours * 60 * 60 * 1000) / 100; // 100 data points across the time range
+            const totalTimespan = hours * 60 * 60 * 1000;
+            
+            // Generate 100 historical data points spanning the full requested timespan
             const data = [];
             
             for (let i = 0; i < 100; i++) {
-                const timestamp = Math.floor((now - (99 - i) * interval) / 1000);
+                const timestamp = Math.floor((now - totalTimespan + (i * totalTimespan / 100)) / 1000);
+                const baseTime = i / 100;
                 
                 // Generate realistic pressure data with some storm patterns
-                const baseTime = i / 100;
                 // Use hPa units (like other sensors) instead of inHg - typical range 980-1040 hPa
                 let pressure = 1013.25 + Math.sin(baseTime * Math.PI * 2) * 15; // Base seasonal variation
                 
@@ -1918,20 +1920,34 @@
                     pressureChange = pressure - data[i-1].pressure;
                 }
                 
-                // Add forecast temperature for future data points - extend based on time period
-                let forecastTemp = undefined;
-                const forecastHours = Math.min(hours * 0.3, 24); // Show forecast for 30% of time range, max 24h
-                if (timestamp > now/1000 - (forecastHours * 3600)) {
-                    forecastTemp = 75 + Math.sin(baseTime * Math.PI * 4) * 10 + Math.random() * 5;
-                    // Vary forecast based on time period
-                    forecastTemp += Math.sin(baseTime * Math.PI * (hours / 24)) * 8;
+                // Generate historical forecast temperature readings
+                // This represents what the forecast high was when this data point was recorded
+                // Base forecast temperature that varies realistically over time
+                let forecastTemp = 78 + Math.sin(baseTime * Math.PI * 2) * 12; // Seasonal variation
+                
+                // Add daily forecast variations - forecasts change throughout the day
+                forecastTemp += Math.sin(baseTime * Math.PI * 8) * 4; // Daily forecast updates
+                
+                // Add some variation based on time period (longer periods show more forecast changes)
+                if (hours > 24) {
+                    // For longer periods, show more forecast variation
+                    forecastTemp += Math.sin(baseTime * Math.PI * (hours / 6)) * 6;
+                } else {
+                    // For shorter periods, show more stable forecasts with small adjustments
+                    forecastTemp += Math.sin(baseTime * Math.PI * (hours / 3)) * 2;
                 }
+                
+                // Add some realistic randomness to forecast readings
+                forecastTemp += (Math.random() - 0.5) * 2;
+                
+                // Clamp to reasonable forecast temperature range
+                forecastTemp = Math.max(45, Math.min(105, forecastTemp));
                 
                 data.push({
                     timestamp: timestamp,
                     pressure: Math.round(pressure * 100) / 100, // Round to 2 decimal places
                     pressureChange: Math.round(pressureChange * 1000) / 1000, // Round to 3 decimal places
-                    forecastTemp: forecastTemp ? Math.round(forecastTemp) : undefined
+                    forecastTemp: Math.round(forecastTemp) // Historical forecast reading for this timestamp
                 });
             }
             
@@ -2056,10 +2072,11 @@
                         pressureChange = currentPressure - pastPressure;
                         
                         // Determine storm risk based on pressure drop rate (hPa thresholds)
-                        if (pressureChange <= -8) riskLevel = 4; // Severe storm risk (>8 hPa drop)
-                        else if (pressureChange <= -5) riskLevel = 3; // High storm risk
-                        else if (pressureChange <= -3) riskLevel = 2; // Moderate storm risk  
-                        else if (pressureChange <= -1) riskLevel = 1; // Low storm risk
+                        // Match the legend: Clear(0), Possible(1), Likely(2), Imminent(3)
+                        if (pressureChange <= -8) riskLevel = 3; // Imminent (was 4)
+                        else if (pressureChange <= -5) riskLevel = 2; // Likely (was 3)
+                        else if (pressureChange <= -3) riskLevel = 1; // Possible (was 2)
+                        else riskLevel = 0; // Clear (was 0-1 range)
                     }
                     
                     return {
@@ -2075,19 +2092,19 @@
                     type: 'bar',
                     backgroundColor: stormRiskData.map(point => {
                         switch(point.y) {
-                            case 4: return 'rgba(220, 53, 69, 0.7)'; // Severe - Red
-                            case 3: return 'rgba(255, 193, 7, 0.7)'; // High - Orange  
-                            case 2: return 'rgba(255, 235, 59, 0.7)'; // Moderate - Yellow
-                            case 1: return 'rgba(76, 175, 80, 0.7)'; // Low - Green
+                            case 3: return 'rgba(220, 53, 69, 0.7)'; // Imminent (3) - Red
+                            case 2: return 'rgba(253, 126, 20, 0.7)'; // Likely (2) - Orange
+                            case 1: return 'rgba(255, 193, 7, 0.7)'; // Possible (1) - Yellow
+                            case 0: return 'rgba(40, 167, 69, 0.7)'; // Clear (0) - Green
                             default: return 'rgba(158, 158, 158, 0.3)'; // None - Gray
                         }
                     }),
                     borderColor: stormRiskData.map(point => {
                         switch(point.y) {
-                            case 4: return 'rgb(220, 53, 69)'; // Severe
-                            case 3: return 'rgb(255, 193, 7)'; // High
-                            case 2: return 'rgb(255, 235, 59)'; // Moderate
-                            case 1: return 'rgb(76, 175, 80)'; // Low
+                            case 3: return 'rgb(220, 53, 69)'; // Imminent
+                            case 2: return 'rgb(253, 126, 20)'; // Likely
+                            case 1: return 'rgb(255, 193, 7)'; // Possible
+                            case 0: return 'rgb(40, 167, 69)'; // Clear
                             default: return 'rgb(158, 158, 158)'; // None
                         }
                     }),
@@ -2097,18 +2114,18 @@
                     maxBarThickness: 15
                 });
                 
-                // Add forecast temperature overlay if available in the data
+                // Add historical forecast temperature readings if available in the data
                 const forecastData = data.filter(point => point.forecastTemp !== undefined && point.forecastTemp !== null);
                 if (forecastData.length > 0) {
                     datasets.push({
-                        label: 'Forecast Temperature',
+                        label: 'Forecast High (Historical)',
                         data: forecastData.map(point => ({
                             x: new Date(point.timestamp * 1000),
                             y: point.forecastTemp
                         })),
                         borderColor: 'rgba(255, 99, 132, 0.8)',
                         backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        borderWidth: 1,
+                        borderWidth: 2,
                         borderDash: [5, 5],
                         fill: false,
                         yAxisID: 'temperature',
@@ -2177,7 +2194,7 @@
                             type: 'linear',
                             position: 'right',
                             min: 0,
-                            max: 5,
+                            max: 3,
                             title: {
                                 display: true,
                                 text: 'Storm Risk',
@@ -2190,7 +2207,7 @@
                             ticks: {
                                 stepSize: 1,
                                 callback: function(value) {
-                                    const labels = ['None', 'Low', 'Moderate', 'High', 'Severe'];
+                                    const labels = ['Clear', 'Possible', 'Likely', 'Imminent'];
                                     return labels[value] || '';
                                 },
                                 color: '#666'
