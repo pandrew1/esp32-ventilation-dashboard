@@ -1926,13 +1926,17 @@
                 console.log('Received pressure/forecast data from API:', apiData);
                 
                 // Transform API data into pressure chart format
-                // Assuming your API returns data with timestamp, pressure, and forecastTemp fields
-                const pressureData = (apiData.data || []).map(point => ({
-                    timestamp: point.timestamp || Math.floor(Date.now() / 1000),
-                    pressure: point.outdoorPressure || point.pressure || 1013.25, // Use outdoor pressure in hPa
-                    pressureChange: point.pressureChange || 0,
-                    forecastTemp: point.forecastHigh || point.forecastTemp || undefined // Real forecast data from ESP32
-                })).filter(point => point.pressure && point.timestamp);
+                // Map to the actual structure returned by Azure Functions: sensors.outdoor.pressure and weather.forecastHigh
+                const pressureData = (apiData.data || []).map(point => {
+                    const hasValidPressure = point.sensors && point.sensors.outdoor && point.sensors.outdoor.pressure && point.sensors.outdoor.pressure !== 1013.25;
+                    
+                    return {
+                        timestamp: point.timestamp || Math.floor(Date.now() / 1000),
+                        pressure: hasValidPressure ? point.sensors.outdoor.pressure : null, // Only use real pressure readings from ESP32
+                        pressureChange: point.pressureChange || 0,
+                        forecastTemp: (point.weather && point.weather.forecastHigh) || undefined // Real forecast data from ESP32
+                    };
+                }).filter(point => point.pressure !== null && point.timestamp); // Only show points with real pressure data
                 
                 console.log(`Processed ${pressureData.length} pressure data points`);
                 updatePressureChart(pressureData, hours);
@@ -1969,7 +1973,7 @@
                 // Barometric Pressure data (primary y-axis)
                 const pressureData = data.map(point => ({
                     x: new Date(point.timestamp * 1000),
-                    y: point.pressure || 1013.25, // Default to standard pressure (hPa) if not available
+                    y: point.pressure, // Use only real pressure data from ESP32
                     pressureChange: point.pressureChange || 0
                 }));
                 
