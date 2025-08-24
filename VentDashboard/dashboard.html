@@ -859,19 +859,19 @@
 
         // Helper function to format detailed timestamps consistently
         function formatDetailedTimestamp(date = new Date()) {
-            const dateStr = date.toLocaleDateString('en-US', { 
-                weekday: 'short', 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
-            });
+            // Create simpler format: m/d hh:mm:ss AM/PM (no leading zeros for date)
+            const month = String(date.getMonth() + 1); // No padding
+            const day = String(date.getDate()); // No padding
             const timeStr = date.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit', 
                 second: '2-digit',
                 hour12: true
             });
-            return { dateStr, timeStr, combined: `${dateStr} ${timeStr}` };
+            
+            const combined = `${month}/${day} ${timeStr}`;
+            
+            return { dateStr: `${month}/${day}`, timeStr, combined };
         }
 
         // Initialize dashboard
@@ -1023,7 +1023,9 @@
 
             // Update last update time with detailed "no data" message
             const timestamp = formatDetailedTimestamp();
-            document.getElementById('lastUpdate').innerHTML = `No ESP32 data<br>Last attempt: ${timestamp.combined}`;
+            document.getElementById('lastUpdate').innerHTML = `No ESP32 data<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - Last Attempt: ${timestamp.combined}]</small>`;
+            document.getElementById('lastUpdate').style.color = '#dc3545';
+            document.getElementById('lastUpdate').title = 'No ESP32 data available - showing browser time of last connection attempt';
         }
 
         async function loadAggregationStatus() {
@@ -1259,9 +1261,38 @@
             // Check for alerts
             checkAlerts(data);
 
-            // Update last update time with detailed timestamp
-            const timestamp = formatDetailedTimestamp();
-            document.getElementById('lastUpdate').innerHTML = `${timestamp.dateStr}<br>${timestamp.timeStr}`;
+            // Update last update time - use ESP32's timestamp if available, otherwise browser time
+            let updateTime = new Date(); // Default to browser time
+            let isESP32Time = false; // Track if we're using ESP32's actual time
+            
+            // Check if ESP32 provides its timestamp in the data
+            if (data.system && data.system.currentTime) {
+                // ESP32 timestamp is available (Unix timestamp in seconds)
+                updateTime = new Date(parseInt(data.system.currentTime) * 1000);
+                isESP32Time = true;
+            } else if (data.timestamp) {
+                // Alternative location for timestamp
+                updateTime = new Date(parseInt(data.timestamp) * 1000);
+                isESP32Time = true;
+            } else if (data.readingTime) {
+                // Another alternative location
+                updateTime = new Date(parseInt(data.readingTime) * 1000);
+                isESP32Time = true;
+            }
+            // If none available, use browser time (already set above, isESP32Time remains false)
+            
+            const timestamp = formatDetailedTimestamp(updateTime);
+            
+            // Display time with clear indication of source
+            if (isESP32Time) {
+                document.getElementById('lastUpdate').innerHTML = `${timestamp.combined}`;
+                document.getElementById('lastUpdate').style.color = '#28a745'; // Green for ESP32 time
+                document.getElementById('lastUpdate').title = 'ESP32 device time - actual transmission timestamp';
+            } else {
+                document.getElementById('lastUpdate').innerHTML = `${timestamp.combined}<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - No ESP32 timestamp]</small>`;
+                document.getElementById('lastUpdate').style.color = '#dc3545'; // Red for browser fallback
+                document.getElementById('lastUpdate').title = 'Browser time fallback - ESP32 did not provide timestamp';
+            }
         }
 
         function updateDoorStatus(doors) {
