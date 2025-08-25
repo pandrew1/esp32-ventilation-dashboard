@@ -1029,12 +1029,29 @@
             document.getElementById('stormRisk').textContent = 'No data';
             document.getElementById('stormRiskExplanation').textContent = 'Storm risk status will be explained here.';
 
-            // Set system info to no data
-            document.getElementById('uptime').textContent = 'No data';
+            // Set system info to no data with null checks
+            const uptimeElement = document.getElementById('uptime');
+            if (uptimeElement) uptimeElement.textContent = 'No data';
             
-            // Set reliability info to no data (only elements that still exist)
-            document.getElementById('rebootCount').textContent = 'No data';
-            document.getElementById('wifiOutageCount').textContent = 'No data';
+            // Set reliability info to no data (only elements that still exist) with null checks
+            const rebootCountElement = document.getElementById('rebootCount');
+            if (rebootCountElement) rebootCountElement.textContent = 'No data';
+            const wifiOutageCountElement = document.getElementById('wifiOutageCount');
+            if (wifiOutageCountElement) wifiOutageCountElement.textContent = 'No data';
+
+            // Set reliability widget elements to no data (with null checks)
+            const reliabilityUptimeElement = document.getElementById('reliabilityUptime');
+            if (reliabilityUptimeElement) reliabilityUptimeElement.textContent = 'No data';
+            const reliabilityRebootsElement = document.getElementById('reliabilityReboots');
+            if (reliabilityRebootsElement) reliabilityRebootsElement.textContent = 'No data';
+            const reliabilityWifiOutagesElement = document.getElementById('reliabilityWifiOutages');
+            if (reliabilityWifiOutagesElement) reliabilityWifiOutagesElement.textContent = 'No data';
+            const reliabilityWifiUptimeElement = document.getElementById('reliabilityWifiUptime');
+            if (reliabilityWifiUptimeElement) reliabilityWifiUptimeElement.textContent = 'No data';
+            const reliabilityLongestWifiOutageElement = document.getElementById('reliabilityLongestWifiOutage');
+            if (reliabilityLongestWifiOutageElement) reliabilityLongestWifiOutageElement.textContent = 'No data';
+            const reliabilityIncidentSummaryElement = document.getElementById('reliabilityIncidentSummary');
+            if (reliabilityIncidentSummaryElement) reliabilityIncidentSummaryElement.textContent = 'No data';
 
             // Hide door section since no data
             document.getElementById('doorSection').style.display = 'none';
@@ -1227,12 +1244,15 @@
             
             // Update system info with proper null/undefined handling
             const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
-            document.getElementById('uptime').textContent = uptimeHours != null ? `${uptimeHours}h` : 'No data';
+            const uptimeElement = document.getElementById('uptime');
+            if (uptimeElement) uptimeElement.textContent = uptimeHours != null ? `${uptimeHours}h` : 'No data';
 
             // Update reliability statistics with proper null/undefined handling (only elements that still exist)
             const reliability = data.reliability || {};
-            document.getElementById('rebootCount').textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
-            document.getElementById('wifiOutageCount').textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
+            const rebootCountElement = document.getElementById('rebootCount');
+            if (rebootCountElement) rebootCountElement.textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
+            const wifiOutageCountElement = document.getElementById('wifiOutageCount');
+            if (wifiOutageCountElement) wifiOutageCountElement.textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
 
             // Populate System Reliability widget
             const formatMinutes = (mins) => {
@@ -1243,11 +1263,16 @@
                 return m > 0 ? `${h}h ${m}m` : `${h}h`;
             };
             const uptimeMinutes = reliability.uptimeMinutes != null ? reliability.uptimeMinutes : (system.uptime != null ? Math.floor(system.uptime / 60) : null);
-            document.getElementById('reliabilityUptime').textContent = uptimeMinutes != null ? formatMinutes(uptimeMinutes) : 'No data';
-            document.getElementById('reliabilityReboots').textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
-            document.getElementById('reliabilityWifiOutages').textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
-            document.getElementById('reliabilityWifiUptime').textContent = reliability.wifiUptimePercentage != null ? `${reliability.wifiUptimePercentage}%` : 'No data';
-            document.getElementById('reliabilityLongestWifiOutage').textContent = reliability.longestWifiOutageMinutes != null ? formatMinutes(reliability.longestWifiOutageMinutes) : 'No data';
+            const reliabilityUptimeElement = document.getElementById('reliabilityUptime');
+            if (reliabilityUptimeElement) reliabilityUptimeElement.textContent = uptimeMinutes != null ? formatMinutes(uptimeMinutes) : 'No data';
+            const reliabilityRebootsElement = document.getElementById('reliabilityReboots');
+            if (reliabilityRebootsElement) reliabilityRebootsElement.textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
+            const reliabilityWifiOutagesElement = document.getElementById('reliabilityWifiOutages');
+            if (reliabilityWifiOutagesElement) reliabilityWifiOutagesElement.textContent = reliability.wifiOutageCount != null ? reliability.wifiOutageCount : 'No data';
+            const reliabilityWifiUptimeElement = document.getElementById('reliabilityWifiUptime');
+            if (reliabilityWifiUptimeElement) reliabilityWifiUptimeElement.textContent = reliability.wifiUptimePercentage != null ? `${reliability.wifiUptimePercentage}%` : 'No data';
+            const reliabilityLongestWifiOutageElement = document.getElementById('reliabilityLongestWifiOutage');
+            if (reliabilityLongestWifiOutageElement) reliabilityLongestWifiOutageElement.textContent = reliability.longestWifiOutageMinutes != null ? formatMinutes(reliability.longestWifiOutageMinutes) : 'No data';
 
             // Incident summary (counts by severity) using data.incidents if present
             if (data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0) {
@@ -1261,9 +1286,11 @@
                     }
                 });
                 const total = counts.critical + counts.high + counts.medium + counts.low;
-                document.getElementById('reliabilityIncidentSummary').textContent = `T:${total} C:${counts.critical} H:${counts.high} M:${counts.medium} L:${counts.low}`;
+                const reliabilityIncidentSummaryElement = document.getElementById('reliabilityIncidentSummary');
+                if (reliabilityIncidentSummaryElement) reliabilityIncidentSummaryElement.textContent = `T:${total} C:${counts.critical} H:${counts.high} M:${counts.medium} L:${counts.low}`;
             } else {
-                document.getElementById('reliabilityIncidentSummary').textContent = 'No incidents';
+                const reliabilityIncidentSummaryElement = document.getElementById('reliabilityIncidentSummary');
+                if (reliabilityIncidentSummaryElement) reliabilityIncidentSummaryElement.textContent = 'No incidents';
             }
 
             // Update incidents if available
