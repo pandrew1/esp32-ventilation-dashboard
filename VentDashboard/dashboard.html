@@ -406,7 +406,7 @@
 
                     <!-- Outdoor Sensors -->
                     <div class="card">
-                        <h3>🌤️ Outdoor Environment</h3>
+                        <h3>🌤️ Outdoor Environment & Weather</h3>
                         <div class="sensor-reading">
                             <span>Temperature</span>
                             <span class="sensor-value temperature" id="outdoorTemp">-°F</span>
@@ -418,6 +418,21 @@
                         <div class="sensor-reading">
                             <span>Pressure</span>
                             <span class="sensor-value pressure" id="outdoorPressure">- inHg</span>
+                        </div>
+                        
+                        <!-- Weather Forecast Section -->
+                        <div style="margin-top: 15px; padding-top: 12px; border-top: 1px solid #e9ecef;">
+                            <div class="sensor-reading">
+                                <span>Forecast High</span>
+                                <span class="sensor-value temperature" id="forecastHigh">-°F</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Storm Risk</span>
+                                <span class="sensor-value" id="stormRisk">-</span>
+                            </div>
+                            <div id="stormRiskExplanation" style="font-size: 12px; color: #666; margin-top: 8px; font-style: italic;">
+                                Storm risk status will be explained here.
+                            </div>
                         </div>
                     </div>
 
@@ -440,7 +455,10 @@
 
                     <!-- System Status -->
                     <div class="card">
-                        <h3>⚙️ System Status</h3>
+                        <h3 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <span>⚙️ System Status</span>
+                            <button type="button" onclick="exportReliabilityDoc()" title="Export to Word" style="background:#17a2b8; border:none; color:#fff; padding:6px 10px; border-radius:5px; cursor:pointer; font-size:12px; line-height:1;">Export</button>
+                        </h3>
                         <div class="system-status">
                             <div class="fan-status" id="fanStatus">🌀</div>
                             <div><strong id="fanStatusText">System Status</strong></div>
@@ -452,36 +470,20 @@
                                 <div>Cooling Effect: <strong id="coolingEffect">-</strong></div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Monthly Aggregation Status -->
-                    <div class="card">
-                        <h3>📊 Monthly Data Aggregation</h3>
-                        <div class="system-status">
-                            <div class="aggregation-status" id="aggregationStatus">🔄</div>
-                            <div><strong id="aggregationStatusText">Checking...</strong></div>
-                            <div style="margin-top: 15px;" id="aggregationDetails">
+                        
+                        <!-- Data Aggregation Status Section -->
+                        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                <span style="font-weight: bold; color: #2c3e50;">📊 Data Aggregation:</span>
+                                <div class="aggregation-status" style="font-size: 1.5em;" id="aggregationStatus">🔄</div>
+                                <strong id="aggregationStatusText" style="font-size: 0.9em;">Checking...</strong>
+                            </div>
+                            <div style="font-size: 0.85em;" id="aggregationDetails">
                                 <div>Last Run: <strong id="lastAggregationRun">-</strong></div>
                                 <div>Records Updated: <strong id="recordsUpdated">-</strong></div>
                                 <div>Next Run: <strong id="nextAggregationRun">-</strong></div>
                                 <div>Status: <strong id="aggregationResult">-</strong></div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Weather & Forecast -->
-                    <div class="card">
-                        <h3>📊 Weather & Forecast</h3>
-                        <div class="sensor-reading">
-                            <span>Forecast High</span>
-                            <span class="sensor-value temperature" id="forecastHigh">-°F</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Storm Risk</span>
-                            <span class="sensor-value" id="stormRisk">-</span>
-                        </div>
-                        <div id="stormRiskExplanation" style="font-size: 12px; color: #666; margin-top: 10px; font-style: italic;">
-                            Storm risk status will be explained here.
                         </div>
                     </div>
 
