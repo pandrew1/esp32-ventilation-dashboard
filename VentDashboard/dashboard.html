@@ -2984,11 +2984,11 @@
             minTime -= padding;
             maxTime += padding;
             
-            let html = '<div class="swimlane-container" style="width: 100%; overflow-x: auto;">';
+            let html = '<div class="swimlane-container" style="width: 100%; overflow-x: auto; padding-bottom: 35px;">';
             
             // Time axis header
             html += '<div style="display: flex; align-items: center; margin-bottom: 15px; padding-left: 120px;">';
-            html += '<div style="flex: 1; height: 20px; background: linear-gradient(to right, #e9ecef 0%, #e9ecef 100%); border-radius: 3px; position: relative;">';
+            html += '<div style="flex: 1; height: 20px; background: linear-gradient(to right, #e9ecef 0%, #e9ecef 100%); border-radius: 3px; position: relative; margin-bottom: 30px;">';
             
             // Add time markers
             const timeSteps = 10;
@@ -2996,7 +2996,7 @@
                 const timePoint = minTime + (maxTime - minTime) * (i / timeSteps);
                 const date = new Date(timePoint * 1000);
                 const left = (i / timeSteps) * 100;
-                html += `<div style="position: absolute; left: ${left}%; top: 25px; font-size: 0.7em; color: #666; transform: translateX(-50%);">`;
+                html += `<div style="position: absolute; left: ${left}%; top: 25px; font-size: 0.7em; color: #666; transform: translateX(-50%); white-space: nowrap;">`;
                 html += `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
                 html += '</div>';
             }
