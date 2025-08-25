@@ -471,14 +471,28 @@
                             </div>
                         </div>
                         
-                        <!-- Data Aggregation Status Section -->
+                        <!-- System Reliability Section (Compact) -->
                         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef;">
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                                <span style="font-weight: bold; color: #2c3e50;">📊 Data Aggregation:</span>
-                                <div class="aggregation-status" style="font-size: 1.5em;" id="aggregationStatus">🔄</div>
-                                <strong id="aggregationStatusText" style="font-size: 0.9em;">Checking...</strong>
+                            <div style="font-weight: bold; color: #2c3e50; margin-bottom: 8px;">🛡️ System Reliability:</div>
+                            <div style="font-size: 0.85em; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div>Uptime: <strong id="reliabilityUptime">-</strong></div>
+                                <div>Reboots: <strong id="reliabilityReboots">-</strong></div>
+                                <div>WiFi Outages: <strong id="reliabilityWifiOutages">-</strong></div>
+                                <div>WiFi Uptime: <strong id="reliabilityWifiUptime">-</strong></div>
                             </div>
-                            <div style="font-size: 0.85em;" id="aggregationDetails">
+                            <div style="margin-top: 8px; font-size: 0.8em; color: #666;">
+                                Incidents: <strong id="reliabilityIncidentSummary" style="font-family: monospace;">No data</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Data Aggregation -->
+                    <div class="card">
+                        <h3>📊 Monthly Data Aggregation</h3>
+                        <div class="system-status">
+                            <div class="aggregation-status" id="aggregationStatus">🔄</div>
+                            <div><strong id="aggregationStatusText">Checking...</strong></div>
+                            <div style="margin-top: 15px;" id="aggregationDetails">
                                 <div>Last Run: <strong id="lastAggregationRun">-</strong></div>
                                 <div>Records Updated: <strong id="recordsUpdated">-</strong></div>
                                 <div>Next Run: <strong id="nextAggregationRun">-</strong></div>
@@ -487,37 +501,6 @@
                         </div>
                     </div>
 
-                    <!-- System Reliability -->
-                    <div class="card" id="systemReliabilityCard">
-                        <h3 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                            <span>🛡️ System Reliability</span>
-                            <button type="button" onclick="exportReliabilityDoc()" title="Export to Word" style="background:#17a2b8; border:none; color:#fff; padding:6px 10px; border-radius:5px; cursor:pointer; font-size:12px; line-height:1;">Export</button>
-                        </h3>
-                        <div class="sensor-reading">
-                            <span>Uptime</span>
-                            <span class="sensor-value" id="reliabilityUptime">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Reboots</span>
-                            <span class="sensor-value" id="reliabilityReboots">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>WiFi Outages</span>
-                            <span class="sensor-value" id="reliabilityWifiOutages">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>WiFi Uptime</span>
-                            <span class="sensor-value" id="reliabilityWifiUptime">-</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Longest WiFi Outage</span>
-                            <span class="sensor-value" id="reliabilityLongestWifiOutage">-</span>
-                        </div>
-                        <div style="margin-top:10px; font-size:0.85em; line-height:1.3; background:#f8f9fa; padding:8px 10px; border-radius:6px; border-left:4px solid #3498db;">
-                            <strong>Incident Summary:</strong>
-                            <div id="reliabilityIncidentSummary" style="margin-top:4px; font-family: monospace;">No data</div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Historical Charts -->
@@ -643,31 +626,64 @@
                     <h3>📊 Incident Almanac</h3>
                     <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
                         <label style="font-weight: bold; margin-right: 10px; color: #333;">View:</label>
-                        <select id="trendsViewFilter" onchange="loadIncidentTrends()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
-                            <option value="weekly">Weekly View</option>
+                        <select id="almanacViewType" onchange="loadIncidentAlmanac()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
+                            <option value="timeline">Timeline Swimlane</option>
+                            <option value="correlation">Correlation Matrix</option>
                             <option value="monthly" selected>Monthly Summary</option>
                         </select>
                         
+                        <label style="font-weight: bold; margin-right: 10px; color: #333;">Period:</label>
+                        <select id="almanacPeriodFilter" onchange="loadIncidentAlmanac()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
+                            <option value="1" selected>Previous Month</option>
+                            <option value="12">Last 12 Months</option>
+                        </select>
+                        
                         <label style="font-weight: bold; margin-right: 10px; color: #333;">Severity:</label>
-                        <select id="trendsSeverityFilter" onchange="loadIncidentTrends()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                        <select id="almanacSeverityFilter" onchange="loadIncidentAlmanac()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white;">
                             <option value="critical-high" selected>Critical & High</option>
                             <option value="critical">Critical Only</option>
                             <option value="high">High Only</option>
                             <option value="critical-high-medium">Critical, High & Medium</option>
-                            <option value="all">All Severities (Critical, High, Medium, Low)</option>
+                            <option value="all">All Severities</option>
                             <option value="medium">Medium Only</option>
                             <option value="low">Low Only</option>
                         </select>
-                        <span id="trendsStatus" style="margin-left: 10px; font-size: 0.85em; color: #666;"></span>
+                        <span id="almanacStatus" style="margin-left: 10px; font-size: 0.85em; color: #666;"></span>
                     </div>
                     
-                    <!-- Monthly Aggregation Data Source Indicator -->
+                    <!-- Timeline Swimlane View -->
+                    <div id="timelineView" style="display: none;">
+                        <div id="timelineMonth" style="font-weight: bold; margin-bottom: 10px; color: #2c3e50;"></div>
+                        <div class="timeline-swimlane" id="incidentTimeline" style="min-height: 400px; border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: white;">
+                            <!-- Timeline will be rendered here -->
+                        </div>
+                        <div id="correlationIndicator" style="margin-top: 10px; padding: 8px 12px; background: #e8f4f8; border-left: 4px solid #17a2b8; border-radius: 4px; font-size: 0.85em; color: #0c5460; display: none;">
+                            <strong>🔗 Correlation Detected:</strong>
+                            <span id="correlationText">Hover over incidents to see potential correlations</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Correlation Matrix View -->
+                    <div id="correlationView" style="display: none;">
+                        <div id="correlationMatrix" style="min-height: 400px; padding: 15px;">
+                            <!-- Correlation matrix will be rendered here -->
+                        </div>
+                        <div id="correlationInsights" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
+                            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">📊 Pattern Analysis</h4>
+                            <div id="insightsList">
+                                <!-- Insights will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Monthly Data Source Indicator -->
                     <div id="monthlyDataSourceIndicator" style="margin: 10px 0; padding: 8px 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; font-size: 0.85em; color: #856404; display: none;">
                         <strong>🗄️ Monthly Data Sources:</strong>
                         <div id="monthlyDataSourceDetails" style="margin-top: 5px; font-family: monospace; font-size: 0.9em;"></div>
                     </div>
                     
-                    <div class="chart-container" style="height: 400px;">
+                    <!-- Chart Container (for Monthly Summary) -->
+                    <div class="chart-container" id="chartContainer" style="height: 400px;">
                         <canvas id="incidentTrendsChart"></canvas>
                     </div>
                 </div>
@@ -894,8 +910,8 @@
             // Load default 6-hour pressure chart
             await loadPressureChart(6); // Load 6-hour pressure chart by default
             
-            // Load incident trends chart
-            await loadIncidentTrends();
+            // Load incident almanac
+            await loadIncidentAlmanac();
             
             // Start auto-refresh
             startAutoRefresh();
@@ -2808,35 +2824,38 @@
             });
         }
 
-        // Load and display incident trends chart
-        async function loadIncidentTrends() {
-            const viewType = document.getElementById('trendsViewFilter').value;
-            const severityFilter = document.getElementById('trendsSeverityFilter').value;
-            const trendsStatus = document.getElementById('trendsStatus');
+        // Enhanced Incident Almanac with multiple visualization modes
+        async function loadIncidentAlmanac() {
+            const viewType = document.getElementById('almanacViewType').value;
+            const periodFilter = parseInt(document.getElementById('almanacPeriodFilter').value);
+            const severityFilter = document.getElementById('almanacSeverityFilter').value;
+            const statusElement = document.getElementById('almanacStatus');
             
             try {
-                trendsStatus.textContent = 'Loading incident trends...';
+                statusElement.textContent = 'Loading incident data...';
                 
-                // Get 12 months of incident data
+                // Calculate time range
                 const now = new Date();
-                const oneYearAgo = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
-                
-                // Get temperature data for monthly view overlays
-                let temperatureData = null;
-                if (viewType === 'monthly') {
-                    temperatureData = await fetchTemperatureDataForTrends();
+                let startDate;
+                if (periodFilter === 1) {
+                    // Previous month
+                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                } else {
+                    // Last 12 months
+                    startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
                 }
                 
-                // For now, we'll use the original incidents data if available
-                // In a real implementation, you'd fetch data with a longer time range
-                if (!originalIncidentsData || originalIncidentsData.length === 0) {
-                    trendsStatus.textContent = 'No incident data available for trends analysis';
-                    updateIncidentTrendsChart([], viewType, severityFilter, temperatureData);
+                // Use existing incident data or fetch if needed
+                let incidents = originalIncidentsData || [];
+                
+                if (incidents.length === 0) {
+                    statusElement.textContent = 'No incident data available';
+                    showAlmanacView(viewType, [], periodFilter);
                     return;
                 }
                 
                 // Filter by severity
-                let filteredIncidents = originalIncidentsData.filter(incident => {
+                let filteredIncidents = incidents.filter(incident => {
                     if (severityFilter === 'critical') return incident.severity === 0;
                     if (severityFilter === 'high') return incident.severity === 1;
                     if (severityFilter === 'medium') return incident.severity === 2;
@@ -2847,18 +2866,442 @@
                     return false;
                 });
                 
-                // Filter by time range (last 12 months)
-                const cutoffTimestamp = Math.floor(oneYearAgo.getTime() / 1000);
+                // Filter by time range
+                const cutoffTimestamp = Math.floor(startDate.getTime() / 1000);
                 filteredIncidents = filteredIncidents.filter(incident => incident.startTime >= cutoffTimestamp);
                 
-                trendsStatus.textContent = `Showing ${filteredIncidents.length} incidents over last 12 months`;
-                updateIncidentTrendsChart(filteredIncidents, viewType, severityFilter, temperatureData);
+                const periodText = periodFilter === 1 ? 'previous month' : 'last 12 months';
+                statusElement.textContent = `Showing ${filteredIncidents.length} incidents from ${periodText}`;
+                
+                // Show the appropriate view
+                showAlmanacView(viewType, filteredIncidents, periodFilter);
                 
             } catch (error) {
-                console.error('Error loading incident trends:', error);
-                trendsStatus.textContent = 'Error loading incident trends data';
-                updateIncidentTrendsChart([], viewType, severityFilter, null);
+                console.error('Error loading incident almanac:', error);
+                statusElement.textContent = 'Error loading incident data';
+                showAlmanacView(viewType, [], periodFilter);
             }
+        }
+        
+        // Show the selected almanac view
+        function showAlmanacView(viewType, incidents, periodFilter) {
+            // Hide all views
+            document.getElementById('timelineView').style.display = 'none';
+            document.getElementById('correlationView').style.display = 'none';
+            document.getElementById('chartContainer').style.display = 'none';
+            
+            switch (viewType) {
+                case 'timeline':
+                    document.getElementById('timelineView').style.display = 'block';
+                    renderTimelineSwimlane(incidents, periodFilter);
+                    break;
+                case 'correlation':
+                    document.getElementById('correlationView').style.display = 'block';
+                    renderCorrelationMatrix(incidents);
+                    break;
+                case 'monthly':
+                default:
+                    document.getElementById('chartContainer').style.display = 'block';
+                    // Use existing chart rendering with backwards compatibility
+                    const severityFilter = document.getElementById('almanacSeverityFilter').value;
+                    updateIncidentTrendsChart(incidents, 'monthly', severityFilter, null);
+                    break;
+            }
+        }
+        
+        // Render Timeline Swimlane View
+        function renderTimelineSwimlane(incidents, periodFilter) {
+            const container = document.getElementById('incidentTimeline');
+            const monthElement = document.getElementById('timelineMonth');
+            
+            if (incidents.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">No incidents found for selected period and severity</div>';
+                monthElement.textContent = '';
+                return;
+            }
+            
+            // Determine the month(s) being displayed
+            if (periodFilter === 1) {
+                const now = new Date();
+                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                monthElement.textContent = `${prevMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+            } else {
+                monthElement.textContent = 'Last 12 Months';
+            }
+            
+            // Group incidents by type for swimlanes
+            const incidentTypes = {
+                0: { name: 'Power Loss', icon: '⚡', color: '#dc3545' },
+                1: { name: 'WiFi Down', icon: '📶', color: '#fd7e14' },
+                2: { name: 'Internet Down', icon: '🌐', color: '#6f42c1' },
+                3: { name: 'API Down', icon: '☁️', color: '#20c997' },
+                4: { name: 'Storm Event', icon: '🌩️', color: '#0dcaf0' },
+                5: { name: 'Heat Event', icon: '🔥', color: '#dc3545' },
+                6: { name: 'Freeze Event', icon: '🧊', color: '#0d6efd' }
+            };
+            
+            const severityColors = {
+                0: '#dc3545', // Critical - Red
+                1: '#fd7e14', // High - Orange  
+                2: '#ffc107', // Medium - Yellow
+                3: '#6c757d'  // Low - Gray
+            };
+            
+            // Calculate time boundaries
+            let minTime = Math.min(...incidents.map(i => i.startTime));
+            let maxTime = Math.max(...incidents.map(i => i.endTime > 0 ? i.endTime : i.startTime));
+            
+            // Add padding to time range
+            const timeRange = maxTime - minTime;
+            const padding = Math.max(timeRange * 0.1, 3600); // 10% or 1 hour minimum
+            minTime -= padding;
+            maxTime += padding;
+            
+            let html = '<div class="swimlane-container" style="width: 100%; overflow-x: auto;">';
+            
+            // Time axis header
+            html += '<div style="display: flex; align-items: center; margin-bottom: 15px; padding-left: 120px;">';
+            html += '<div style="flex: 1; height: 20px; background: linear-gradient(to right, #e9ecef 0%, #e9ecef 100%); border-radius: 3px; position: relative;">';
+            
+            // Add time markers
+            const timeSteps = 10;
+            for (let i = 0; i <= timeSteps; i++) {
+                const timePoint = minTime + (maxTime - minTime) * (i / timeSteps);
+                const date = new Date(timePoint * 1000);
+                const left = (i / timeSteps) * 100;
+                html += `<div style="position: absolute; left: ${left}%; top: 25px; font-size: 0.7em; color: #666; transform: translateX(-50%);">`;
+                html += `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                html += '</div>';
+            }
+            
+            html += '</div></div>';
+            
+            // Render swimlanes for each incident type
+            Object.entries(incidentTypes).forEach(([typeId, typeInfo]) => {
+                const typeIncidents = incidents.filter(i => i.type == typeId);
+                
+                html += '<div style="display: flex; align-items: center; margin-bottom: 8px;">';
+                html += `<div style="width: 110px; font-size: 0.85em; color: #333; font-weight: bold;">${typeInfo.icon} ${typeInfo.name}</div>`;
+                html += '<div style="flex: 1; height: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 3px; position: relative;">';
+                
+                // Render incidents for this type
+                typeIncidents.forEach(incident => {
+                    const startPercent = ((incident.startTime - minTime) / (maxTime - minTime)) * 100;
+                    const duration = incident.endTime > 0 ? incident.endTime - incident.startTime : 300; // 5 min default for ongoing
+                    const widthPercent = Math.max((duration / (maxTime - minTime)) * 100, 0.5); // Minimum 0.5% width
+                    
+                    const color = severityColors[incident.severity] || '#6c757d';
+                    const opacity = incident.endTime === 0 ? 0.7 : 1.0; // Lighter for ongoing
+                    
+                    const formatDuration = (seconds) => {
+                        if (seconds < 60) return `${seconds}s`;
+                        if (seconds < 3600) return `${Math.floor(seconds/60)}m ${seconds%60}s`;
+                        const hours = Math.floor(seconds/3600);
+                        const mins = Math.floor((seconds%3600)/60);
+                        return `${hours}h ${mins}m`;
+                    };
+                    
+                    const startDate = new Date(incident.startTime * 1000);
+                    const endDate = incident.endTime > 0 ? new Date(incident.endTime * 1000) : null;
+                    const tooltipText = `${typeInfo.name}\\nStart: ${startDate.toLocaleString()}\\n${endDate ? `End: ${endDate.toLocaleString()}\\nDuration: ${formatDuration(duration)}` : 'Ongoing'}\\nSeverity: ${['Critical', 'High', 'Medium', 'Low'][incident.severity]}`;
+                    
+                    html += `<div style="position: absolute; left: ${startPercent}%; width: ${widthPercent}%; height: 100%; background: ${color}; opacity: ${opacity}; border-radius: 2px; cursor: pointer;" `;
+                    html += `title="${tooltipText}" `;
+                    html += `onmouseover="highlightCorrelations(${incident.startTime}, ${incident.endTime || incident.startTime}, '${typeInfo.name}')" `;
+                    html += `onmouseout="clearCorrelationHighlight()"></div>`;
+                });
+                
+                html += '</div></div>';
+            });
+            
+            html += '</div>';
+            
+            // Add legend
+            html += '<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.85em;">';
+            html += '<strong>Severity Colors:</strong> ';
+            html += '<span style="color: #dc3545;">■ Critical</span> ';
+            html += '<span style="color: #fd7e14;">■ High</span> ';
+            html += '<span style="color: #ffc107;">■ Medium</span> ';
+            html += '<span style="color: #6c757d;">■ Low</span>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        // Render Correlation Matrix
+        function renderCorrelationMatrix(incidents) {
+            const container = document.getElementById('correlationMatrix');
+            const insightsContainer = document.getElementById('insightsList');
+            
+            if (incidents.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">No incidents available for correlation analysis</div>';
+                insightsContainer.innerHTML = '<p style="color: #666;">No data available for pattern analysis</p>';
+                return;
+            }
+            
+            const incidentTypes = {
+                0: 'Power Loss',
+                1: 'WiFi Down', 
+                2: 'Internet Down',
+                3: 'API Down',
+                4: 'Storm Event',
+                5: 'Heat Event',
+                6: 'Freeze Event'
+            };
+            
+            // Calculate correlations
+            const correlations = calculateCorrelationMatrix(incidents);
+            const insights = analyzeCorrelationPatterns(incidents, correlations);
+            
+            // Render correlation matrix
+            let html = '<div style="overflow-x: auto;"><table style="border-collapse: collapse; width: 100%; min-width: 600px;">';
+            html += '<tr><th style="border: 1px solid #dee2e6; padding: 8px; background: #f8f9fa;"></th>';
+            
+            // Header row
+            Object.values(incidentTypes).forEach(typeName => {
+                html += `<th style="border: 1px solid #dee2e6; padding: 8px; background: #f8f9fa; font-size: 0.8em; writing-mode: vertical-rl; text-orientation: mixed;">${typeName}</th>`;
+            });
+            html += '</tr>';
+            
+            // Data rows
+            Object.entries(incidentTypes).forEach(([typeId1, typeName1]) => {
+                html += `<tr><td style="border: 1px solid #dee2e6; padding: 8px; background: #f8f9fa; font-weight: bold; font-size: 0.85em;">${typeName1}</td>`;
+                
+                Object.entries(incidentTypes).forEach(([typeId2, typeName2]) => {
+                    if (typeId1 === typeId2) {
+                        html += '<td style="border: 1px solid #dee2e6; padding: 8px; background: #e9ecef; text-align: center;">-</td>';
+                    } else {
+                        const correlation = correlations[`${typeId1}-${typeId2}`] || 0;
+                        const intensity = Math.abs(correlation);
+                        const color = correlation > 0.3 ? `rgba(220, 53, 69, ${intensity})` : 
+                                     correlation > 0.1 ? `rgba(255, 193, 7, ${intensity})` : 
+                                     `rgba(108, 117, 125, ${Math.max(0.1, intensity)})`;
+                        
+                        html += `<td style="border: 1px solid #dee2e6; padding: 8px; background: ${color}; text-align: center; font-size: 0.8em; color: ${intensity > 0.5 ? 'white' : 'black'};">${correlation.toFixed(2)}</td>`;
+                    }
+                });
+                html += '</tr>';
+            });
+            
+            html += '</table></div>';
+            
+            // Add correlation explanation
+            html += '<div style="margin-top: 15px; font-size: 0.85em; color: #666;">';
+            html += '<strong>Correlation Values:</strong> 0.00 = No correlation, 1.00 = Perfect correlation<br>';
+            html += '<strong>Colors:</strong> <span style="background: rgba(220, 53, 69, 0.7); color: white; padding: 2px 6px;">Strong (>0.3)</span> ';
+            html += '<span style="background: rgba(255, 193, 7, 0.7); padding: 2px 6px;">Moderate (0.1-0.3)</span> ';
+            html += '<span style="background: rgba(108, 117, 125, 0.3); padding: 2px 6px;">Weak (<0.1)</span>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+            
+            // Render insights
+            let insightsHtml = '';
+            insights.forEach(insight => {
+                insightsHtml += `<div class="insight-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #17a2b8; background: rgba(23, 162, 184, 0.1);">`;
+                insightsHtml += `<strong>${insight.type}:</strong> ${insight.description}`;
+                insightsHtml += '</div>';
+            });
+            
+            if (insightsHtml === '') {
+                insightsHtml = '<p style="color: #666;">No significant patterns detected with current data set</p>';
+            }
+            
+            insightsContainer.innerHTML = insightsHtml;
+        }
+        
+        // Calculate correlation matrix between incident types
+        function calculateCorrelationMatrix(incidents) {
+            const correlations = {};
+            const timeWindow = 2 * 60 * 60; // 2 hours correlation window
+            
+            // Get all unique incident type pairs
+            const types = [...new Set(incidents.map(i => i.type))];
+            
+            types.forEach(type1 => {
+                types.forEach(type2 => {
+                    if (type1 !== type2) {
+                        const type1Incidents = incidents.filter(i => i.type === type1);
+                        const type2Incidents = incidents.filter(i => i.type === type2);
+                        
+                        let correlatedCount = 0;
+                        let totalType1 = type1Incidents.length;
+                        
+                        if (totalType1 === 0) {
+                            correlations[`${type1}-${type2}`] = 0;
+                            return;
+                        }
+                        
+                        // Check how many type1 incidents have a type2 incident within the time window
+                        type1Incidents.forEach(incident1 => {
+                            const hasCorrelation = type2Incidents.some(incident2 => {
+                                const timeDiff = Math.abs(incident2.startTime - incident1.startTime);
+                                return timeDiff <= timeWindow;
+                            });
+                            
+                            if (hasCorrelation) {
+                                correlatedCount++;
+                            }
+                        });
+                        
+                        correlations[`${type1}-${type2}`] = correlatedCount / totalType1;
+                    }
+                });
+            });
+            
+            return correlations;
+        }
+        
+        // Analyze correlation patterns and generate insights
+        function analyzeCorrelationPatterns(incidents, correlations) {
+            const insights = [];
+            const incidentTypes = {
+                0: 'Power Loss', 1: 'WiFi Down', 2: 'Internet Down',
+                3: 'API Down', 4: 'Storm Event', 5: 'Heat Event', 6: 'Freeze Event'
+            };
+            
+            // Find strong correlations
+            Object.entries(correlations).forEach(([key, value]) => {
+                if (value >= 0.5) {
+                    const [type1, type2] = key.split('-');
+                    insights.push({
+                        type: 'Strong Correlation',
+                        description: `${incidentTypes[type1]} incidents are followed by ${incidentTypes[type2]} incidents ${(value * 100).toFixed(0)}% of the time within 2 hours`
+                    });
+                }
+            });
+            
+            // Find cascade patterns (A → B → C)
+            const cascades = findCascadePatterns(incidents);
+            cascades.forEach(cascade => {
+                insights.push({
+                    type: 'Cascade Pattern',
+                    description: `${cascade.pattern} detected with average delays of ${cascade.delays.join(' → ')}`
+                });
+            });
+            
+            // Temporal patterns
+            const temporalPatterns = analyzeTemporalPatterns(incidents);
+            temporalPatterns.forEach(pattern => {
+                insights.push({
+                    type: 'Temporal Pattern',
+                    description: pattern
+                });
+            });
+            
+            return insights;
+        }
+        
+        // Find cascade failure patterns
+        function findCascadePatterns(incidents) {
+            // This is a simplified implementation - could be enhanced with more sophisticated pattern detection
+            const cascades = [];
+            const timeWindow = 30 * 60; // 30 minutes for cascade detection
+            
+            // Look for Storm → Power → WiFi cascade
+            const stormIncidents = incidents.filter(i => i.type === 4);
+            stormIncidents.forEach(storm => {
+                const powerIncidents = incidents.filter(i => 
+                    i.type === 0 && 
+                    i.startTime >= storm.startTime && 
+                    i.startTime <= storm.startTime + timeWindow
+                );
+                
+                powerIncidents.forEach(power => {
+                    const wifiIncidents = incidents.filter(i =>
+                        i.type === 1 &&
+                        i.startTime >= power.startTime &&
+                        i.startTime <= power.startTime + timeWindow
+                    );
+                    
+                    if (wifiIncidents.length > 0) {
+                        const delay1 = power.startTime - storm.startTime;
+                        const delay2 = wifiIncidents[0].startTime - power.startTime;
+                        cascades.push({
+                            pattern: 'Storm Event → Power Loss → WiFi Down',
+                            delays: [`${Math.floor(delay1/60)}min`, `${Math.floor(delay2/60)}min`]
+                        });
+                    }
+                });
+            });
+            
+            return cascades;
+        }
+        
+        // Analyze temporal patterns
+        function analyzeTemporalPatterns(incidents) {
+            const patterns = [];
+            
+            // Group by day of week
+            const dayGroups = {};
+            incidents.forEach(incident => {
+                const date = new Date(incident.startTime * 1000);
+                const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()];
+                dayGroups[dayName] = (dayGroups[dayName] || 0) + 1;
+            });
+            
+            // Find peak day
+            const peakDay = Object.entries(dayGroups).reduce((a, b) => a[1] > b[1] ? a : b);
+            if (peakDay[1] > 1) {
+                patterns.push(`Most incidents occur on ${peakDay[0]} (${peakDay[1]} incidents)`);
+            }
+            
+            // Group by hour
+            const hourGroups = {};
+            incidents.forEach(incident => {
+                const date = new Date(incident.startTime * 1000);
+                const hour = date.getHours();
+                hourGroups[hour] = (hourGroups[hour] || 0) + 1;
+            });
+            
+            // Find peak hour
+            const peakHour = Object.entries(hourGroups).reduce((a, b) => a[1] > b[1] ? a : b);
+            if (peakHour[1] > 1) {
+                const hour12 = parseInt(peakHour[0]) === 0 ? 12 : 
+                             parseInt(peakHour[0]) > 12 ? parseInt(peakHour[0]) - 12 : parseInt(peakHour[0]);
+                const ampm = parseInt(peakHour[0]) >= 12 ? 'PM' : 'AM';
+                patterns.push(`Peak incident time is ${hour12}:00 ${ampm} (${peakHour[1]} incidents)`);
+            }
+            
+            return patterns;
+        }
+        
+        // Highlight correlations in timeline view
+        function highlightCorrelations(incidentStart, incidentEnd, incidentType) {
+            const indicator = document.getElementById('correlationIndicator');
+            const text = document.getElementById('correlationText');
+            const timeWindow = 2 * 60 * 60; // 2 hours
+            
+            // Find related incidents within time window
+            const relatedIncidents = (originalIncidentsData || []).filter(incident => {
+                const timeDiff = Math.min(
+                    Math.abs(incident.startTime - incidentStart),
+                    Math.abs((incident.endTime || incident.startTime) - incidentStart)
+                );
+                return timeDiff <= timeWindow && incident.startTime !== incidentStart;
+            });
+            
+            if (relatedIncidents.length > 0) {
+                const typeNames = {0: 'Power Loss', 1: 'WiFi Down', 2: 'Internet Down', 3: 'API Down', 4: 'Storm Event', 5: 'Heat Event', 6: 'Freeze Event'};
+                const relatedTypes = [...new Set(relatedIncidents.map(i => typeNames[i.type]))];
+                
+                text.textContent = `${incidentType} correlates with: ${relatedTypes.join(', ')} (within 2 hours)`;
+                indicator.style.display = 'block';
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+        
+        // Clear correlation highlighting
+        function clearCorrelationHighlight() {
+            document.getElementById('correlationIndicator').style.display = 'none';
+        }
+
+        // Legacy function to maintain compatibility
+        async function loadIncidentTrends() {
+            // Redirect to new function with monthly view
+            document.getElementById('almanacViewType').value = 'monthly';
+            await loadIncidentAlmanac();
         }
 
         // Global tracking for data sources
