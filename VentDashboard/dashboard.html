@@ -3030,7 +3030,7 @@
                     
                     const startDate = new Date(incident.startTime * 1000);
                     const endDate = incident.endTime > 0 ? new Date(incident.endTime * 1000) : null;
-                    const tooltipText = `${typeInfo.name}\\nStart: ${startDate.toLocaleString()}\\n${endDate ? `End: ${endDate.toLocaleString()}\\nDuration: ${formatDuration(duration)}` : 'Ongoing'}\\nSeverity: ${['Critical', 'High', 'Medium', 'Low'][incident.severity]}`;
+                    const tooltipText = `${typeInfo.name}\nStart: ${startDate.toLocaleString()}\n${endDate ? `End: ${endDate.toLocaleString()}\nDuration: ${formatDuration(duration)}` : 'Ongoing'}\nSeverity: ${['Critical', 'High', 'Medium', 'Low'][incident.severity]}`;
                     
                     html += `<div style="position: absolute; left: ${startPercent}%; width: ${widthPercent}%; height: 100%; background: ${color}; opacity: ${opacity}; border-radius: 2px; cursor: pointer;" `;
                     html += `title="${tooltipText}" `;
