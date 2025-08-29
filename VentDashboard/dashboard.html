@@ -115,6 +115,468 @@
             padding: 30px;
         }
 
+        /* Yesterday's Report Hero Section Styles */
+        .hero-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 1px solid #dee2e6;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
+            color: white;
+            padding: 20px 30px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .section-header:hover {
+            background: linear-gradient(135deg, #3d4449 0%, #5a6268 100%);
+        }
+
+        .section-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        .date-indicator {
+            font-size: 0.9em;
+            opacity: 0.9;
+            background: rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border-radius: 15px;
+        }
+
+        .expand-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 0.9em;
+            cursor: pointer;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .expand-toggle:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .summary-metrics-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 25px 30px;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .metric-card.environmental {
+            border-left: 4px solid #28a745;
+        }
+
+        .metric-card.performance {
+            border-left: 4px solid #007bff;
+        }
+
+        .metric-card.activity {
+            border-left: 4px solid #fd7e14;
+        }
+
+        .metric-card.system {
+            border-left: 4px solid #6f42c1;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .metric-range {
+            font-size: 0.8em;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+
+        .metric-trend {
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .metric-trend.positive {
+            color: #28a745;
+        }
+
+        .metric-trend.negative {
+            color: #dc3545;
+        }
+
+        .metric-trend.neutral {
+            color: #6c757d;
+        }
+
+        .detailed-content {
+            padding: 0 30px 30px;
+        }
+
+        .detailed-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+        }
+
+        .detail-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .detail-section h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.1em;
+        }
+
+        .detail-content {
+            color: #6c757d;
+            line-height: 1.5;
+        }
+
+        /* Enhanced Door Activity Styles */
+        .door-timeline-chart {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            border: 1px solid #e9ecef;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .timeline-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .time-filter {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.3s ease;
+        }
+
+        .time-filter.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .time-filter:hover {
+            background: #e9ecef;
+        }
+
+        .time-filter.active:hover {
+            background: #0056b3;
+        }
+
+        .activity-summary {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .door-stats {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .stat-item {
+            font-size: 0.85em;
+            color: #6c757d;
+            padding: 5px 10px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+
+        /* System Health Widget */
+        .system-health-widget {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            border: 1px solid #e9ecef;
+        }
+
+        .health-gauge {
+            flex: 0 0 auto;
+        }
+
+        .gauge-container {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: conic-gradient(#28a745 0% var(--health-percentage, 85%), #e9ecef var(--health-percentage, 85%) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .gauge-container::before {
+            content: '';
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        .gauge-value {
+            position: relative;
+            z-index: 1;
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+
+        .gauge-label {
+            position: relative;
+            z-index: 1;
+            font-size: 0.7em;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+
+        .health-metrics {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .metric-icon {
+            font-size: 1.1em;
+        }
+
+        .metric-text {
+            flex: 1;
+            color: #495057;
+        }
+
+        .metric-status {
+            font-size: 0.8em;
+        }
+
+        .metric-status.green {
+            color: #28a745;
+        }
+
+        .metric-status.yellow {
+            color: #ffc107;
+        }
+
+        .metric-status.red {
+            color: #dc3545;
+        }
+
+        /* Mobile responsiveness for new sections */
+        @media (max-width: 768px) {
+            .summary-metrics-row {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+                padding: 20px;
+            }
+
+            .detailed-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .section-header {
+                padding: 15px 20px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .section-header h2 {
+                font-size: 1.3em;
+            }
+
+            .door-stats {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .system-health-widget {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .timeline-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .summary-metrics-row {
+                grid-template-columns: 1fr;
+            }
+
+            .metric-value {
+                font-size: 1.8em;
+            }
+
+            .main-content {
+                padding: 15px;
+            }
+        }
+
+        /* Enhanced Card Styles */
+        .enhanced-garage-card,
+        .enhanced-system-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .enhanced-garage-card:hover,
+        .enhanced-system-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .garage-sensors {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .door-activity-section h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .door-activity-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .door-status-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .door-status-card:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .door-count .count-value {
+            display: block;
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .door-count .count-label {
+            font-size: 0.8em;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .timeline-placeholder {
+            text-align: center;
+            padding: 30px;
+            color: #6c757d;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px dashed #dee2e6;
+        }
+
+        .timeline-placeholder p {
+            margin: 0;
+            font-style: italic;
+        }
+
+        .door-activity-section .door-timeline-chart {
+            margin: 0;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+
+        .door-activity-section .timeline-header h5 {
+            margin: 0;
+            color: #495057;
+            font-size: 1em;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -385,6 +847,77 @@
             </div>
 
             <div id="dashboardContent" style="display: none;">
+                <!-- Yesterday's Complete Report Hero Section (NEW) -->
+                <div class="hero-section yesterday-report" id="yesterdayReport">
+                    <div class="section-header" onclick="toggleYesterdayReport()">
+                        <h2>📋 Yesterday's Complete Report</h2>
+                        <span class="date-indicator" id="yesterdayDate">Loading...</span>
+                        <button class="expand-toggle" id="expandToggle">▼ Show Details</button>
+                    </div>
+                    
+                    <div class="summary-metrics-row" id="yesterdaySummaryMetrics">
+                        <div class="metric-card environmental">
+                            <div class="metric-value" id="yesterdayAvgTemp">--°F</div>
+                            <div class="metric-label">Avg Indoor</div>
+                            <div class="metric-range" id="yesterdayTempRange">-- - --</div>
+                            <div class="metric-trend" id="yesterdayTempTrend">--</div>
+                        </div>
+                        
+                        <div class="metric-card performance">
+                            <div class="metric-value" id="yesterdayEfficiency">--%</div>
+                            <div class="metric-label">Cooling Efficiency</div>
+                            <div class="metric-detail" id="yesterdayRuntime">-- hrs runtime</div>
+                            <div class="metric-trend" id="yesterdayEfficiencyTrend">--</div>
+                        </div>
+                        
+                        <div class="metric-card activity">
+                            <div class="metric-value" id="yesterdayDoorsActive">-/-</div>
+                            <div class="metric-label">Doors Active</div>
+                            <div class="metric-detail" id="yesterdaySessions">-- sessions</div>
+                            <div class="metric-trend" id="yesterdayPeakTime">--</div>
+                        </div>
+                        
+                        <div class="metric-card system">
+                            <div class="metric-value" id="yesterdaySystemHealth">--%</div>
+                            <div class="metric-label">System Health</div>
+                            <div class="metric-detail" id="yesterdayIncidents">-- incidents</div>
+                            <div class="metric-trend" id="yesterdayUptime">--</div>
+                        </div>
+                    </div>
+
+                    <div class="detailed-content" id="yesterdayDetailedContent" style="display: none;">
+                        <div class="detailed-grid">
+                            <div class="detail-section">
+                                <h4>🌡️ Environmental Summary</h4>
+                                <div class="detail-content" id="yesterdayEnvironmental">
+                                    <p>Loading detailed environmental data...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>⚡ System Performance</h4>
+                                <div class="detail-content" id="yesterdayPerformance">
+                                    <p>Loading performance metrics...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>🚪 Door Activity Timeline</h4>
+                                <div class="detail-content" id="yesterdayDoorTimeline">
+                                    <p>Loading door activity data...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>📊 Incident Summary</h4>
+                                <div class="detail-content" id="yesterdayIncidentSummary">
+                                    <p>Loading incident data...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Current Status Grid -->
                 <div class="grid">
                     <!-- Indoor Sensors -->
@@ -436,29 +969,85 @@
                         </div>
                     </div>
 
-                    <!-- Garage Sensors -->
-                    <div class="card">
-                        <h3>🏠 Garage Environment</h3>
-                        <div class="sensor-reading">
-                            <span>Temperature</span>
-                            <span class="sensor-value temperature" id="garageTemp">-°F</span>
+                    <!-- Enhanced Garage Environment & Door Activity -->
+                    <div class="card enhanced-garage-card">
+                        <h3>🏠 Garage Environment & Door Activity</h3>
+                        
+                        <!-- Environmental Sensors -->
+                        <div class="garage-sensors">
+                            <div class="sensor-reading">
+                                <span>Temperature</span>
+                                <span class="sensor-value temperature" id="garageTemp">-°F</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Humidity</span>
+                                <span class="sensor-value humidity" id="garageHumidity">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Pressure</span>
+                                <span class="sensor-value pressure" id="garagePressure">- inHg</span>
+                            </div>
                         </div>
-                        <div class="sensor-reading">
-                            <span>Humidity</span>
-                            <span class="sensor-value humidity" id="garageHumidity">-%</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Pressure</span>
-                            <span class="sensor-value pressure" id="garagePressure">- inHg</span>
+
+                        <!-- Enhanced Door Activity Section -->
+                        <div class="door-activity-section">
+                            <h4>🚪 Door Activity Center</h4>
+                            <div class="door-activity-grid">
+                                <div class="door-status-card">
+                                    <div class="door-count">
+                                        <span class="count-value" id="activeDoorsCount">-</span>
+                                        <span class="count-label">Active Today</span>
+                                    </div>
+                                </div>
+                                <div class="door-status-card">
+                                    <div class="door-count">
+                                        <span class="count-value" id="totalSessionsCount">-</span>
+                                        <span class="count-label">Total Sessions</span>
+                                    </div>
+                                </div>
+                                <div class="door-status-card">
+                                    <div class="door-count">
+                                        <span class="count-value" id="lastActivityTime">--:--</span>
+                                        <span class="count-label">Last Activity</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Door Timeline Visualization -->
+                            <div class="door-timeline-chart">
+                                <div class="timeline-header">
+                                    <h5>📊 Activity Timeline</h5>
+                                    <div class="timeline-controls">
+                                        <button class="time-filter active" data-hours="24">24h</button>
+                                        <button class="time-filter" data-hours="168">7d</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="timeline-visualization" id="doorTimelineViz">
+                                    <div class="timeline-placeholder">
+                                        <p>Loading door activity timeline...</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="activity-summary">
+                                    <div class="door-stats">
+                                        <span class="stat-item" id="firstActivityStat">First: --</span>
+                                        <span class="stat-item" id="peakHourStat">Peak: --</span>
+                                        <span class="stat-item" id="totalSessionsStat">Sessions: --</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- System Status -->
-                    <div class="card">
+                    <!-- Enhanced System Status & Health Monitor -->
+                    <div class="card enhanced-system-card">
                         <h3 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                            <span>⚙️ System Status</span>
+                            <span>⚙️ System Status & Health</span>
                             <button type="button" onclick="exportReliabilityDoc()" title="Export to Word" style="background:#17a2b8; border:none; color:#fff; padding:6px 10px; border-radius:5px; cursor:pointer; font-size:12px; line-height:1;">Export</button>
                         </h3>
+                        
+                        <!-- Current System Status -->
                         <div class="system-status">
                             <div class="fan-status" id="fanStatus">🌀</div>
                             <div><strong id="fanStatusText">System Status</strong></div>
@@ -470,8 +1059,34 @@
                                 <div>Cooling Effect: <strong id="coolingEffect">-</strong></div>
                             </div>
                         </div>
+
+                        <!-- System Health Monitoring -->
+                        <div class="system-health-widget" style="margin-top: 20px;">
+                            <div class="health-gauge">
+                                <div class="gauge-container" style="--health-percentage: 85%;">
+                                    <div class="gauge-value" id="systemHealthPercentage">--%</div>
+                                </div>
+                            </div>
+                            <div class="health-metrics">
+                                <div class="metric">
+                                    <span class="metric-icon">⚡</span>
+                                    <span class="metric-text" id="systemUptimeText">Uptime: --</span>
+                                    <span class="metric-status green" id="uptimeStatus">●</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-icon">📡</span>
+                                    <span class="metric-text" id="wifiStrengthText">WiFi: -- dBm</span>
+                                    <span class="metric-status green" id="wifiStatus">●</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-icon">🧠</span>
+                                    <span class="metric-text" id="memoryUsageText">Memory: --%</span>
+                                    <span class="metric-status yellow" id="memoryStatus">●</span>
+                                </div>
+                            </div>
+                        </div>
                         
-                        <!-- System Reliability Section (Compact) -->
+                        <!-- System Reliability & Startup Info -->
                         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef;">
                             <div style="font-weight: bold; color: #2c3e50; margin-bottom: 8px;">🛡️ System Reliability:</div>
                             <div style="font-size: 0.85em; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -482,6 +1097,15 @@
                             </div>
                             <div style="margin-top: 8px; font-size: 0.8em; color: #666;">
                                 Incidents: <strong id="reliabilityIncidentSummary" style="font-family: monospace;">No data</strong>
+                            </div>
+                            
+                            <!-- Startup Information -->
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                                <div style="font-weight: bold; color: #2c3e50; margin-bottom: 5px;">🚀 Last Boot:</div>
+                                <div style="font-size: 0.8em; color: #666;">
+                                    <div id="lastBootInfo">Loading startup information...</div>
+                                    <div id="bootReasonInfo" style="margin-top: 3px;">Reason: --</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -873,6 +1497,7 @@
             }
             
             initializeDashboard();
+            setupEnhancedDashboard(); // Initialize Phase 2 enhancements
         });
 
         // Helper function to format detailed timestamps consistently
@@ -915,6 +1540,154 @@
             
             // Start auto-refresh
             startAutoRefresh();
+        }
+
+        // Enhanced Dashboard Functions for Phase 2
+
+        function toggleYesterdayReport() {
+            const detailedContent = document.getElementById('yesterdayDetailedContent');
+            const expandToggle = document.getElementById('expandToggle');
+            
+            if (detailedContent.style.display === 'none' || detailedContent.style.display === '') {
+                detailedContent.style.display = 'block';
+                expandToggle.textContent = '▲ Hide Details';
+                // Load detailed content if not already loaded
+                loadYesterdayDetailedContent();
+            } else {
+                detailedContent.style.display = 'none';
+                expandToggle.textContent = '▼ Show Details';
+            }
+        }
+
+        function loadYesterdayDetailedContent() {
+            // This will be connected to the GetEnhancedDashboardData API in Phase 3
+            // For now, show placeholder content
+            document.getElementById('yesterdayEnvironmental').innerHTML = `
+                <div class="env-summary">
+                    <p><strong>Temperature Range:</strong> 72.1°F - 78.5°F (Avg: 75.2°F)</p>
+                    <p><strong>Humidity Range:</strong> 45% - 62% (Avg: 53%)</p>
+                    <p><strong>Pressure:</strong> 30.12 - 30.18 inHg (Storm risk: Low)</p>
+                    <p><em>Detailed environmental data will be loaded from enhanced API...</em></p>
+                </div>
+            `;
+            
+            document.getElementById('yesterdayPerformance').innerHTML = `
+                <div class="performance-summary">
+                    <p><strong>Cooling Efficiency:</strong> 85% (+12% vs previous day)</p>
+                    <p><strong>Runtime:</strong> 3.2 hours total</p>
+                    <p><strong>Energy Usage:</strong> Estimated 2.1 kWh</p>
+                    <p><em>Performance metrics will be loaded from enhanced API...</em></p>
+                </div>
+            `;
+            
+            document.getElementById('yesterdayDoorTimeline').innerHTML = `
+                <div class="door-timeline-summary">
+                    <p><strong>Active Doors:</strong> 3 of 4 doors had activity</p>
+                    <p><strong>Total Sessions:</strong> 15 opening/closing events</p>
+                    <p><strong>Peak Activity:</strong> 7:00 PM - 8:00 PM</p>
+                    <p><em>Complete door timeline will be loaded from enhanced API...</em></p>
+                </div>
+            `;
+            
+            document.getElementById('yesterdayIncidentSummary').innerHTML = `
+                <div class="incident-summary">
+                    <p><strong>Total Incidents:</strong> 0 critical, 1 minor</p>
+                    <p><strong>System Health:</strong> 98.5% uptime</p>
+                    <p><strong>Reliability:</strong> All systems operational</p>
+                    <p><em>Complete incident analysis will be loaded from enhanced API...</em></p>
+                </div>
+            `;
+        }
+
+        function setupEnhancedDashboard() {
+            // Initialize yesterday's report with placeholder data
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            document.getElementById('yesterdayDate').textContent = yesterday.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // Set up door activity timeline controls
+            const timeFilters = document.querySelectorAll('.time-filter');
+            timeFilters.forEach(filter => {
+                filter.addEventListener('click', function() {
+                    // Remove active class from all filters
+                    timeFilters.forEach(f => f.classList.remove('active'));
+                    // Add active class to clicked filter
+                    this.classList.add('active');
+                    // Update timeline (placeholder for now)
+                    updateDoorTimeline(this.dataset.hours);
+                });
+            });
+
+            // Initialize with placeholder data for UI testing
+            updateYesterdaySummaryMetrics();
+            updateEnhancedDoorActivity();
+            updateSystemHealthWidget();
+        }
+
+        function updateYesterdaySummaryMetrics() {
+            // Placeholder data for Phase 2 testing - will be replaced with API data in Phase 3
+            document.getElementById('yesterdayAvgTemp').textContent = '75.2°F';
+            document.getElementById('yesterdayTempRange').textContent = '72.1° - 78.5°';
+            document.getElementById('yesterdayTempTrend').innerHTML = '↓ 2.1° vs prev day';
+            document.getElementById('yesterdayTempTrend').className = 'metric-trend positive';
+            
+            document.getElementById('yesterdayEfficiency').textContent = '85%';
+            document.getElementById('yesterdayRuntime').textContent = '3.2 hrs runtime';
+            document.getElementById('yesterdayEfficiencyTrend').innerHTML = '↑ 12% vs prev day';
+            document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend positive';
+            
+            document.getElementById('yesterdayDoorsActive').textContent = '3/4';
+            document.getElementById('yesterdaySessions').textContent = '15 sessions';
+            document.getElementById('yesterdayPeakTime').textContent = 'Peak: 7-8 PM';
+            
+            document.getElementById('yesterdaySystemHealth').textContent = '98.5%';
+            document.getElementById('yesterdayIncidents').textContent = '0 incidents';
+            document.getElementById('yesterdayUptime').textContent = '15d uptime';
+        }
+
+        function updateEnhancedDoorActivity() {
+            // Placeholder data for Phase 2 testing
+            document.getElementById('activeDoorsCount').textContent = '3';
+            document.getElementById('totalSessionsCount').textContent = '15';
+            document.getElementById('lastActivityTime').textContent = '2:34 PM';
+            
+            document.getElementById('firstActivityStat').textContent = 'First: 6:23 AM';
+            document.getElementById('peakHourStat').textContent = 'Peak: 7-8 PM';
+            document.getElementById('totalSessionsStat').textContent = 'Sessions: 15';
+        }
+
+        function updateSystemHealthWidget() {
+            // Placeholder data for Phase 2 testing
+            document.getElementById('systemHealthPercentage').textContent = '98%';
+            document.getElementById('systemUptimeText').textContent = 'Uptime: 15d 8h';
+            document.getElementById('wifiStrengthText').textContent = 'WiFi: -42 dBm';
+            document.getElementById('memoryUsageText').textContent = 'Memory: 78%';
+            
+            document.getElementById('lastBootInfo').textContent = 'Aug 14, 2025 at 6:23 AM';
+            document.getElementById('bootReasonInfo').textContent = 'Reason: Power restored after outage';
+            
+            // Update health gauge percentage
+            const gauge = document.querySelector('.gauge-container');
+            if (gauge) {
+                gauge.style.setProperty('--health-percentage', '98%');
+            }
+        }
+
+        function updateDoorTimeline(hours) {
+            // Placeholder function for timeline updates - will be implemented in Phase 3
+            const timelineViz = document.getElementById('doorTimelineViz');
+            const placeholder = timelineViz.querySelector('.timeline-placeholder p');
+            
+            if (placeholder) {
+                placeholder.textContent = `Loading ${hours}h door activity timeline...`;
+            }
+            
+            // This will connect to the GetEnhancedDashboardData API to load actual timeline data
         }
 
         async function refreshData() {
