@@ -569,6 +569,8 @@
             grid-template-columns: repeat(5, 1fr);
             gap: 20px;
             margin-bottom: 30px;
+            width: 100%;
+            overflow-x: auto; /* Allow horizontal scroll if needed */
         }
 
         .card {
@@ -577,6 +579,7 @@
             padding: 25px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             border: 1px solid #e9ecef;
+            min-width: 280px; /* Ensure cards have minimum width */
         }
 
         .card h3 {
@@ -781,18 +784,6 @@
             text-align: center;
             padding: 50px;
             color: #dc3545;
-        }
-
-        @media (max-width: 1200px) {
-            .grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
-
-        @media (max-width: 900px) {
-            .grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
 
         @media (max-width: 768px) {

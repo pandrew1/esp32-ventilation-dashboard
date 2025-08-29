@@ -941,23 +941,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 const headers = getAuthHeaders();
                 const apiUrl = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
                 
+                console.log('loadAggregationStatus: Making API call to:', apiUrl);
+                
                 const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers
                 });
 
                 if (!response.ok) {
+                    console.log('loadAggregationStatus: API call failed:', response.status);
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const data = await response.json();
+                console.log('loadAggregationStatus: Received data, system keys:', Object.keys(data.system || {}));
                 
                 // Look for MonthlyAggregationStatus in the system data (original implementation)
                 const systemData = data.system || {};
                 
                 if (systemData.MonthlyAggregationStatus) {
+                    console.log('loadAggregationStatus: Found MonthlyAggregationStatus:', systemData.MonthlyAggregationStatus);
                     updateAggregationStatusDisplay(systemData.MonthlyAggregationStatus, null);
                 } else {
+                    console.log('loadAggregationStatus: MonthlyAggregationStatus not found, using fallback');
                     // Try to fetch directly from fallback (original behavior)
                     await fetchAggregationStatusDirect();
                 }
@@ -968,6 +974,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async function fetchAggregationStatusDirect() {
+            console.log('fetchAggregationStatusDirect: Using fallback status');
             // This would require a direct API endpoint to VentilationStatus table
             // For now, we'll show a generic status (original fallback behavior)
             updateAggregationStatusDisplay({
