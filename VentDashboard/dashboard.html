@@ -1320,8 +1320,9 @@
                     <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
                         <label style="font-weight: bold; margin-right: 10px; color: #333;">Time Period:</label>
                         <select id="timePeriodFilter" onchange="applyIncidentFilters()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
+                            <option value="last5" selected>Last 5 Incidents</option>
                             <option value="1">Last 24 Hours</option>
-                            <option value="7" selected>Last Week</option>
+                            <option value="7">Last Week</option>
                             <option value="30">Last 30 Days</option>
                         </select>
                         
@@ -1560,47 +1561,104 @@
         }
 
         function loadYesterdayDetailedContent() {
-            // This will be connected to the GetEnhancedDashboardData API in Phase 3
-            // For now, show placeholder content
-            document.getElementById('yesterdayEnvironmental').innerHTML = `
-                <div class="env-summary">
-                    <p><strong>Temperature Range:</strong> 72.1°F - 78.5°F (Avg: 75.2°F)</p>
-                    <p><strong>Humidity Range:</strong> 45% - 62% (Avg: 53%)</p>
-                    <p><strong>Pressure:</strong> 30.12 - 30.18 inHg (Storm risk: Low)</p>
-                    <p><em>Detailed environmental data will be loaded from enhanced API...</em></p>
-                </div>
-            `;
+            // Show loading states initially
+            document.getElementById('yesterdayEnvironmental').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading environmental data...</em></div>';
+            document.getElementById('yesterdayPerformance').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading performance metrics...</em></div>';
+            document.getElementById('yesterdayDoorTimeline').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading door activity...</em></div>';
+            document.getElementById('yesterdayIncidentSummary').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading incident analysis...</em></div>';
             
-            document.getElementById('yesterdayPerformance').innerHTML = `
-                <div class="performance-summary">
-                    <p><strong>Cooling Efficiency:</strong> 85% (+12% vs previous day)</p>
-                    <p><strong>Runtime:</strong> 3.2 hours total</p>
-                    <p><strong>Energy Usage:</strong> Estimated 2.1 kWh</p>
-                    <p><em>Performance metrics will be loaded from enhanced API...</em></p>
-                </div>
-            `;
+            // Get API key from URL or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
             
-            document.getElementById('yesterdayDoorTimeline').innerHTML = `
-                <div class="door-timeline-summary">
-                    <p><strong>Active Doors:</strong> 3 of 4 doors had activity</p>
-                    <p><strong>Total Sessions:</strong> 15 opening/closing events</p>
-                    <p><strong>Peak Activity:</strong> 7:00 PM - 8:00 PM</p>
-                    <p><em>Complete door timeline will be loaded from enhanced API...</em></p>
-                </div>
-            `;
+            // Call the enhanced dashboard API
+            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
             
-            document.getElementById('yesterdayIncidentSummary').innerHTML = `
-                <div class="incident-summary">
-                    <p><strong>Total Incidents:</strong> 0 critical, 1 minor</p>
-                    <p><strong>System Health:</strong> 98.5% uptime</p>
-                    <p><strong>Reliability:</strong> All systems operational</p>
-                    <p><em>Complete incident analysis will be loaded from enhanced API...</em></p>
-                </div>
-            `;
+            fetch(`${apiUrl}?apikey=${apiKey}&section=yesterday`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Load environmental data
+                    if (data.environmental) {
+                        const env = data.environmental;
+                        document.getElementById('yesterdayEnvironmental').innerHTML = `
+                            <div class="env-summary">
+                                <p><strong>Temperature Range:</strong> ${env.tempMin}°F - ${env.tempMax}°F (Avg: ${env.tempAvg}°F)</p>
+                                <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
+                                <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} inHg</p>
+                                ${env.airQuality ? `<p><strong>Air Quality:</strong> ${env.airQuality} (AQI: ${env.aqi})</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayEnvironmental').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Environmental data not available</em></div>';
+                    }
+                    
+                    // Load performance data
+                    if (data.performance) {
+                        const perf = data.performance;
+                        document.getElementById('yesterdayPerformance').innerHTML = `
+                            <div class="performance-summary">
+                                <p><strong>Cooling Efficiency:</strong> ${perf.efficiency}%${perf.efficiencyChange ? ` (${perf.efficiencyChange > 0 ? '+' : ''}${perf.efficiencyChange}% vs previous day)` : ''}</p>
+                                <p><strong>Runtime:</strong> ${perf.runtime} hours total</p>
+                                ${perf.energyUsage ? `<p><strong>Energy Usage:</strong> ${perf.energyUsage} kWh</p>` : ''}
+                                ${perf.peakLoad ? `<p><strong>Peak Load:</strong> ${perf.peakLoad}</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayPerformance').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Performance data not available</em></div>';
+                    }
+                    
+                    // Load door timeline data
+                    if (data.doorActivity) {
+                        const doors = data.doorActivity;
+                        document.getElementById('yesterdayDoorTimeline').innerHTML = `
+                            <div class="door-timeline-summary">
+                                <p><strong>Active Doors:</strong> ${doors.activeDoors} of ${doors.totalDoors} doors had activity</p>
+                                <p><strong>Total Sessions:</strong> ${doors.totalEvents} opening/closing events</p>
+                                ${doors.peakActivity ? `<p><strong>Peak Activity:</strong> ${doors.peakActivity}</p>` : ''}
+                                ${doors.mostActive ? `<p><strong>Most Active:</strong> ${doors.mostActive.name} (${doors.mostActive.events} events)</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayDoorTimeline').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Door activity data not available</em></div>';
+                    }
+                    
+                    // Load incident analysis data
+                    if (data.incidents) {
+                        const incidents = data.incidents;
+                        document.getElementById('yesterdayIncidentSummary').innerHTML = `
+                            <div class="incident-summary">
+                                <p><strong>Total Incidents:</strong> ${incidents.critical || 0} critical, ${incidents.minor || 0} minor</p>
+                                <p><strong>System Health:</strong> ${incidents.uptime}% uptime</p>
+                                <p><strong>Reliability:</strong> ${incidents.status}</p>
+                                ${incidents.responseTime ? `<p><strong>Response Time:</strong> Average ${incidents.responseTime} seconds</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayIncidentSummary').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Incident analysis not available</em></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading enhanced dashboard data:', error);
+                    
+                    // Show error messages for each section
+                    const errorMessage = `<div style="color: #ff6b6b; padding: 15px; border: 1px solid #ff6b6b; border-radius: 4px; background: #fff5f5;">
+                        <em>❌ Failed to load data: ${error.message}</em>
+                    </div>`;
+                    
+                    document.getElementById('yesterdayEnvironmental').innerHTML = errorMessage;
+                    document.getElementById('yesterdayPerformance').innerHTML = errorMessage;
+                    document.getElementById('yesterdayDoorTimeline').innerHTML = errorMessage;
+                    document.getElementById('yesterdayIncidentSummary').innerHTML = errorMessage;
+                });
         }
 
         function setupEnhancedDashboard() {
-            // Initialize yesterday's report with placeholder data
+            // Initialize yesterday's report with loading state
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
             document.getElementById('yesterdayDate').textContent = yesterday.toLocaleDateString('en-US', {
@@ -1609,6 +1667,9 @@
                 month: 'long',
                 day: 'numeric'
             });
+
+            // Load summary metrics from API
+            loadYesterdaySummaryMetrics();
 
             // Set up door activity timeline controls
             const timeFilters = document.querySelectorAll('.time-filter');
@@ -1623,53 +1684,233 @@
                 });
             });
 
-            // Initialize with placeholder data for UI testing
-            updateYesterdaySummaryMetrics();
+            // Load real data from API instead of using placeholders
             updateEnhancedDoorActivity();
             updateSystemHealthWidget();
         }
 
-        function updateYesterdaySummaryMetrics() {
-            // Placeholder data for Phase 2 testing - will be replaced with API data in Phase 3
-            document.getElementById('yesterdayAvgTemp').textContent = '75.2°F';
-            document.getElementById('yesterdayTempRange').textContent = '72.1° - 78.5°';
-            document.getElementById('yesterdayTempTrend').innerHTML = '↓ 2.1° vs prev day';
-            document.getElementById('yesterdayTempTrend').className = 'metric-trend positive';
+        function loadYesterdaySummaryMetrics() {
+            // Show loading states for all metric elements
+            const loadingText = 'Loading...';
             
-            document.getElementById('yesterdayEfficiency').textContent = '85%';
-            document.getElementById('yesterdayRuntime').textContent = '3.2 hrs runtime';
-            document.getElementById('yesterdayEfficiencyTrend').innerHTML = '↑ 12% vs prev day';
-            document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend positive';
+            // Temperature metrics
+            document.getElementById('yesterdayAvgTemp').textContent = loadingText;
+            document.getElementById('yesterdayTempRange').textContent = loadingText;
+            document.getElementById('yesterdayTempTrend').textContent = loadingText;
             
-            document.getElementById('yesterdayDoorsActive').textContent = '3/4';
-            document.getElementById('yesterdaySessions').textContent = '15 sessions';
-            document.getElementById('yesterdayPeakTime').textContent = 'Peak: 7-8 PM';
+            // Efficiency metrics
+            document.getElementById('yesterdayEfficiency').textContent = loadingText;
+            document.getElementById('yesterdayRuntime').textContent = loadingText;
+            document.getElementById('yesterdayEfficiencyTrend').textContent = loadingText;
             
-            document.getElementById('yesterdaySystemHealth').textContent = '98.5%';
-            document.getElementById('yesterdayIncidents').textContent = '0 incidents';
-            document.getElementById('yesterdayUptime').textContent = '15d uptime';
+            // Door activity metrics
+            document.getElementById('yesterdayDoorsActive').textContent = loadingText;
+            document.getElementById('yesterdaySessions').textContent = loadingText;
+            document.getElementById('yesterdayPeakTime').textContent = loadingText;
+            
+            // System health metrics
+            document.getElementById('yesterdaySystemHealth').textContent = loadingText;
+            document.getElementById('yesterdayIncidents').textContent = loadingText;
+            document.getElementById('yesterdayUptime').textContent = loadingText;
+            
+            // Get API key from URL or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            
+            // Call the enhanced dashboard API for summary data
+            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
+            
+            fetch(`${apiUrl}?apikey=${apiKey}&section=yesterday_summary`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update temperature metrics
+                    if (data.temperature) {
+                        document.getElementById('yesterdayAvgTemp').textContent = `${data.temperature.average}°F`;
+                        document.getElementById('yesterdayTempRange').textContent = `${data.temperature.min}° - ${data.temperature.max}°`;
+                        
+                        if (data.temperature.trend) {
+                            const trendIcon = data.temperature.trend > 0 ? '↑' : '↓';
+                            const trendClass = data.temperature.trend > 0 ? 'negative' : 'positive'; // cooler is better
+                            document.getElementById('yesterdayTempTrend').innerHTML = `${trendIcon} ${Math.abs(data.temperature.trend)}° vs prev day`;
+                            document.getElementById('yesterdayTempTrend').className = `metric-trend ${trendClass}`;
+                        }
+                    }
+                    
+                    // Update efficiency metrics
+                    if (data.efficiency) {
+                        document.getElementById('yesterdayEfficiency').textContent = `${data.efficiency.value}%`;
+                        document.getElementById('yesterdayRuntime').textContent = `${data.efficiency.runtime} hrs runtime`;
+                        
+                        if (data.efficiency.trend) {
+                            const trendIcon = data.efficiency.trend > 0 ? '↑' : '↓';
+                            const trendClass = data.efficiency.trend > 0 ? 'positive' : 'negative';
+                            document.getElementById('yesterdayEfficiencyTrend').innerHTML = `${trendIcon} ${Math.abs(data.efficiency.trend)}% vs prev day`;
+                            document.getElementById('yesterdayEfficiencyTrend').className = `metric-trend ${trendClass}`;
+                        }
+                    }
+                    
+                    // Update door activity metrics
+                    if (data.doors) {
+                        document.getElementById('yesterdayDoorsActive').textContent = `${data.doors.active}/${data.doors.total}`;
+                        document.getElementById('yesterdaySessions').textContent = `${data.doors.sessions} sessions`;
+                        if (data.doors.peakTime) {
+                            document.getElementById('yesterdayPeakTime').textContent = `Peak: ${data.doors.peakTime}`;
+                        }
+                    }
+                    
+                    // Update system health metrics
+                    if (data.system) {
+                        document.getElementById('yesterdaySystemHealth').textContent = `${data.system.health}%`;
+                        document.getElementById('yesterdayIncidents').textContent = `${data.system.incidents} incidents`;
+                        if (data.system.uptime) {
+                            document.getElementById('yesterdayUptime').textContent = `${data.system.uptime} uptime`;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading yesterday summary metrics:', error);
+                    
+                    // Show error state for all metrics
+                    const errorText = 'Error';
+                    
+                    // Temperature metrics
+                    document.getElementById('yesterdayAvgTemp').textContent = errorText;
+                    document.getElementById('yesterdayTempRange').textContent = 'Failed to load';
+                    document.getElementById('yesterdayTempTrend').textContent = 'No data';
+                    document.getElementById('yesterdayTempTrend').className = 'metric-trend';
+                    
+                    // Efficiency metrics
+                    document.getElementById('yesterdayEfficiency').textContent = errorText;
+                    document.getElementById('yesterdayRuntime').textContent = 'Failed to load';
+                    document.getElementById('yesterdayEfficiencyTrend').textContent = 'No data';
+                    document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                    
+                    // Door activity metrics
+                    document.getElementById('yesterdayDoorsActive').textContent = errorText;
+                    document.getElementById('yesterdaySessions').textContent = 'Failed to load';
+                    document.getElementById('yesterdayPeakTime').textContent = 'No data';
+                    
+                    // System health metrics
+                    document.getElementById('yesterdaySystemHealth').textContent = errorText;
+                    document.getElementById('yesterdayIncidents').textContent = 'Failed to load';
+                    document.getElementById('yesterdayUptime').textContent = 'No data';
+                });
         }
 
         function updateEnhancedDoorActivity() {
-            // Placeholder data for Phase 2 testing
-            document.getElementById('activeDoorsCount').textContent = '3';
-            document.getElementById('totalSessionsCount').textContent = '15';
-            document.getElementById('lastActivityTime').textContent = '2:34 PM';
+            // Show loading states
+            document.getElementById('activeDoorsCount').textContent = '...';
+            document.getElementById('totalSessionsCount').textContent = '...';
+            document.getElementById('lastActivityTime').textContent = 'Loading...';
             
-            document.getElementById('firstActivityStat').textContent = 'First: 6:23 AM';
-            document.getElementById('peakHourStat').textContent = 'Peak: 7-8 PM';
-            document.getElementById('totalSessionsStat').textContent = 'Sessions: 15';
+            document.getElementById('firstActivityStat').textContent = 'Loading...';
+            document.getElementById('peakHourStat').textContent = 'Loading...';
+            document.getElementById('totalSessionsStat').textContent = 'Loading...';
+            
+            // Get API key from URL or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            
+            // Call the enhanced dashboard API for door activity data
+            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
+            
+            fetch(`${apiUrl}?apikey=${apiKey}&section=doors`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.doorActivity) {
+                        const doors = data.doorActivity;
+                        
+                        document.getElementById('activeDoorsCount').textContent = doors.activeDoors || '0';
+                        document.getElementById('totalSessionsCount').textContent = doors.totalSessions || '0';
+                        document.getElementById('lastActivityTime').textContent = doors.lastActivity || 'No recent activity';
+                        
+                        document.getElementById('firstActivityStat').textContent = doors.firstActivity ? `First: ${doors.firstActivity}` : 'No activity';
+                        document.getElementById('peakHourStat').textContent = doors.peakHour ? `Peak: ${doors.peakHour}` : 'No peak identified';
+                        document.getElementById('totalSessionsStat').textContent = `Sessions: ${doors.totalSessions || 0}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading door activity data:', error);
+                    
+                    // Show error states
+                    document.getElementById('activeDoorsCount').textContent = '?';
+                    document.getElementById('totalSessionsCount').textContent = '?';
+                    document.getElementById('lastActivityTime').textContent = 'Error loading';
+                    
+                    document.getElementById('firstActivityStat').textContent = 'Data unavailable';
+                    document.getElementById('peakHourStat').textContent = 'Data unavailable';
+                    document.getElementById('totalSessionsStat').textContent = 'Data unavailable';
+                });
         }
 
         function updateSystemHealthWidget() {
-            // Placeholder data for Phase 2 testing
-            document.getElementById('systemHealthPercentage').textContent = '98%';
-            document.getElementById('systemUptimeText').textContent = 'Uptime: 15d 8h';
-            document.getElementById('wifiStrengthText').textContent = 'WiFi: -42 dBm';
-            document.getElementById('memoryUsageText').textContent = 'Memory: 78%';
+            // Show loading states
+            document.getElementById('systemHealthPercentage').textContent = '...';
+            document.getElementById('systemUptimeText').textContent = 'Loading...';
+            document.getElementById('wifiStrengthText').textContent = 'Loading...';
+            document.getElementById('memoryUsageText').textContent = 'Loading...';
             
-            document.getElementById('lastBootInfo').textContent = 'Aug 14, 2025 at 6:23 AM';
-            document.getElementById('bootReasonInfo').textContent = 'Reason: Power restored after outage';
+            document.getElementById('lastBootInfo').textContent = 'Loading boot information...';
+            document.getElementById('bootReasonInfo').textContent = 'Loading...';
+            
+            // Get API key from URL or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            
+            // Call the enhanced dashboard API for system health data
+            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
+            
+            fetch(`${apiUrl}?apikey=${apiKey}&section=system`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.systemHealth) {
+                        const health = data.systemHealth;
+                        
+                        document.getElementById('systemHealthPercentage').textContent = `${health.healthPercentage || '0'}%`;
+                        document.getElementById('systemUptimeText').textContent = `Uptime: ${health.uptime || 'Unknown'}`;
+                        document.getElementById('wifiStrengthText').textContent = `WiFi: ${health.wifiStrength || 'Unknown'}`;
+                        document.getElementById('memoryUsageText').textContent = `Memory: ${health.memoryUsage || 'Unknown'}`;
+                        
+                        document.getElementById('lastBootInfo').textContent = health.lastBoot || 'Boot time unavailable';
+                        document.getElementById('bootReasonInfo').textContent = `Reason: ${health.bootReason || 'Unknown'}`;
+                        
+                        // Update gauge visualization if health percentage is available
+                        if (health.healthPercentage !== undefined) {
+                            updateSystemHealthGauge(health.healthPercentage);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading system health data:', error);
+                    
+                    // Show error states
+                    document.getElementById('systemHealthPercentage').textContent = '?%';
+                    document.getElementById('systemUptimeText').textContent = 'Error loading uptime';
+                    document.getElementById('wifiStrengthText').textContent = 'WiFi: Error';
+                    document.getElementById('memoryUsageText').textContent = 'Memory: Error';
+                    
+                    document.getElementById('lastBootInfo').textContent = 'Boot information unavailable';
+                    document.getElementById('bootReasonInfo').textContent = 'Reason: Data not available';
+                    
+                    // Show error state in gauge
+                    updateSystemHealthGauge(0);
+                });
+        }
             
             // Update health gauge percentage
             const gauge = document.querySelector('.gauge-container');
@@ -2280,20 +2521,30 @@
                 return;
             }
             
-            // First filter by time period
-            const now = new Date();
-            const cutoffDays = parseInt(timePeriodValue);
-            const cutoffTime = new Date(now.getTime() - (cutoffDays * 24 * 60 * 60 * 1000));
-            const cutoffTimestamp = Math.floor(cutoffTime.getTime() / 1000);
+            let timeFilteredIncidents;
             
-            let timeFilteredIncidents = originalIncidentsData.filter(incident => {
-                // Always include ongoing incidents (endTime = 0) regardless of start time
-                if (incident.endTime === 0) {
-                    return true;
-                }
-                // For completed incidents, check if they started within the time period
-                return incident.startTime >= cutoffTimestamp;
-            });
+            // Handle "Last 5 Incidents" option differently
+            if (timePeriodValue === 'last5') {
+                // Sort incidents by start time (most recent first) and take the first 5
+                timeFilteredIncidents = [...originalIncidentsData]
+                    .sort((a, b) => b.startTime - a.startTime)
+                    .slice(0, 5);
+            } else {
+                // Traditional time-based filtering
+                const now = new Date();
+                const cutoffDays = parseInt(timePeriodValue);
+                const cutoffTime = new Date(now.getTime() - (cutoffDays * 24 * 60 * 60 * 1000));
+                const cutoffTimestamp = Math.floor(cutoffTime.getTime() / 1000);
+                
+                timeFilteredIncidents = originalIncidentsData.filter(incident => {
+                    // Always include ongoing incidents (endTime = 0) regardless of start time
+                    if (incident.endTime === 0) {
+                        return true;
+                    }
+                    // For completed incidents, check if they started within the time period
+                    return incident.startTime >= cutoffTimestamp;
+                });
+            }
             
             // Then filter by severity
             let filteredIncidents;
@@ -2308,14 +2559,19 @@
             let filterDescription = '';
             
             // Time period description
-            if (cutoffDays === 1) {
-                filterDescription += 'Last 24 hours';
-            } else if (cutoffDays === 7) {
-                filterDescription += 'Last week';
-            } else if (cutoffDays === 30) {
-                filterDescription += 'Last 30 days';
+            if (timePeriodValue === 'last5') {
+                filterDescription += 'Last 5 incidents';
             } else {
-                filterDescription += `Last ${cutoffDays} days`;
+                const cutoffDays = parseInt(timePeriodValue);
+                if (cutoffDays === 1) {
+                    filterDescription += 'Last 24 hours';
+                } else if (cutoffDays === 7) {
+                    filterDescription += 'Last week';
+                } else if (cutoffDays === 30) {
+                    filterDescription += 'Last 30 days';
+                } else {
+                    filterDescription += `Last ${cutoffDays} days`;
+                }
             }
             
             // Severity description
@@ -2332,7 +2588,8 @@
             filterStatus.textContent = `${filterDescription} (${filteredIncidents.length} of ${originalIncidentsData.length} total incidents)`;
             
             // Re-render incidents with filtered data
-            renderFilteredIncidents(filteredIncidents, cutoffDays);
+            const timePeriodParam = timePeriodValue === 'last5' ? 'last5' : parseInt(timePeriodValue);
+            renderFilteredIncidents(filteredIncidents, timePeriodParam);
         }
 
         // Function to render filtered incidents (extracted from updateIncidents)
@@ -2341,10 +2598,19 @@
             const incidentsSummary = document.getElementById('incidentsSummary');
             
             if (!incidents || incidents.length === 0) {
-                const timePeriodText = timePeriodDays === 1 ? 'last 24 hours' : 
-                                     timePeriodDays === 7 ? 'last week' : 
-                                     timePeriodDays === 30 ? 'last 30 days' : 
-                                     `last ${timePeriodDays} days`;
+                let timePeriodText;
+                if (timePeriodDays === 'last5') {
+                    timePeriodText = 'last 5 incidents';
+                } else if (timePeriodDays === 1) {
+                    timePeriodText = 'last 24 hours';
+                } else if (timePeriodDays === 7) {
+                    timePeriodText = 'last week';
+                } else if (timePeriodDays === 30) {
+                    timePeriodText = 'last 30 days';
+                } else {
+                    timePeriodText = `last ${timePeriodDays} days`;
+                }
+                
                 incidentsList.innerHTML = `<div style="text-align: center; padding: 20px; color: #666;">No incidents found in ${timePeriodText} with current filters</div>`;
                 incidentsSummary.innerHTML = `<strong>Filtered results:</strong> No incidents`;
                 return;
