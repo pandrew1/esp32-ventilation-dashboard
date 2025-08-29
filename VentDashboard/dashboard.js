@@ -836,14 +836,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function updateSystemHealthWidget() {
-            // Show loading states
-            document.getElementById('systemHealthPercentage').textContent = '...';
-            document.getElementById('systemUptimeText').textContent = 'Loading...';
-            document.getElementById('wifiStrengthText').textContent = 'Loading...';
-            document.getElementById('memoryUsageText').textContent = 'Loading...';
+            // Show loading states with null checks for simplified health metrics
+            const healthUptime = document.getElementById('healthUptime');
+            const healthWifi = document.getElementById('healthWifi'); 
+            const healthErrors = document.getElementById('healthErrors');
+            const lastBootInfo = document.getElementById('lastBootInfo');
             
-            document.getElementById('lastBootInfo').textContent = 'Loading boot information...';
-            document.getElementById('bootReasonInfo').textContent = 'Loading...';
+            if (healthUptime) healthUptime.textContent = 'Loading...';
+            if (healthWifi) healthWifi.textContent = 'Loading...';
+            if (healthErrors) healthErrors.textContent = 'Loading...';
+            if (lastBootInfo) lastBootInfo.textContent = 'Loading boot information...';
+            
+            const bootReasonInfo = document.getElementById('bootReasonInfo');
+            if (bootReasonInfo) bootReasonInfo.textContent = 'Loading...';
             
             // Get API key from URL or use default
             const urlParams = new URLSearchParams(window.location.search);
@@ -869,40 +874,54 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Extract startup data from sections  
                     const startup = data.sections && data.sections.startup;
                     if (startup) {
-                        document.getElementById('systemHealthPercentage').textContent = `${startup.health_percentage || '0'}%`;
-                        document.getElementById('systemUptimeText').textContent = `Uptime: ${startup.uptime || 'Unknown'}`;
-                        document.getElementById('wifiStrengthText').textContent = `WiFi: ${startup.wifi_strength || 'Unknown'}`;
-                        document.getElementById('memoryUsageText').textContent = `Memory: ${startup.memory_usage || 'Unknown'}`;
+                        // Update simplified health metrics with null checks
+                        const healthUptime = document.getElementById('healthUptime');
+                        const healthWifi = document.getElementById('healthWifi'); 
+                        const healthErrors = document.getElementById('healthErrors');
+                        const lastBootInfo = document.getElementById('lastBootInfo');
+                        const bootReasonInfo = document.getElementById('bootReasonInfo');
                         
-                        document.getElementById('lastBootInfo').textContent = startup.last_boot || 'Boot time unavailable';
-                        document.getElementById('bootReasonInfo').textContent = `Reason: ${startup.boot_reason || 'Unknown'}`;
+                        if (healthUptime) healthUptime.textContent = startup.uptime || 'Unknown';
+                        if (healthWifi) healthWifi.textContent = startup.wifi_strength || 'Unknown';
+                        if (healthErrors) healthErrors.textContent = startup.memory_usage || 'Unknown';
+                        if (lastBootInfo) lastBootInfo.textContent = startup.last_boot || 'Boot time unavailable';
+                        if (bootReasonInfo) bootReasonInfo.textContent = `Reason: ${startup.boot_reason || 'Unknown'}`;
                         
                         // Update gauge visualization if health percentage is available
-                        if (startup.health_percentage !== undefined && typeof updateSystemHealthGauge === 'function') {
-                            updateSystemHealthGauge(startup.health_percentage);
+                        const gaugeContainer = document.querySelector('.gauge-container');
+                        if (startup.health_percentage !== undefined && gaugeContainer) {
+                            gaugeContainer.style.setProperty('--health-percentage', `${startup.health_percentage}%`);
                         }
                     } else {
                         // Handle case where startup data is not available
-                        document.getElementById('systemHealthPercentage').textContent = '0%';
-                        document.getElementById('systemUptimeText').textContent = 'Uptime: Waiting for data';
-                        document.getElementById('wifiStrengthText').textContent = 'WiFi: Waiting for data';
-                        document.getElementById('memoryUsageText').textContent = 'Memory: Waiting for data';
+                        const healthUptime = document.getElementById('healthUptime');
+                        const healthWifi = document.getElementById('healthWifi'); 
+                        const healthErrors = document.getElementById('healthErrors');
+                        const lastBootInfo = document.getElementById('lastBootInfo');
+                        const bootReasonInfo = document.getElementById('bootReasonInfo');
                         
-                        document.getElementById('lastBootInfo').textContent = 'Boot information pending';
-                        document.getElementById('bootReasonInfo').textContent = 'Reason: Pending';
+                        if (healthUptime) healthUptime.textContent = 'Waiting...';
+                        if (healthWifi) healthWifi.textContent = 'Waiting...';
+                        if (healthErrors) healthErrors.textContent = 'Waiting...';
+                        if (lastBootInfo) lastBootInfo.textContent = 'Boot information pending';
+                        if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Pending';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading system health data:', error);
                     
-                    // Show error states
-                    document.getElementById('systemHealthPercentage').textContent = '?%';
-                    document.getElementById('systemUptimeText').textContent = 'Error loading uptime';
-                    document.getElementById('wifiStrengthText').textContent = 'WiFi: Error';
-                    document.getElementById('memoryUsageText').textContent = 'Memory: Error';
+                    // Show error states with null checks
+                    const healthUptime = document.getElementById('healthUptime');
+                    const healthWifi = document.getElementById('healthWifi'); 
+                    const healthErrors = document.getElementById('healthErrors');
+                    const lastBootInfo = document.getElementById('lastBootInfo');
+                    const bootReasonInfo = document.getElementById('bootReasonInfo');
                     
-                    document.getElementById('lastBootInfo').textContent = 'Boot information unavailable';
-                    document.getElementById('bootReasonInfo').textContent = 'Reason: Data not available';
+                    if (healthUptime) healthUptime.textContent = 'Error';
+                    if (healthWifi) healthWifi.textContent = 'Error';
+                    if (healthErrors) healthErrors.textContent = 'Error';
+                    if (lastBootInfo) lastBootInfo.textContent = 'Boot information unavailable';
+                    if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Data not available';
                     
                     // Show error state in gauge
                     updateSystemHealthGauge(0);
