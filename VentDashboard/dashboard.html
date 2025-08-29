@@ -567,19 +567,20 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 20px;
+            gap: 15px; /* Reduced from 20px */
             margin-bottom: 30px;
             width: 100%;
-            overflow-x: auto; /* Allow horizontal scroll if needed */
+            overflow-x: auto;
         }
 
         .card {
             background: white;
             border-radius: 10px;
-            padding: 25px;
+            padding: 20px; /* Reduced from 25px */
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             border: 1px solid #e9ecef;
-            min-width: 280px; /* Ensure cards have minimum width */
+            min-width: 220px; /* Reduced from 280px */
+            max-width: 280px; /* Add max-width to prevent cards from getting too wide */
         }
 
         .card h3 {
@@ -786,9 +787,35 @@
             color: #dc3545;
         }
 
+        /* Responsive grid layout */
+        @media (max-width: 1600px) {
+            .grid {
+                gap: 12px; /* Even smaller gap for tighter screens */
+            }
+            .card {
+                padding: 18px; /* Slightly more compact */
+                min-width: 200px; /* Smaller minimum width */
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+        }
+
         @media (max-width: 768px) {
             .grid {
                 grid-template-columns: 1fr;
+                gap: 20px;
             }
             
             .status-bar {
