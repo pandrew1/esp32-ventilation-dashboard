@@ -707,6 +707,24 @@
             color: #2c3e50;
         }
 
+        /* Garage sensor layout improvements */
+        .garage-sensors {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .garage-sensors .sensor-reading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
         /* Door Activity Improvements */
         .door-activity-grid {
             display: grid;
@@ -774,9 +792,14 @@
 
         .health-metrics {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
             font-size: 0.85em;
+        }
+
+        .health-metrics .metric:last-child {
+            grid-column: 1 / -1;
+            text-align: center;
         }
 
         .health-metrics .metric {
@@ -1107,7 +1130,7 @@
                     <div class="card enhanced-garage-card">
                         <h3>🏠 Garage Environment & Door Activity</h3>
                         
-                        <!-- Environmental Sensors -->
+                        <!-- Environmental Sensors - Vertical layout for better fit -->
                         <div class="garage-sensors">
                             <div class="sensor-reading">
                                 <span>Temperature</span>
@@ -1186,11 +1209,13 @@
                             <div class="fan-status" id="fanStatus">🌀</div>
                             <div><strong id="fanStatusText">System Status</strong></div>
                             <div style="margin-top: 15px;">
-                                <div>Mode: <strong id="ventilationMode">-</strong></div>
-                                <div>Runtime Today: <strong id="fanMinutes">0</strong> minutes</div>
-                                <div>Fresh Air: <strong id="freshAirStatus">-</strong></div>
-                                <div>Operating Hours: <strong id="ventilationHours">-</strong></div>
-                                <div>Cooling Effect: <strong id="coolingEffect">-</strong></div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9em;">
+                                    <div>Mode: <strong id="ventilationMode">-</strong></div>
+                                    <div>Runtime: <strong id="fanMinutes">0</strong> min</div>
+                                    <div>Fresh Air: <strong id="freshAirStatus">-</strong></div>
+                                    <div>Hours: <strong id="ventilationHours">-</strong></div>
+                                    <div style="grid-column: 1 / -1;">Cooling: <strong id="coolingEffect">-</strong></div>
+                                </div>
                             </div>
                         </div>
 
@@ -1203,19 +1228,16 @@
                             </div>
                             <div class="health-metrics">
                                 <div class="metric">
-                                    <span class="metric-icon">⚡</span>
-                                    <span class="metric-text" id="systemUptimeText">Uptime: --</span>
-                                    <span class="metric-status green" id="uptimeStatus">●</span>
+                                    <span>Uptime</span>
+                                    <span id="healthUptime">99.2%</span>
                                 </div>
                                 <div class="metric">
-                                    <span class="metric-icon">📡</span>
-                                    <span class="metric-text" id="wifiStrengthText">WiFi: -- dBm</span>
-                                    <span class="metric-status green" id="wifiStatus">●</span>
+                                    <span>WiFi</span>
+                                    <span id="healthWifi">98.5%</span>
                                 </div>
                                 <div class="metric">
-                                    <span class="metric-icon">🧠</span>
-                                    <span class="metric-text" id="memoryUsageText">Memory: --%</span>
-                                    <span class="metric-status yellow" id="memoryStatus">●</span>
+                                    <span>Memory</span>
+                                    <span id="healthErrors">75%</span>
                                 </div>
                             </div>
                         </div>

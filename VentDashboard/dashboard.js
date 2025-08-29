@@ -1257,6 +1257,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateDashboard(data);
                 updateConnectionStatus('connected');
 
+                // Load aggregation status (Monthly Data Aggregation widget)
+                console.log('RefreshData: About to call loadAggregationStatus()');
+                await loadAggregationStatus();
+
                 // Refresh chart data if chart is currently displayed
                 refreshCurrentChart();
                 
