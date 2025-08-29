@@ -1278,7 +1278,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Load aggregation status (Monthly Data Aggregation widget)
                 console.log('RefreshData: About to call loadAggregationStatus()');
-                await loadAggregationStatus();
+                try {
+                    await loadAggregationStatus();
+                    console.log('RefreshData: loadAggregationStatus() completed successfully');
+                } catch (error) {
+                    console.error('RefreshData: Error in loadAggregationStatus():', error);
+                }
 
                 // Refresh chart data if chart is currently displayed
                 refreshCurrentChart();
@@ -1361,113 +1366,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('lastUpdate').innerHTML = `No ESP32 data<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - Last Attempt: ${timestamp.combined}]</small>`;
             document.getElementById('lastUpdate').style.color = '#dc3545';
             document.getElementById('lastUpdate').title = 'No ESP32 data available - showing browser time of last connection attempt';
-        }
-
-        async function loadAggregationStatus() {
-            // Show loading state
-            document.getElementById('aggregationStatusText').textContent = 'Loading...';
-            
-            try {
-                // Get API key from URL or use default
-                const urlParams = new URLSearchParams(window.location.search);
-                const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
-                
-                // Call the enhanced dashboard API for monthly data
-                const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        'X-API-Secret': apiKey
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                
-                // Look for monthly aggregation status in the enhanced API structure
-                if (data.sections && data.sections.monthly && data.sections.monthly.monthlyAggregation) {
-                    updateAggregationStatusDisplay(data.sections.monthly.monthlyAggregation, null);
-                } else {
-                    // Show error if no real aggregation data available
-                    throw new Error('Monthly aggregation data not available');
-                }
-                
-            } catch (error) {
-                console.error('Error loading aggregation status:', error);
-                updateAggregationStatusDisplay(null, `Failed to load: ${error.message}`);
-            }
-        }
-
-        async function fetchAggregationStatusDirect() {
-            // This would require a direct API endpoint to VentilationStatus table
-            // For now, we'll show a generic status
-            updateAggregationStatusDisplay({
-                LastRun: new Date().toISOString(),
-                Success: true,
-                MonthsProcessed: 'Unknown',
-                RecordsUpdated: 'Unknown',
-                NextScheduledRun: new Date(Date.now() + 24*60*60*1000).toISOString()
-            }, null);
-        }
-
-        function updateAggregationStatusDisplay(status, error) {
-            const statusElement = document.getElementById('aggregationStatus');
-            const statusTextElement = document.getElementById('aggregationStatusText');
-            const lastRunElement = document.getElementById('lastAggregationRun');
-            const recordsUpdatedElement = document.getElementById('recordsUpdated');
-            const nextRunElement = document.getElementById('nextAggregationRun');
-            const resultElement = document.getElementById('aggregationResult');
-            
-            if (error) {
-                statusElement.textContent = '❌';
-                statusElement.className = 'aggregation-status aggregation-error';
-                statusTextElement.textContent = 'Error';
-                lastRunElement.textContent = 'Unknown';
-                recordsUpdatedElement.textContent = 'Unknown';
-                nextRunElement.textContent = 'Unknown';
-                resultElement.textContent = error;
-                return;
-            }
-            
-            if (!status) {
-                statusElement.textContent = '⏳';
-                statusElement.className = 'aggregation-status aggregation-pending';
-                statusTextElement.textContent = 'Pending';
-                lastRunElement.textContent = 'Unknown';
-                recordsUpdatedElement.textContent = 'Unknown';
-                nextRunElement.textContent = 'Daily at 2:15 AM UTC';
-                resultElement.textContent = 'Waiting for next run';
-                return;
-            }
-            
-            // Format timestamps
-            const formatDateTime = (isoString) => {
-                if (!isoString) return 'Unknown';
-                try {
-                    const date = new Date(isoString);
-                    return date.toLocaleString();
-                } catch (e) {
-                    return 'Invalid date';
-                }
-            };
-            
-            if (status.Success) {
-                statusElement.textContent = '✅';
-                statusElement.className = 'aggregation-status aggregation-success';
-                statusTextElement.textContent = 'Success';
-                resultElement.textContent = 'Completed successfully';
-            } else {
-                statusElement.textContent = '❌';
-                statusElement.className = 'aggregation-status aggregation-error';
-                statusTextElement.textContent = 'Failed';
-                resultElement.textContent = status.ErrorMessage || 'Unknown error';
-            }
-            
-            lastRunElement.textContent = formatDateTime(status.LastRun);
-            recordsUpdatedElement.textContent = status.RecordsUpdated || 'Unknown';
-            nextRunElement.textContent = formatDateTime(status.NextScheduledRun);
         }
 
         function updateDashboard(data) {
