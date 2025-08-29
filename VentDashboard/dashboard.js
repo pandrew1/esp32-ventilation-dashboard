@@ -289,30 +289,7 @@ async function refreshData() {
     }
 }
 
-// Placeholder functions - these will be extracted from the HTML file
-function showNoDataState() {
-    console.log('Showing no data state - function needs to be implemented');
-}
-
-function updateDashboard(data) {
-    console.log('Updating dashboard - function needs to be implemented');
-}
-
-function loadAggregationStatus() {
-    console.log('Loading aggregation status - function needs to be implemented');
-}
-
-function loadChart(hours) {
-    console.log(`Loading chart for ${hours} hours - function needs to be implemented`);
-}
-
-function loadPressureChart(hours) {
-    console.log(`Loading pressure chart for ${hours} hours - function needs to be implemented`);
-}
-
-function loadIncidentAlmanac() {
-    console.log('Loading incident almanac - function needs to be implemented');
-}
+// Note: These functions are implemented later in this file
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -956,49 +933,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async function loadAggregationStatus() {
-            console.log('=== DEBUGGING: loadAggregationStatus() started ===');
             try {
                 // Show loading state
-                console.log('Setting loading state for aggregation status');
                 document.getElementById('aggregationStatusText').textContent = 'Checking...';
                 document.getElementById('aggregationStatus').textContent = '🔄';
                 
                 const headers = getAuthHeaders();
-                console.log('Using headers:', headers);
-                
                 const apiUrl = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
-                console.log('Calling aggregation API:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers
                 });
 
-                console.log('Aggregation API response status:', response.status);
-
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const data = await response.json();
-                console.log('Aggregation API response data keys:', Object.keys(data));
                 
                 // Look for MonthlyAggregationStatus in the system data (original implementation)
                 const systemData = data.system || {};
-                console.log('System data keys:', Object.keys(systemData));
-                console.log('MonthlyAggregationStatus in system:', !!systemData.MonthlyAggregationStatus);
                 
                 if (systemData.MonthlyAggregationStatus) {
-                    console.log('Found MonthlyAggregationStatus:', systemData.MonthlyAggregationStatus);
                     updateAggregationStatusDisplay(systemData.MonthlyAggregationStatus, null);
                 } else {
                     // Try to fetch directly from fallback (original behavior)
-                    console.log('No MonthlyAggregationStatus found, using fallback');
                     await fetchAggregationStatusDirect();
                 }
-                console.log('=== DEBUGGING: loadAggregationStatus() completed ===');
             } catch (error) {
-                console.error('=== DEBUGGING: Error in loadAggregationStatus() ===', error);
+                console.error('Error in loadAggregationStatus():', error);
                 updateAggregationStatusDisplay(null, error.message);
             }
         }
@@ -1197,53 +1161,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async function refreshData() {
-            console.log('=== DEBUGGING: refreshData() started ===');
-            console.log('CONFIG.statusApiUrl:', CONFIG.statusApiUrl);
-            console.log('CONFIG.deviceId:', CONFIG.deviceId);
-            console.log('CONFIG.apiSecret:', CONFIG.apiSecret ? 'Present' : 'Missing');
-            
-            // Add visual debugging indicator
-            const debugDiv = document.createElement('div');
-            debugDiv.id = 'debug-indicator';
-            debugDiv.style.cssText = 'position: fixed; top: 50px; right: 10px; background: yellow; padding: 10px; border: 2px solid red; z-index: 9999; max-width: 300px;';
-            debugDiv.innerHTML = '<strong>DEBUG:</strong> refreshData() started<br>Checking authentication...';
-            document.body.appendChild(debugDiv);
+            console.log('Refreshing dashboard data...');
             
             try {
                 updateConnectionStatus('connecting');
                 
                 const token = localStorage.getItem('ventilation_auth_token');
-                console.log('Token:', token ? 'Present' : 'Missing');
-                
-                // Update debug indicator
-                debugDiv.innerHTML += '<br>Token: ' + (token ? 'Present' : 'Missing');
-                debugDiv.innerHTML += '<br>API Secret: ' + (CONFIG.apiSecret ? 'Present' : 'Missing');
                 
                 // If no authentication method is available, show no data
                 if (!token && !CONFIG.apiSecret) {
-                    console.log('DEBUGGING: No authentication available');
-                    debugDiv.innerHTML += '<br><strong>ERROR: No authentication!</strong>';
-                    // No authentication available, show no data state
                     showNoDataState();
                     updateConnectionStatus('disconnected');
                     return;
                 }
                 
-                console.log('DEBUGGING: About to fetch API...');
-                debugDiv.innerHTML += '<br>Making API call to: ' + CONFIG.statusApiUrl;
-                
                 const headers = getAuthHeaders();
-                console.log('Request headers:', headers);
                 
                 const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
                     method: 'GET',
                     headers: headers
                 });
-                
-                console.log('DEBUGGING: API response received');
-                console.log('Response status:', response.status);
-                console.log('Response ok:', response.ok);
-                debugDiv.innerHTML += '<br>Response status: ' + response.status;
                 
                 if (response.status === 401) {
                     // Only logout if using API key authentication
@@ -1287,54 +1224,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                console.log('DEBUGGING: Response OK, parsing JSON...');
-                debugDiv.innerHTML += '<br>Response OK! Parsing JSON...';
                 
                 const data = await response.json();
-                console.log('DEBUGGING: JSON parsed successfully');
-                console.log('Data keys:', Object.keys(data));
-                debugDiv.innerHTML += '<br>JSON parsed! Keys: ' + Object.keys(data).join(', ');
+                console.log('Dashboard data received successfully');
                 
-                console.log('DEBUGGING: Calling updateDashboard...');
-                debugDiv.innerHTML += '<br>Calling updateDashboard...';
+                // Update dashboard with new data
                 updateDashboard(data);
-                
-                console.log('DEBUGGING: updateDashboard complete');
-                debugDiv.innerHTML += '<br>Dashboard updated!';
                 updateConnectionStatus('connected');
 
                 // Refresh chart data if chart is currently displayed
                 refreshCurrentChart();
                 
-                console.log('=== DEBUGGING: refreshData() completed successfully ===');
-                debugDiv.innerHTML += '<br><strong>SUCCESS!</strong>';
-                
-                // Remove debug indicator after 10 seconds if successful
-                setTimeout(() => {
-                    if (debugDiv.parentNode) {
-                        debugDiv.parentNode.removeChild(debugDiv);
-                    }
-                }, 10000);
-            } catch (error) {
-                console.error('DEBUGGING: Exception in refreshData:', error);
-                console.error('DEBUGGING: Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    token: localStorage.getItem('ventilation_auth_token') ? 'Present' : 'Missing',
-                    apiSecret: CONFIG.apiSecret ? 'Present' : 'Missing'
-                });
-                
-                // Update debug indicator with error
-                const debugDiv = document.getElementById('debug-indicator');
-                if (debugDiv) {
-                    debugDiv.style.background = 'red';
-                    debugDiv.style.color = 'white';
-                    debugDiv.innerHTML += '<br><strong>EXCEPTION: ' + error.message + '</strong>';
-                    debugDiv.innerHTML += '<br>Stack: ' + (error.stack ? error.stack.substring(0, 200) + '...' : 'No stack');
+                // Clear any existing error notices
+                const apiFailureNotice = document.getElementById('apiFailureNotice');
+                if (apiFailureNotice) {
+                    apiFailureNotice.style.display = 'none';
                 }
                 
-                // Show no data instead of mock data
-                // Network error, show no data state
+            } catch (error) {
+                console.error('Error refreshing dashboard data:', error);
                 showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
                 showNoDataState();
                 updateConnectionStatus('disconnected');
@@ -2351,7 +2259,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                 }).filter(point => point.pressure !== null && point.timestamp); // Only show points with real pressure data
                 
-                console.log(`Processed ${pressureData.length} pressure data points`);
+                // Check if data has actually changed to avoid unnecessary chart refreshes
+                const newDataHash = JSON.stringify(pressureData.map(p => ({ 
+                    t: p.timestamp, 
+                    p: p.pressure, 
+                    c: p.pressureChange 
+                })));
+                
+                if (latestPressureDataTimestamp === newDataHash) {
+                    console.log('Pressure chart data unchanged, skipping refresh animation');
+                    return;
+                }
+                
+                // Update the data hash to track changes
+                latestPressureDataTimestamp = newDataHash;
+                
+                console.log(`Processed ${pressureData.length} pressure data points (data changed, refreshing chart)`);
                 updatePressureChart(pressureData, hours);
                 
             } catch (error) {
