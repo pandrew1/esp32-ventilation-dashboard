@@ -7,6 +7,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script>
+        // Helper function to get API key from URL parameter
+        function getApiKeyFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('apikey') || urlParams.get('key');
+        }
+        
         // Authentication check - redirect to login if not authenticated
         window.addEventListener('load', function() {
             const token = localStorage.getItem('ventilation_auth_token');
@@ -1372,11 +1378,7 @@
             apiSecret: getApiKeyFromUrl() || null // Get from URL parameter or environment
         };
 
-        // Helper function to get API key from URL parameter
-        function getApiKeyFromUrl() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('apikey') || urlParams.get('key');
-        }
+        // Note: getApiKeyFromUrl() function is defined at the top of the page
 
         let temperatureChart = null;
         let pressureChart = null;
@@ -1475,8 +1477,22 @@
 
         // Add logout button to header
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== DEBUGGING: DOMContentLoaded event fired ===');
+            
+            // Add visual debugging indicator for DOMContentLoaded
+            const domDebugDiv = document.createElement('div');
+            domDebugDiv.id = 'dom-debug-indicator';
+            domDebugDiv.style.cssText = 'position: fixed; top: 10px; left: 10px; background: orange; padding: 10px; border: 2px solid darkorange; z-index: 9999; max-width: 300px;';
+            domDebugDiv.innerHTML = '<strong>DEBUG DOM:</strong> DOMContentLoaded fired';
+            document.body.appendChild(domDebugDiv);
+            
             const header = document.querySelector('.header');
+            console.log('DEBUGGING: Header element found:', !!header);
+            domDebugDiv.innerHTML += '<br>Header found: ' + (header ? 'YES' : 'NO');
+            
             const userEmail = localStorage.getItem('ventilation_user_email') || 'User';
+            console.log('DEBUGGING: User email:', userEmail);
+            domDebugDiv.innerHTML += '<br>User email: ' + userEmail;
             
             const userSection = document.createElement('div');
             userSection.style.cssText = 'position: absolute; top: 15px; right: 20px; font-size: 0.9em;';
@@ -1485,20 +1501,44 @@
                 <button onclick="logout()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Logout</button>
             `;
             
-            header.style.position = 'relative';
-            header.appendChild(userSection);
+            if (header) {
+                header.style.position = 'relative';
+                header.appendChild(userSection);
+                console.log('DEBUGGING: User section added to header');
+                domDebugDiv.innerHTML += '<br>User section added';
+            }
             
             // Add no-data notice if no authentication is provided
             const token = localStorage.getItem('ventilation_auth_token');
+            console.log('DEBUGGING: Token check - Token present:', !!token, 'API Secret present:', !!CONFIG.apiSecret);
+            domDebugDiv.innerHTML += '<br>Auth - Token: ' + (token ? 'YES' : 'NO') + ', API Secret: ' + (CONFIG.apiSecret ? 'YES' : 'NO');
+            
             if (!CONFIG.apiSecret && !token) {
+                console.log('DEBUGGING: No authentication, adding no-data notice');
                 const noDataNotice = document.createElement('div');
                 noDataNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
                 noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> Data is currently unavailable. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
-                header.appendChild(noDataNotice);
+                if (header) header.appendChild(noDataNotice);
+                domDebugDiv.innerHTML += '<br>No-data notice added';
             }
             
+            console.log('DEBUGGING: About to call initializeDashboard()');
+            domDebugDiv.innerHTML += '<br>Calling initializeDashboard()...';
             initializeDashboard();
+            
+            console.log('DEBUGGING: About to call setupEnhancedDashboard()');
+            domDebugDiv.innerHTML += '<br>Calling setupEnhancedDashboard()...';
             setupEnhancedDashboard(); // Initialize Phase 2 enhancements
+            
+            console.log('=== DEBUGGING: DOMContentLoaded handler completed ===');
+            domDebugDiv.innerHTML += '<br><strong>DOM SETUP COMPLETE!</strong>';
+            
+            // Remove DOM debug indicator after 20 seconds
+            setTimeout(() => {
+                if (domDebugDiv.parentNode) {
+                    domDebugDiv.parentNode.removeChild(domDebugDiv);
+                }
+            }, 20000);
         });
 
         // Helper function to format detailed timestamps consistently
@@ -1520,27 +1560,60 @@
 
         // Initialize dashboard
         async function initializeDashboard() {
+            console.log('=== DEBUGGING: initializeDashboard() started ===');
+            
+            // Add visual debugging indicator for initialization
+            const initDebugDiv = document.createElement('div');
+            initDebugDiv.id = 'init-debug-indicator';
+            initDebugDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: lightblue; padding: 10px; border: 2px solid blue; z-index: 9999; max-width: 300px;';
+            initDebugDiv.innerHTML = '<strong>DEBUG INIT:</strong> initializeDashboard() started';
+            document.body.appendChild(initDebugDiv);
+            
             // Clear any previous data source tracking
             if (window.dataSourceTracker) {
                 window.dataSourceTracker.clearAll();
+                console.log('DEBUGGING: Cleared data source tracker');
+                initDebugDiv.innerHTML += '<br>Data source tracker cleared';
             }
             
+            console.log('DEBUGGING: About to call refreshData()');
+            initDebugDiv.innerHTML += '<br>Calling refreshData()...';
             await refreshData();
             
+            console.log('DEBUGGING: refreshData() completed, loading aggregation status...');
+            initDebugDiv.innerHTML += '<br>Loading aggregation status...';
             // Load aggregation status
             await loadAggregationStatus();
             
+            console.log('DEBUGGING: Loading chart...');
+            initDebugDiv.innerHTML += '<br>Loading chart...';
             // Load default 6-hour chart
             await loadChart(6); // Load 6-hour chart by default
             
+            console.log('DEBUGGING: Loading pressure chart...');
+            initDebugDiv.innerHTML += '<br>Loading pressure chart...';
             // Load default 6-hour pressure chart
             await loadPressureChart(6); // Load 6-hour pressure chart by default
             
+            console.log('DEBUGGING: Loading incident almanac...');
+            initDebugDiv.innerHTML += '<br>Loading incident almanac...';
             // Load incident almanac
             await loadIncidentAlmanac();
             
+            console.log('DEBUGGING: Starting auto-refresh...');
+            initDebugDiv.innerHTML += '<br>Starting auto-refresh...';
             // Start auto-refresh
             startAutoRefresh();
+            
+            console.log('=== DEBUGGING: initializeDashboard() completed ===');
+            initDebugDiv.innerHTML += '<br><strong>INIT COMPLETE!</strong>';
+            
+            // Remove init debug indicator after 15 seconds
+            setTimeout(() => {
+                if (initDebugDiv.parentNode) {
+                    initDebugDiv.parentNode.removeChild(initDebugDiv);
+                }
+            }, 15000);
         }
 
         // Enhanced Dashboard Functions for Phase 2
@@ -1910,7 +1983,6 @@
                     // Show error state in gauge
                     updateSystemHealthGauge(0);
                 });
-        }
             
             // Update health gauge percentage
             const gauge = document.querySelector('.gauge-container');
@@ -1932,23 +2004,53 @@
         }
 
         async function refreshData() {
+            console.log('=== DEBUGGING: refreshData() started ===');
+            console.log('CONFIG.statusApiUrl:', CONFIG.statusApiUrl);
+            console.log('CONFIG.deviceId:', CONFIG.deviceId);
+            console.log('CONFIG.apiSecret:', CONFIG.apiSecret ? 'Present' : 'Missing');
+            
+            // Add visual debugging indicator
+            const debugDiv = document.createElement('div');
+            debugDiv.id = 'debug-indicator';
+            debugDiv.style.cssText = 'position: fixed; top: 50px; right: 10px; background: yellow; padding: 10px; border: 2px solid red; z-index: 9999; max-width: 300px;';
+            debugDiv.innerHTML = '<strong>DEBUG:</strong> refreshData() started<br>Checking authentication...';
+            document.body.appendChild(debugDiv);
+            
             try {
                 updateConnectionStatus('connecting');
                 
                 const token = localStorage.getItem('ventilation_auth_token');
+                console.log('Token:', token ? 'Present' : 'Missing');
+                
+                // Update debug indicator
+                debugDiv.innerHTML += '<br>Token: ' + (token ? 'Present' : 'Missing');
+                debugDiv.innerHTML += '<br>API Secret: ' + (CONFIG.apiSecret ? 'Present' : 'Missing');
                 
                 // If no authentication method is available, show no data
                 if (!token && !CONFIG.apiSecret) {
+                    console.log('DEBUGGING: No authentication available');
+                    debugDiv.innerHTML += '<br><strong>ERROR: No authentication!</strong>';
                     // No authentication available, show no data state
                     showNoDataState();
                     updateConnectionStatus('disconnected');
                     return;
                 }
                 
+                console.log('DEBUGGING: About to fetch API...');
+                debugDiv.innerHTML += '<br>Making API call to: ' + CONFIG.statusApiUrl;
+                
+                const headers = getAuthHeaders();
+                console.log('Request headers:', headers);
+                
                 const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
                     method: 'GET',
-                    headers: getAuthHeaders()
+                    headers: headers
                 });
+                
+                console.log('DEBUGGING: API response received');
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                debugDiv.innerHTML += '<br>Response status: ' + response.status;
                 
                 if (response.status === 401) {
                     // Only logout if using API key authentication
@@ -1970,13 +2072,17 @@
                 
                 if (!response.ok) {
                     // Log the error details for debugging
-                    console.error(`API Error: ${response.status} ${response.statusText}`);
+                    console.error(`DEBUGGING: API Error: ${response.status} ${response.statusText}`);
+                    debugDiv.innerHTML += '<br><strong>API ERROR: ' + response.status + ' ' + response.statusText + '</strong>';
+                    
                     const errorText = await response.text();
-                    console.error('Error response:', errorText);
+                    console.error('DEBUGGING: Error response:', errorText);
+                    debugDiv.innerHTML += '<br>Error text: ' + (errorText.substring(0, 100) + '...');
                     
                     // If unauthorized and no API secret, show no data
                     if (response.status === 401 || response.status === 404) {
                         // API call failed, show no data state
+                        debugDiv.innerHTML += '<br><strong>Showing no data state due to ' + response.status + '</strong>';
                         showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
                         showNoDataState();
                         updateConnectionStatus('disconnected');
@@ -1988,20 +2094,51 @@
                     return;
                 }
                 
+                console.log('DEBUGGING: Response OK, parsing JSON...');
+                debugDiv.innerHTML += '<br>Response OK! Parsing JSON...';
+                
                 const data = await response.json();
+                console.log('DEBUGGING: JSON parsed successfully');
+                console.log('Data keys:', Object.keys(data));
+                debugDiv.innerHTML += '<br>JSON parsed! Keys: ' + Object.keys(data).join(', ');
+                
+                console.log('DEBUGGING: Calling updateDashboard...');
+                debugDiv.innerHTML += '<br>Calling updateDashboard...';
                 updateDashboard(data);
+                
+                console.log('DEBUGGING: updateDashboard complete');
+                debugDiv.innerHTML += '<br>Dashboard updated!';
                 updateConnectionStatus('connected');
 
                 // Refresh chart data if chart is currently displayed
                 refreshCurrentChart();
+                
+                console.log('=== DEBUGGING: refreshData() completed successfully ===');
+                debugDiv.innerHTML += '<br><strong>SUCCESS!</strong>';
+                
+                // Remove debug indicator after 10 seconds if successful
+                setTimeout(() => {
+                    if (debugDiv.parentNode) {
+                        debugDiv.parentNode.removeChild(debugDiv);
+                    }
+                }, 10000);
             } catch (error) {
-                console.error('Error fetching data:', error);
-                console.error('Error details:', {
+                console.error('DEBUGGING: Exception in refreshData:', error);
+                console.error('DEBUGGING: Error details:', {
                     message: error.message,
                     stack: error.stack,
                     token: localStorage.getItem('ventilation_auth_token') ? 'Present' : 'Missing',
                     apiSecret: CONFIG.apiSecret ? 'Present' : 'Missing'
                 });
+                
+                // Update debug indicator with error
+                const debugDiv = document.getElementById('debug-indicator');
+                if (debugDiv) {
+                    debugDiv.style.background = 'red';
+                    debugDiv.style.color = 'white';
+                    debugDiv.innerHTML += '<br><strong>EXCEPTION: ' + error.message + '</strong>';
+                    debugDiv.innerHTML += '<br>Stack: ' + (error.stack ? error.stack.substring(0, 200) + '...' : 'No stack');
+                }
                 
                 // Show no data instead of mock data
                 // Network error, show no data state
