@@ -273,6 +273,11 @@ async function refreshData() {
         
         // Update dashboard with new data
         updateDashboard(data);
+        
+        // Load aggregation status (Monthly Data Aggregation widget)
+        console.log('RefreshData: About to call loadAggregationStatus()');
+        await loadAggregationStatus();
+        
         updateConnectionStatus('connected');
         
         // Clear any existing error notices
@@ -933,6 +938,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async function loadAggregationStatus() {
+            console.log('=== AGGREGATION DEBUG: loadAggregationStatus() function started ===');
             try {
                 // Show loading state
                 document.getElementById('aggregationStatusText').textContent = 'Checking...';
@@ -987,6 +993,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function updateAggregationStatusDisplay(status, error) {
+            console.log('=== AGGREGATION DEBUG: updateAggregationStatusDisplay called ===');
+            console.log('Status:', status);
+            console.log('Error:', error);
+            
             const statusElement = document.getElementById('aggregationStatus');
             const statusTextElement = document.getElementById('aggregationStatusText');
             const lastRunElement = document.getElementById('lastAggregationRun');
