@@ -1003,77 +1003,6 @@
             </div>
 
             <div id="dashboardContent" style="display: none;">
-                <!-- Yesterday's Complete Report Hero Section (NEW) -->
-                <div class="hero-section yesterday-report" id="yesterdayReport">
-                    <div class="section-header" onclick="toggleYesterdayReport()">
-                        <h2>📋 Yesterday's Complete Report</h2>
-                        <span class="date-indicator" id="yesterdayDate">Loading...</span>
-                        <button class="expand-toggle" id="expandToggle">▼ Show Details</button>
-                    </div>
-                    
-                    <div class="summary-metrics-row" id="yesterdaySummaryMetrics">
-                        <div class="metric-card environmental">
-                            <div class="metric-value" id="yesterdayAvgTemp">--°F</div>
-                            <div class="metric-label">Avg Indoor</div>
-                            <div class="metric-range" id="yesterdayTempRange">-- - --</div>
-                            <div class="metric-trend" id="yesterdayTempTrend">--</div>
-                        </div>
-                        
-                        <div class="metric-card performance">
-                            <div class="metric-value" id="yesterdayEfficiency">--%</div>
-                            <div class="metric-label">Cooling Efficiency</div>
-                            <div class="metric-detail" id="yesterdayRuntime">-- hrs runtime</div>
-                            <div class="metric-trend" id="yesterdayEfficiencyTrend">--</div>
-                        </div>
-                        
-                        <div class="metric-card activity">
-                            <div class="metric-value" id="yesterdayDoorsActive">-/-</div>
-                            <div class="metric-label">Doors Active</div>
-                            <div class="metric-detail" id="yesterdaySessions">-- sessions</div>
-                            <div class="metric-trend" id="yesterdayPeakTime">--</div>
-                        </div>
-                        
-                        <div class="metric-card system">
-                            <div class="metric-value" id="yesterdaySystemHealth">--%</div>
-                            <div class="metric-label">System Health</div>
-                            <div class="metric-detail" id="yesterdayIncidents">-- incidents</div>
-                            <div class="metric-trend" id="yesterdayUptime">--</div>
-                        </div>
-                    </div>
-
-                    <div class="detailed-content" id="yesterdayDetailedContent" style="display: none;">
-                        <div class="detailed-grid">
-                            <div class="detail-section">
-                                <h4>🌡️ Environmental Summary</h4>
-                                <div class="detail-content" id="yesterdayEnvironmental">
-                                    <p>Loading detailed environmental data...</p>
-                                </div>
-                            </div>
-                            
-                            <div class="detail-section">
-                                <h4>⚡ System Performance</h4>
-                                <div class="detail-content" id="yesterdayPerformance">
-                                    <p>Loading performance metrics...</p>
-                                </div>
-                            </div>
-                            
-                            <div class="detail-section">
-                                <h4>🚪 Door Activity Timeline</h4>
-                                <div class="detail-content" id="yesterdayDoorTimeline">
-                                    <p>Loading door activity data...</p>
-                                </div>
-                            </div>
-                            
-                            <div class="detail-section">
-                                <h4>📊 Incident Summary</h4>
-                                <div class="detail-content" id="yesterdayIncidentSummary">
-                                    <p>Loading incident data...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Current Status Grid -->
                 <div class="grid">
                     <!-- Indoor Sensors -->
@@ -1280,6 +1209,77 @@
                         </div>
                     </div>
 
+                </div>
+
+                <!-- Yesterday's Complete Report Hero Section -->
+                <div class="hero-section yesterday-report" id="yesterdayReport">
+                    <div class="section-header" onclick="toggleYesterdayReport()">
+                        <h2>📋 Yesterday's Complete Report</h2>
+                        <span class="date-indicator" id="yesterdayDate">Loading...</span>
+                        <button class="expand-toggle" id="expandToggle">▼ Show Details</button>
+                    </div>
+                    
+                    <div class="summary-metrics-row" id="yesterdaySummaryMetrics">
+                        <div class="metric-card environmental">
+                            <div class="metric-value" id="yesterdayAvgTemp">--°F</div>
+                            <div class="metric-label">Avg Indoor</div>
+                            <div class="metric-range" id="yesterdayTempRange">-- - --</div>
+                            <div class="metric-trend" id="yesterdayTempTrend">--</div>
+                        </div>
+                        
+                        <div class="metric-card performance">
+                            <div class="metric-value" id="yesterdayEfficiency">--%</div>
+                            <div class="metric-label">Cooling Efficiency</div>
+                            <div class="metric-detail" id="yesterdayRuntime">-- hrs runtime</div>
+                            <div class="metric-trend" id="yesterdayEfficiencyTrend">--</div>
+                        </div>
+                        
+                        <div class="metric-card activity">
+                            <div class="metric-value" id="yesterdayDoorsActive">-/-</div>
+                            <div class="metric-label">Doors Active</div>
+                            <div class="metric-detail" id="yesterdaySessions">-- sessions</div>
+                            <div class="metric-trend" id="yesterdayPeakTime">--</div>
+                        </div>
+                        
+                        <div class="metric-card system">
+                            <div class="metric-value" id="yesterdaySystemHealth">--%</div>
+                            <div class="metric-label">System Health</div>
+                            <div class="metric-detail" id="yesterdayIncidents">-- incidents</div>
+                            <div class="metric-trend" id="yesterdayUptime">--</div>
+                        </div>
+                    </div>
+
+                    <div class="detailed-content" id="yesterdayDetailedContent" style="display: none;">
+                        <div class="detailed-grid">
+                            <div class="detail-section">
+                                <h4>🌡️ Environmental Summary</h4>
+                                <div class="detail-content" id="yesterdayEnvironmental">
+                                    <p>Loading detailed environmental data...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>⚡ System Performance</h4>
+                                <div class="detail-content" id="yesterdayPerformance">
+                                    <p>Loading performance metrics...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>🚪 Door Activity Timeline</h4>
+                                <div class="detail-content" id="yesterdayDoorTimeline">
+                                    <p>Loading door activity data...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>📊 Incident Summary</h4>
+                                <div class="detail-content" id="yesterdayIncidentSummary">
+                                    <p>Loading incident data...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Historical Charts -->
