@@ -314,21 +314,11 @@ document.addEventListener('DOMContentLoaded', function() {
 //
 // Moved by Paul from dashboard.html 20250829
 //
-    <!-- Discrete Build Info Footer -->
-        };
 
-        // Note: getApiKeyFromUrl() function is defined at the top of the page
+// Note: getApiKeyFromUrl() function is defined at the top of the page
+// Variables are already declared at the top of this file
 
-        let temperatureChart = null;
-        let pressureChart = null;
-        let incidentTrendsChart = null;
-        let refreshTimer = null;
-        let currentChartHours = 6; // Track the currently displayed time period
-        let currentPressureChartHours = 6; // Track the currently displayed pressure chart time period
-        let latestChartDataTimestamp = null; // Track the latest data point timestamp to avoid unnecessary chart refreshes
-        let latestPressureDataTimestamp = null; // Track pressure chart data freshness
-
-        // Authentication and API helper functions
+// Authentication and API helper functions
         function getAuthHeaders() {
             const token = localStorage.getItem('ventilation_auth_token');
             const headers = {
@@ -1588,8 +1578,7 @@ document.addEventListener('DOMContentLoaded', function() {
             applyIncidentFilters();
         }
 
-        // Global variable to store original incidents data for filtering
-        let originalIncidentsData = [];
+        // originalIncidentsData is already declared at the top of the file
 
         // Function to apply both time period and severity filters
         function applyIncidentFilters() {
