@@ -620,6 +620,12 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             border: 1px solid #e9ecef;
             min-width: 300px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
         }
 
         .card h3 {
@@ -707,22 +713,19 @@
             color: #2c3e50;
         }
 
-        /* Garage sensor layout improvements - match indoor spacing */
+        /* Garage sensor layout improvements - match indoor spacing exactly */
         .garage-sensors {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 15px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         .garage-sensors .sensor-reading {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin: 15px 0;
             padding: 10px;
             background: #f8f9fa;
             border-radius: 5px;
-            margin: 15px 0;
         }
 
         /* Door Activity Improvements */
