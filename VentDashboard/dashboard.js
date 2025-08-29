@@ -13,8 +13,17 @@ const CONFIG = {
     historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 30000, // 30 seconds - check for new telemetry data
-    apiSecret: getApiKeyFromUrl() || null // Get from URL parameter or environment
+    apiSecret: null, // Will be set dynamically
+    enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
 };
+
+// Initialize API secret from URL parameter
+function initializeApiSecret() {
+    if (!CONFIG.apiSecret) {
+        CONFIG.apiSecret = getApiKeyFromUrl() || 'VentilationSystem2025SecretKey';
+    }
+    return CONFIG.apiSecret;
+}
 
 // Global variables
 let temperatureChart = null;
@@ -455,6 +464,9 @@ document.addEventListener('DOMContentLoaded', function() {
         async function initializeDashboard() {
             console.log('Initializing dashboard...');
             
+            // Initialize API secret from URL parameters
+            initializeApiSecret();
+            
             // Clear any previous data source tracking
             if (window.dataSourceTracker) {
                 window.dataSourceTracker.clearAll();
@@ -466,6 +478,12 @@ document.addEventListener('DOMContentLoaded', function() {
             await loadChart(6); // Load 6-hour chart by default
             await loadPressureChart(6); // Load 6-hour pressure chart by default
             await loadIncidentAlmanac();
+            
+            // Load Enhanced API data sections (only the ones that work)
+            loadYesterdaySummaryMetrics();
+            updateEnhancedDoorActivity();
+            updateSystemHealthWidget();
+            // Note: Monthly aggregation status is handled by loadAggregationStatus() above
             
             // Start auto-refresh
             startAutoRefresh();
@@ -935,6 +953,183 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // This will connect to the GetEnhancedDashboardData API to load actual timeline data
+        }
+
+        async function loadAggregationStatus() {
+            try {
+                // Show loading state
+                document.getElementById('aggregationStatusText').textContent = 'Checking...';
+                document.getElementById('aggregationStatus').textContent = '🔄';
+                
+                const headers = getAuthHeaders();
+                
+                const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
+                    method: 'GET',
+                    headers
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // Check if we have monthly aggregation data in the response
+                if (data.monthlyAggregation) {
+                    const agg = data.monthlyAggregation;
+                    document.getElementById('aggregationStatusText').textContent = agg.status || 'Active';
+                    document.getElementById('aggregationStatus').textContent = agg.status === 'active' ? '✅' : '🔄';
+                    
+                    document.getElementById('lastAggregationRun').textContent = agg.lastRun || 'Unknown';
+                    document.getElementById('recordsUpdated').textContent = agg.recordsUpdated || 'N/A';
+                    document.getElementById('nextAggregationRun').textContent = agg.nextRun || 'Unknown';
+                    document.getElementById('aggregationResult').textContent = agg.result || 'Pending';
+                } else {
+                    // Default state when no aggregation data is available
+                    document.getElementById('aggregationStatusText').textContent = 'Not Available';
+                    document.getElementById('aggregationStatus').textContent = '❌';
+                    document.getElementById('lastAggregationRun').textContent = 'No data';
+                    document.getElementById('recordsUpdated').textContent = 'No data';
+                    document.getElementById('nextAggregationRun').textContent = 'No data';
+                    document.getElementById('aggregationResult').textContent = 'No data';
+                }
+            } catch (error) {
+                console.error('Error loading aggregation status:', error);
+                document.getElementById('aggregationStatusText').textContent = 'Error';
+                document.getElementById('aggregationStatus').textContent = '❌';
+                document.getElementById('lastAggregationRun').textContent = 'Error';
+                document.getElementById('recordsUpdated').textContent = 'Error';
+                document.getElementById('nextAggregationRun').textContent = 'Error';
+                document.getElementById('aggregationResult').textContent = 'Error';
+            }
+        }
+
+        function loadYesterdaySummaryMetrics() {
+            // This function was embedded in the loadYesterdayDetailedContent but should be separate
+            // Show loading states for summary metrics
+            document.getElementById('yesterdayAvgTemp').textContent = 'Loading...';
+            document.getElementById('yesterdayTempRange').textContent = 'Loading...';
+            document.getElementById('yesterdayTempTrend').textContent = 'Checking...';
+            
+            document.getElementById('yesterdayEfficiency').textContent = 'Loading...';
+            document.getElementById('yesterdayRuntime').textContent = 'Loading...';
+            document.getElementById('yesterdayEfficiencyTrend').textContent = 'Checking...';
+            
+            document.getElementById('yesterdayDoorsActive').textContent = 'Loading...';
+            document.getElementById('yesterdaySessions').textContent = 'Loading...';
+            document.getElementById('yesterdayPeakTime').textContent = 'Checking...';
+            
+            document.getElementById('yesterdaySystemHealth').textContent = 'Loading...';
+            document.getElementById('yesterdayIncidents').textContent = 'Loading...';
+            document.getElementById('yesterdayUptime').textContent = 'Checking...';
+            
+            // Initialize API secret
+            const apiSecret = initializeApiSecret();
+            
+            // Call the enhanced dashboard API for yesterday data
+            fetch(CONFIG.enhancedApiUrl, {
+                method: 'GET',
+                headers: {
+                    'X-API-Secret': apiSecret,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Extract yesterday data from sections
+                    const yesterday = data.sections && data.sections.yesterday;
+                    if (yesterday && yesterday.status !== 'waiting_for_esp32_data') {
+                        // Update temperature metrics
+                        if (yesterday.environmental) {
+                            const env = yesterday.environmental;
+                            document.getElementById('yesterdayAvgTemp').textContent = `${env.tempAvg || '0'}°F`;
+                            document.getElementById('yesterdayTempRange').textContent = `${env.tempMin || '0'}°F - ${env.tempMax || '0'}°F`;
+                            document.getElementById('yesterdayTempTrend').textContent = env.tempTrend || 'Stable';
+                            document.getElementById('yesterdayTempTrend').className = `metric-trend ${env.tempTrend === 'Rising' ? 'rising' : env.tempTrend === 'Falling' ? 'falling' : ''}`;
+                        }
+                        
+                        // Update efficiency metrics
+                        if (yesterday.performance) {
+                            const perf = yesterday.performance;
+                            document.getElementById('yesterdayEfficiency').textContent = `${perf.efficiency || '0'}%`;
+                            document.getElementById('yesterdayRuntime').textContent = `${perf.runtime || '0'} hrs runtime`;
+                            document.getElementById('yesterdayEfficiencyTrend').textContent = 'Data available';
+                            document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                        }
+                        
+                        // Update door activity metrics
+                        if (yesterday.doors) {
+                            const doors = yesterday.doors;
+                            document.getElementById('yesterdayDoorsActive').textContent = `${doors.activeDoors || '0'}/${doors.totalDoors || '0'}`;
+                            document.getElementById('yesterdaySessions').textContent = `${doors.totalSessions || '0'} sessions`;
+                            document.getElementById('yesterdayPeakTime').textContent = `Peak: ${doors.peakTime || 'N/A'}`;
+                        }
+                        
+                        // Update system health metrics
+                        if (yesterday.incidents) {
+                            const incidents = yesterday.incidents;
+                            document.getElementById('yesterdaySystemHealth').textContent = `${incidents.uptime || '0'}%`;
+                            document.getElementById('yesterdayIncidents').textContent = `${incidents.total || '0'} incidents`;
+                            document.getElementById('yesterdayUptime').textContent = `${incidents.uptime || '0'}% uptime`;
+                        }
+                    } else {
+                        // Show waiting states for all metrics
+                        const waitingText = 'Waiting for data';
+                        
+                        // Temperature metrics
+                        document.getElementById('yesterdayAvgTemp').textContent = waitingText;
+                        document.getElementById('yesterdayTempRange').textContent = waitingText;
+                        document.getElementById('yesterdayTempTrend').textContent = 'Pending';
+                        
+                        // Efficiency metrics
+                        document.getElementById('yesterdayEfficiency').textContent = waitingText;
+                        document.getElementById('yesterdayRuntime').textContent = waitingText;
+                        document.getElementById('yesterdayEfficiencyTrend').textContent = 'Pending';
+                        
+                        // Door activity metrics
+                        document.getElementById('yesterdayDoorsActive').textContent = waitingText;
+                        document.getElementById('yesterdaySessions').textContent = waitingText;
+                        document.getElementById('yesterdayPeakTime').textContent = 'Pending';
+                        
+                        // System health metrics
+                        document.getElementById('yesterdaySystemHealth').textContent = waitingText;
+                        document.getElementById('yesterdayIncidents').textContent = waitingText;
+                        document.getElementById('yesterdayUptime').textContent = 'Pending';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading yesterday summary metrics:', error);
+                    
+                    // Show error state for all metrics
+                    const errorText = 'Error';
+                    
+                    // Temperature metrics
+                    document.getElementById('yesterdayAvgTemp').textContent = errorText;
+                    document.getElementById('yesterdayTempRange').textContent = 'Failed to load';
+                    document.getElementById('yesterdayTempTrend').textContent = 'No data';
+                    document.getElementById('yesterdayTempTrend').className = 'metric-trend';
+                    
+                    // Efficiency metrics
+                    document.getElementById('yesterdayEfficiency').textContent = errorText;
+                    document.getElementById('yesterdayRuntime').textContent = 'Failed to load';
+                    document.getElementById('yesterdayEfficiencyTrend').textContent = 'No data';
+                    document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                    
+                    // Door activity metrics
+                    document.getElementById('yesterdayDoorsActive').textContent = errorText;
+                    document.getElementById('yesterdaySessions').textContent = 'Failed to load';
+                    document.getElementById('yesterdayPeakTime').textContent = 'No data';
+                    
+                    // System health metrics
+                    document.getElementById('yesterdaySystemHealth').textContent = errorText;
+                    document.getElementById('yesterdayIncidents').textContent = 'Failed to load';
+                    document.getElementById('yesterdayUptime').textContent = 'No data';
+                });
         }
 
         async function refreshData() {
