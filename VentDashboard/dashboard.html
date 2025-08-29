@@ -1477,22 +1477,8 @@
 
         // Add logout button to header
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== DEBUGGING: DOMContentLoaded event fired ===');
-            
-            // Add visual debugging indicator for DOMContentLoaded
-            const domDebugDiv = document.createElement('div');
-            domDebugDiv.id = 'dom-debug-indicator';
-            domDebugDiv.style.cssText = 'position: fixed; top: 10px; left: 10px; background: orange; padding: 10px; border: 2px solid darkorange; z-index: 9999; max-width: 300px;';
-            domDebugDiv.innerHTML = '<strong>DEBUG DOM:</strong> DOMContentLoaded fired';
-            document.body.appendChild(domDebugDiv);
-            
             const header = document.querySelector('.header');
-            console.log('DEBUGGING: Header element found:', !!header);
-            domDebugDiv.innerHTML += '<br>Header found: ' + (header ? 'YES' : 'NO');
-            
             const userEmail = localStorage.getItem('ventilation_user_email') || 'User';
-            console.log('DEBUGGING: User email:', userEmail);
-            domDebugDiv.innerHTML += '<br>User email: ' + userEmail;
             
             const userSection = document.createElement('div');
             userSection.style.cssText = 'position: absolute; top: 15px; right: 20px; font-size: 0.9em;';
@@ -1504,41 +1490,19 @@
             if (header) {
                 header.style.position = 'relative';
                 header.appendChild(userSection);
-                console.log('DEBUGGING: User section added to header');
-                domDebugDiv.innerHTML += '<br>User section added';
             }
             
             // Add no-data notice if no authentication is provided
             const token = localStorage.getItem('ventilation_auth_token');
-            console.log('DEBUGGING: Token check - Token present:', !!token, 'API Secret present:', !!CONFIG.apiSecret);
-            domDebugDiv.innerHTML += '<br>Auth - Token: ' + (token ? 'YES' : 'NO') + ', API Secret: ' + (CONFIG.apiSecret ? 'YES' : 'NO');
-            
             if (!CONFIG.apiSecret && !token) {
-                console.log('DEBUGGING: No authentication, adding no-data notice');
                 const noDataNotice = document.createElement('div');
                 noDataNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
                 noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> Data is currently unavailable. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
                 if (header) header.appendChild(noDataNotice);
-                domDebugDiv.innerHTML += '<br>No-data notice added';
             }
             
-            console.log('DEBUGGING: About to call initializeDashboard()');
-            domDebugDiv.innerHTML += '<br>Calling initializeDashboard()...';
             initializeDashboard();
-            
-            console.log('DEBUGGING: About to call setupEnhancedDashboard()');
-            domDebugDiv.innerHTML += '<br>Calling setupEnhancedDashboard()...';
             setupEnhancedDashboard(); // Initialize Phase 2 enhancements
-            
-            console.log('=== DEBUGGING: DOMContentLoaded handler completed ===');
-            domDebugDiv.innerHTML += '<br><strong>DOM SETUP COMPLETE!</strong>';
-            
-            // Remove DOM debug indicator after 20 seconds
-            setTimeout(() => {
-                if (domDebugDiv.parentNode) {
-                    domDebugDiv.parentNode.removeChild(domDebugDiv);
-                }
-            }, 20000);
         });
 
         // Helper function to format detailed timestamps consistently
@@ -1560,60 +1524,24 @@
 
         // Initialize dashboard
         async function initializeDashboard() {
-            console.log('=== DEBUGGING: initializeDashboard() started ===');
-            
-            // Add visual debugging indicator for initialization
-            const initDebugDiv = document.createElement('div');
-            initDebugDiv.id = 'init-debug-indicator';
-            initDebugDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: lightblue; padding: 10px; border: 2px solid blue; z-index: 9999; max-width: 300px;';
-            initDebugDiv.innerHTML = '<strong>DEBUG INIT:</strong> initializeDashboard() started';
-            document.body.appendChild(initDebugDiv);
+            console.log('Initializing dashboard...');
             
             // Clear any previous data source tracking
             if (window.dataSourceTracker) {
                 window.dataSourceTracker.clearAll();
-                console.log('DEBUGGING: Cleared data source tracker');
-                initDebugDiv.innerHTML += '<br>Data source tracker cleared';
             }
             
-            console.log('DEBUGGING: About to call refreshData()');
-            initDebugDiv.innerHTML += '<br>Calling refreshData()...';
+            // Load dashboard components
             await refreshData();
-            
-            console.log('DEBUGGING: refreshData() completed, loading aggregation status...');
-            initDebugDiv.innerHTML += '<br>Loading aggregation status...';
-            // Load aggregation status
             await loadAggregationStatus();
-            
-            console.log('DEBUGGING: Loading chart...');
-            initDebugDiv.innerHTML += '<br>Loading chart...';
-            // Load default 6-hour chart
             await loadChart(6); // Load 6-hour chart by default
-            
-            console.log('DEBUGGING: Loading pressure chart...');
-            initDebugDiv.innerHTML += '<br>Loading pressure chart...';
-            // Load default 6-hour pressure chart
             await loadPressureChart(6); // Load 6-hour pressure chart by default
-            
-            console.log('DEBUGGING: Loading incident almanac...');
-            initDebugDiv.innerHTML += '<br>Loading incident almanac...';
-            // Load incident almanac
             await loadIncidentAlmanac();
             
-            console.log('DEBUGGING: Starting auto-refresh...');
-            initDebugDiv.innerHTML += '<br>Starting auto-refresh...';
             // Start auto-refresh
             startAutoRefresh();
             
-            console.log('=== DEBUGGING: initializeDashboard() completed ===');
-            initDebugDiv.innerHTML += '<br><strong>INIT COMPLETE!</strong>';
-            
-            // Remove init debug indicator after 15 seconds
-            setTimeout(() => {
-                if (initDebugDiv.parentNode) {
-                    initDebugDiv.parentNode.removeChild(initDebugDiv);
-                }
-            }, 15000);
+            console.log('Dashboard initialization complete');
         }
 
         // Enhanced Dashboard Functions for Phase 2
@@ -1647,7 +1575,13 @@
             // Call the enhanced dashboard API
             const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
             
-            fetch(`${apiUrl}?apikey=${apiKey}&section=yesterday`)
+            fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'X-API-Secret': apiKey,
+                    'Content-Type': 'application/json'
+                }
+            })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1655,74 +1589,82 @@
                     return response.json();
                 })
                 .then(data => {
+                    // Extract yesterday's data from the sections
+                    const yesterdayData = data.sections && data.sections.yesterday;
+                    if (!yesterdayData) {
+                        throw new Error('Yesterday section not found in API response');
+                    }
+                    
+                    // Check if this is real data or just a status message
+                    if (yesterdayData.status === 'waiting_for_esp32_data') {
+                        throw new Error('Real ESP32 data not yet available: ' + yesterdayData.message);
+                    }
+                    
                     // Load environmental data
-                    if (data.environmental) {
-                        const env = data.environmental;
+                    if (yesterdayData.environmental) {
+                        const env = yesterdayData.environmental;
                         document.getElementById('yesterdayEnvironmental').innerHTML = `
                             <div class="env-summary">
                                 <p><strong>Temperature Range:</strong> ${env.tempMin}°F - ${env.tempMax}°F (Avg: ${env.tempAvg}°F)</p>
                                 <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
                                 <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} inHg</p>
-                                ${env.airQuality ? `<p><strong>Air Quality:</strong> ${env.airQuality} (AQI: ${env.aqi})</p>` : ''}
+                                <p><strong>Air Quality:</strong> ${env.airQuality} (AQI: ${env.aqi})</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayEnvironmental').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Environmental data not available</em></div>';
+                        document.getElementById('yesterdayEnvironmental').innerHTML = '<div class="error-state">Environmental data not available</div>';
                     }
                     
                     // Load performance data
-                    if (data.performance) {
-                        const perf = data.performance;
+                    if (yesterdayData.performance) {
+                        const perf = yesterdayData.performance;
                         document.getElementById('yesterdayPerformance').innerHTML = `
-                            <div class="performance-summary">
-                                <p><strong>Cooling Efficiency:</strong> ${perf.efficiency}%${perf.efficiencyChange ? ` (${perf.efficiencyChange > 0 ? '+' : ''}${perf.efficiencyChange}% vs previous day)` : ''}</p>
-                                <p><strong>Runtime:</strong> ${perf.runtime} hours total</p>
-                                ${perf.energyUsage ? `<p><strong>Energy Usage:</strong> ${perf.energyUsage} kWh</p>` : ''}
-                                ${perf.peakLoad ? `<p><strong>Peak Load:</strong> ${perf.peakLoad}</p>` : ''}
+                            <div class="perf-summary">
+                                <p><strong>Efficiency:</strong> ${perf.efficiency}%</p>
+                                <p><strong>Runtime:</strong> ${perf.runtime} hours</p>
+                                <p><strong>Energy Usage:</strong> ${perf.energyUsage}</p>
+                                <p><strong>Peak Load:</strong> ${perf.peakLoad}</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayPerformance').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Performance data not available</em></div>';
+                        document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available</div>';
                     }
                     
-                    // Load door timeline data
-                    if (data.doorActivity) {
-                        const doors = data.doorActivity;
+                    // Load door timeline
+                    if (yesterdayData.doors) {
+                        const doors = yesterdayData.doors;
                         document.getElementById('yesterdayDoorTimeline').innerHTML = `
-                            <div class="door-timeline-summary">
-                                <p><strong>Active Doors:</strong> ${doors.activeDoors} of ${doors.totalDoors} doors had activity</p>
-                                <p><strong>Total Sessions:</strong> ${doors.totalEvents} opening/closing events</p>
-                                ${doors.peakActivity ? `<p><strong>Peak Activity:</strong> ${doors.peakActivity}</p>` : ''}
-                                ${doors.mostActive ? `<p><strong>Most Active:</strong> ${doors.mostActive.name} (${doors.mostActive.events} events)</p>` : ''}
+                            <div class="door-summary">
+                                <p><strong>Active Doors:</strong> ${doors.activeDoors} of ${doors.totalDoors}</p>
+                                <p><strong>Total Events:</strong> ${doors.totalEvents}</p>
+                                <p><strong>Peak Activity:</strong> ${doors.peakActivity}</p>
+                                <p><strong>Most Active:</strong> ${doors.mostActive || 'N/A'}</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayDoorTimeline').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Door activity data not available</em></div>';
+                        document.getElementById('yesterdayDoorTimeline').innerHTML = '<div class="error-state">Door timeline data not available</div>';
                     }
                     
-                    // Load incident analysis data
-                    if (data.incidents) {
-                        const incidents = data.incidents;
+                    // Load incident summary
+                    if (yesterdayData.incidents) {
+                        const incidents = yesterdayData.incidents;
                         document.getElementById('yesterdayIncidentSummary').innerHTML = `
                             <div class="incident-summary">
-                                <p><strong>Total Incidents:</strong> ${incidents.critical || 0} critical, ${incidents.minor || 0} minor</p>
+                                <p><strong>Total Incidents:</strong> ${incidents.total}</p>
+                                <p><strong>Critical:</strong> ${incidents.critical}</p>
                                 <p><strong>System Health:</strong> ${incidents.uptime}% uptime</p>
-                                <p><strong>Reliability:</strong> ${incidents.status}</p>
-                                ${incidents.responseTime ? `<p><strong>Response Time:</strong> Average ${incidents.responseTime} seconds</p>` : ''}
+                                <p><strong>Status:</strong> ${incidents.status}</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayIncidentSummary').innerHTML = '<div style="color: #ff6b6b; padding: 15px;"><em>⚠️ Incident analysis not available</em></div>';
+                        document.getElementById('yesterdayIncidentSummary').innerHTML = '<div class="error-state">Incident data not available</div>';
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading enhanced dashboard data:', error);
+                    console.error('Error loading yesterday detailed content:', error);
                     
-                    // Show error messages for each section
-                    const errorMessage = `<div style="color: #ff6b6b; padding: 15px; border: 1px solid #ff6b6b; border-radius: 4px; background: #fff5f5;">
-                        <em>❌ Failed to load data: ${error.message}</em>
-                    </div>`;
-                    
+                    // Show error message in all sections
+                    const errorMessage = `<div class="error-state">Failed to load data: ${error.message}</div>`;
                     document.getElementById('yesterdayEnvironmental').innerHTML = errorMessage;
                     document.getElementById('yesterdayPerformance').innerHTML = errorMessage;
                     document.getElementById('yesterdayDoorTimeline').innerHTML = errorMessage;
@@ -2225,7 +2167,11 @@
                 
                 // Call the enhanced dashboard API for monthly data
                 const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
-                const response = await fetch(`${apiUrl}?apikey=${apiKey}&section=monthly`);
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'X-API-Secret': apiKey
+                    }
+                });
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2233,20 +2179,12 @@
                 
                 const data = await response.json();
                 
-                // Look for monthly aggregation status in the returned data
-                if (data.monthlyAggregation) {
-                    updateAggregationStatusDisplay(data.monthlyAggregation, null);
-                } else if (data.system && data.system.monthlyAggregation) {
-                    updateAggregationStatusDisplay(data.system.monthlyAggregation, null);
+                // Look for monthly aggregation status in the enhanced API structure
+                if (data.sections && data.sections.monthly && data.sections.monthly.monthlyAggregation) {
+                    updateAggregationStatusDisplay(data.sections.monthly.monthlyAggregation, null);
                 } else {
-                    // Show default/placeholder status if no aggregation data available
-                    updateAggregationStatusDisplay({
-                        status: 'active',
-                        lastRun: 'Today at 3:15 AM',
-                        nextRun: 'Tomorrow at 3:15 AM', 
-                        recordsUpdated: 'Unknown',
-                        result: 'Data aggregation active'
-                    }, null);
+                    // Show error if no real aggregation data available
+                    throw new Error('Monthly aggregation data not available');
                 }
                 
             } catch (error) {
