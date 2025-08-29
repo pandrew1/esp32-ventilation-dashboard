@@ -1006,47 +1006,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (error) {
                 statusElement.textContent = '❌';
+                statusElement.className = 'aggregation-status aggregation-error';
                 statusTextElement.textContent = 'Error';
-                lastRunElement.textContent = 'Unknown';
-                recordsUpdatedElement.textContent = 'Unknown';
-                nextRunElement.textContent = 'Unknown';
-                resultElement.textContent = error;
+                if (lastRunElement) lastRunElement.textContent = 'Unknown';
+                if (recordsUpdatedElement) recordsUpdatedElement.textContent = 'Unknown';
+                if (nextRunElement) nextRunElement.textContent = 'Unknown';
+                if (resultElement) resultElement.textContent = error;
                 return;
             }
 
             if (!status) {
                 statusElement.textContent = '⏳';
+                statusElement.className = 'aggregation-status aggregation-pending';
                 statusTextElement.textContent = 'Pending';
-                lastRunElement.textContent = 'Unknown';
-                recordsUpdatedElement.textContent = 'Unknown';
-                nextRunElement.textContent = 'Daily at 2:15 AM UTC';
-                resultElement.textContent = 'Waiting for data';
+                if (lastRunElement) lastRunElement.textContent = 'Unknown';
+                if (recordsUpdatedElement) recordsUpdatedElement.textContent = 'Unknown';
+                if (nextRunElement) nextRunElement.textContent = 'Daily at 2:15 AM UTC';
+                if (resultElement) resultElement.textContent = 'Waiting for data';
                 return;
             }
 
             // Process successful status
-            statusElement.textContent = status.Success ? '✅' : '⚠️';
-            statusTextElement.textContent = status.Success ? 'Active' : 'Issues Detected';
-            
-            // Format last run time
-            if (status.LastRun) {
-                const lastRun = new Date(status.LastRun);
-                lastRunElement.textContent = lastRun.toLocaleDateString() + ' ' + lastRun.toLocaleTimeString();
+            // Update display with proper CSS classes
+            if (status.Success) {
+                statusElement.textContent = '✅';
+                statusElement.className = 'aggregation-status aggregation-success';
+                statusTextElement.textContent = 'Success';
+                if (resultElement) resultElement.textContent = 'Completed Successfully';
             } else {
-                lastRunElement.textContent = 'Unknown';
+                statusElement.textContent = '❌';
+                statusElement.className = 'aggregation-status aggregation-error';
+                statusTextElement.textContent = 'Failed';
+                if (resultElement) resultElement.textContent = status.ErrorMessage || 'Unknown error';
             }
             
-            recordsUpdatedElement.textContent = status.RecordsUpdated || 'Unknown';
+            // Format timestamps with helper function
+            const formatDateTime = (isoString) => {
+                if (!isoString) return 'Unknown';
+                try {
+                    const date = new Date(isoString);
+                    return date.toLocaleString();
+                } catch (e) {
+                    return 'Invalid date';
+                }
+            };
             
-            // Format next run time  
-            if (status.NextScheduledRun) {
-                const nextRun = new Date(status.NextScheduledRun);
-                nextRunElement.textContent = nextRun.toLocaleDateString() + ' ' + nextRun.toLocaleTimeString();
-            } else {
-                nextRunElement.textContent = 'Daily at 2:15 AM UTC';
-            }
-            
-            resultElement.textContent = status.Success ? 'Completed Successfully' : 'Error occurred';
+            // Update all elements with null checks
+            if (lastRunElement) lastRunElement.textContent = formatDateTime(status.LastRun);
+            if (recordsUpdatedElement) recordsUpdatedElement.textContent = status.RecordsUpdated || 'Unknown';
+            if (nextRunElement) nextRunElement.textContent = formatDateTime(status.NextScheduledRun);
         }
 
         function loadYesterdaySummaryMetrics() {
