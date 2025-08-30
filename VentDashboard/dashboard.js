@@ -581,10 +581,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Calculate most active door from actual activity data if available
                         let mostActiveDoor = doors.mostActive || 'N/A';
-                        if (doorEvents && doorEvents.length > 0) {
+                        // Note: doorEvents is from timeline processing, may not be available in this context
+                        // Use doors data from API instead
+                        if (doors.doorTransitions && doors.doorTransitions.length > 0) {
                             const doorActivityCounts = {};
-                            doorEvents.forEach(event => {
-                                doorActivityCounts[event.door] = (doorActivityCounts[event.door] || 0) + 1;
+                            doors.doorTransitions.forEach(transition => {
+                                const doorName = transition.door || transition.doorName;
+                                if (doorName) {
+                                    doorActivityCounts[doorName] = (doorActivityCounts[doorName] || 0) + 1;
+                                }
                             });
                             const sortedDoors = Object.entries(doorActivityCounts).sort(([,a], [,b]) => b - a);
                             if (sortedDoors.length > 0) {
@@ -1301,6 +1306,40 @@ document.addEventListener('DOMContentLoaded', function() {
                             bootReasonInfo.textContent = `Reason: ${startup.bootReason || 'Unknown'}`;
                         }
                         
+                        // Update System Specifications elements
+                        const chipModel = document.getElementById('chipModel');
+                        const cpuFreq = document.getElementById('cpuFreq');
+                        const flashSize = document.getElementById('flashSize');
+                        const freeHeap = document.getElementById('freeHeap');
+                        const wifiIP = document.getElementById('wifiIP');
+                        const macAddress = document.getElementById('macAddress');
+                        
+                        if (chipModel) chipModel.textContent = startup.system?.chipModel || 'Unknown';
+                        if (cpuFreq) cpuFreq.textContent = startup.system?.cpuFreq ? `${startup.system.cpuFreq} MHz` : 'Unknown';
+                        if (flashSize) flashSize.textContent = startup.system?.flashSize ? `${Math.round(startup.system.flashSize / (1024 * 1024))} MB` : 'Unknown';
+                        if (freeHeap) freeHeap.textContent = startup.system?.freeHeap ? `${Math.round(startup.system.freeHeap / 1024)} KB` : 'Unknown';
+                        if (wifiIP) wifiIP.textContent = startup.system?.wifiIP || 'Unknown';
+                        if (macAddress) macAddress.textContent = startup.system?.macAddress || 'Unknown';
+                        
+                        // Update Hardware Status elements
+                        const displayStatus = document.getElementById('displayStatus');
+                        const sensorStatus = document.getElementById('sensorStatus');
+                        const relayStatus = document.getElementById('relayStatus');
+                        const watchdogStatus = document.getElementById('watchdogStatus');
+                        
+                        if (displayStatus) displayStatus.textContent = startup.hardware?.display ? 'OK' : 'Error';
+                        if (sensorStatus) {
+                            // Count working sensors
+                            const workingSensors = [
+                                startup.hardware?.indoorBME,
+                                startup.hardware?.outdoorBME,
+                                startup.hardware?.garageBME
+                            ].filter(Boolean).length;
+                            sensorStatus.textContent = `${workingSensors}/3 OK`;
+                        }
+                        if (relayStatus) relayStatus.textContent = startup.hardware?.relay ? 'OK' : 'Error';
+                        if (watchdogStatus) watchdogStatus.textContent = startup.hardware?.watchdog ? 'OK' : 'Error';
+                        
                         // Calculate health percentage based on available metrics
                         const gaugeContainer = document.querySelector('.gauge-container');
                         if (gaugeContainer) {
@@ -1391,6 +1430,32 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (healthErrors) healthErrors.textContent = 'Waiting...';
                         if (lastBootInfo) lastBootInfo.textContent = 'Boot information pending';
                         if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Pending';
+                        
+                        // Handle System Specifications waiting states
+                        const chipModel = document.getElementById('chipModel');
+                        const cpuFreq = document.getElementById('cpuFreq');
+                        const flashSize = document.getElementById('flashSize');
+                        const freeHeap = document.getElementById('freeHeap');
+                        const wifiIP = document.getElementById('wifiIP');
+                        const macAddress = document.getElementById('macAddress');
+                        
+                        if (chipModel) chipModel.textContent = 'Waiting...';
+                        if (cpuFreq) cpuFreq.textContent = 'Waiting...';
+                        if (flashSize) flashSize.textContent = 'Waiting...';
+                        if (freeHeap) freeHeap.textContent = 'Waiting...';
+                        if (wifiIP) wifiIP.textContent = 'Waiting...';
+                        if (macAddress) macAddress.textContent = 'Waiting...';
+                        
+                        // Handle Hardware Status waiting states
+                        const displayStatus = document.getElementById('displayStatus');
+                        const sensorStatus = document.getElementById('sensorStatus');
+                        const relayStatus = document.getElementById('relayStatus');
+                        const watchdogStatus = document.getElementById('watchdogStatus');
+                        
+                        if (displayStatus) displayStatus.textContent = 'Waiting...';
+                        if (sensorStatus) sensorStatus.textContent = 'Waiting...';
+                        if (relayStatus) relayStatus.textContent = 'Waiting...';
+                        if (watchdogStatus) watchdogStatus.textContent = 'Waiting...';
                     }
                 })
                 .catch(error => {
@@ -1408,6 +1473,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (healthErrors) healthErrors.textContent = 'Error';
                     if (lastBootInfo) lastBootInfo.textContent = 'Boot information unavailable';
                     if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Data not available';
+                    
+                    // Handle System Specifications error states
+                    const chipModel = document.getElementById('chipModel');
+                    const cpuFreq = document.getElementById('cpuFreq');
+                    const flashSize = document.getElementById('flashSize');
+                    const freeHeap = document.getElementById('freeHeap');
+                    const wifiIP = document.getElementById('wifiIP');
+                    const macAddress = document.getElementById('macAddress');
+                    
+                    if (chipModel) chipModel.textContent = 'Error';
+                    if (cpuFreq) cpuFreq.textContent = 'Error';
+                    if (flashSize) flashSize.textContent = 'Error';
+                    if (freeHeap) freeHeap.textContent = 'Error';
+                    if (wifiIP) wifiIP.textContent = 'Error';
+                    if (macAddress) macAddress.textContent = 'Error';
+                    
+                    // Handle Hardware Status error states
+                    const displayStatus = document.getElementById('displayStatus');
+                    const sensorStatus = document.getElementById('sensorStatus');
+                    const relayStatus = document.getElementById('relayStatus');
+                    const watchdogStatus = document.getElementById('watchdogStatus');
+                    
+                    if (displayStatus) displayStatus.textContent = 'Error';
+                    if (sensorStatus) sensorStatus.textContent = 'Error';
+                    if (relayStatus) relayStatus.textContent = 'Error';
+                    if (watchdogStatus) watchdogStatus.textContent = 'Error';
                     
                     // Show error state in gauge
                     updateSystemHealthGauge(0);
@@ -1985,6 +2076,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         async function loadAggregationStatus() {
             console.log('=== AGGREGATION DEBUG: loadAggregationStatus() function started ===');
+            console.log('Monthly Aggregation widget has been moved to Yesterday\'s Report - function disabled');
+            return; // Early return - widget moved to Yesterday's Report
+            
             try {
                 // Show loading state
                 document.getElementById('aggregationStatusText').textContent = 'Checking...';
@@ -2175,14 +2269,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateDashboard(data);
                 updateConnectionStatus('connected');
 
-                // Load aggregation status (Monthly Data Aggregation widget)
-                console.log('RefreshData: About to call loadAggregationStatus()');
-                try {
-                    await loadAggregationStatus();
-                    console.log('RefreshData: loadAggregationStatus() completed successfully');
-                } catch (error) {
-                    console.error('RefreshData: Error in loadAggregationStatus():', error);
-                }
+                // Monthly Data Aggregation moved to Yesterday's Report detailed view - function calls removed
+                // console.log('RefreshData: About to call loadAggregationStatus()');
+                // try {
+                //     await loadAggregationStatus();
+                //     console.log('RefreshData: loadAggregationStatus() completed successfully');
+                // } catch (error) {
+                //     console.error('RefreshData: Error in loadAggregationStatus():', error);
+                // }
 
                 // Refresh chart data if chart is currently displayed
                 refreshCurrentChart();
