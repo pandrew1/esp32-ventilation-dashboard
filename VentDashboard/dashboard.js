@@ -712,6 +712,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (yesterday && yesterday.status !== 'waiting_for_esp32_data') {
                         console.log('loadYesterdaySummaryMetrics: Yesterday data available, status:', yesterday.status);
                         console.log('loadYesterdaySummaryMetrics: Processing yesterday data');
+                        console.log('loadYesterdaySummaryMetrics: Yesterday data structure:', {
+                            environmental: yesterday.environmental ? 'PRESENT' : 'MISSING',
+                            performance: yesterday.performance ? 'PRESENT' : 'MISSING', 
+                            doors: yesterday.doors ? 'PRESENT' : 'MISSING',
+                            incidents: yesterday.incidents ? 'PRESENT' : 'MISSING'
+                        });
                         // Update temperature metrics
                         if (yesterday.environmental) {
                             const env = yesterday.environmental;
@@ -719,6 +725,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             document.getElementById('yesterdayTempRange').textContent = `${env.tempMin}° - ${env.tempMax}°`;
                             document.getElementById('yesterdayTempTrend').textContent = 'Data available';
                             document.getElementById('yesterdayTempTrend').className = 'metric-trend';
+                        } else {
+                            document.getElementById('yesterdayAvgTemp').textContent = 'No temp data';
+                            document.getElementById('yesterdayTempRange').textContent = 'No range data';
+                            document.getElementById('yesterdayTempTrend').textContent = 'Missing environmental data';
                         }
                         
                         // Update efficiency metrics
@@ -728,22 +738,40 @@ document.addEventListener('DOMContentLoaded', function() {
                             document.getElementById('yesterdayRuntime').textContent = `${perf.runtime} hrs runtime`;
                             document.getElementById('yesterdayEfficiencyTrend').textContent = 'Data available';
                             document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                        } else {
+                            document.getElementById('yesterdayEfficiency').textContent = 'No data';
+                            document.getElementById('yesterdayRuntime').textContent = 'No runtime data';
+                            document.getElementById('yesterdayEfficiencyTrend').textContent = 'Missing performance data';
                         }
                         
                         // Update door activity metrics
                         if (yesterday.doors) {
                             const doors = yesterday.doors;
-                            document.getElementById('yesterdayDoorsActive').textContent = `${doors.activeDoors}/${doors.totalDoors}`;
-                            document.getElementById('yesterdaySessions').textContent = `${doors.totalSessions} sessions`;
-                            document.getElementById('yesterdayPeakTime').textContent = `Peak: ${doors.peakTime || 'N/A'}`;
+                            console.log('loadYesterdaySummaryMetrics: Door data:', doors);
+                            document.getElementById('yesterdayDoorsActive').textContent = `${doors.activeDoors || 0}/${doors.totalDoors || 0}`;
+                            document.getElementById('yesterdaySessions').textContent = `${doors.totalEvents || 0} events`;
+                            document.getElementById('yesterdayPeakTime').textContent = `Peak: ${doors.peakActivity || 'N/A'}`;
+                        } else {
+                            console.log('loadYesterdaySummaryMetrics: No door data in yesterday section');
+                            document.getElementById('yesterdayDoorsActive').textContent = 'No door data';
+                            document.getElementById('yesterdaySessions').textContent = '0 events';
+                            document.getElementById('yesterdayPeakTime').textContent = 'Peak: No data';
                         }
                         
-                        // Update system health metrics
+                        // Update system health metrics - use environmental/performance data since incidents doesn't have uptime
                         if (yesterday.incidents) {
                             const incidents = yesterday.incidents;
-                            document.getElementById('yesterdaySystemHealth').textContent = `${incidents.uptime}%`;
+                            console.log('loadYesterdaySummaryMetrics: Incident data:', incidents);
+                            const systemHealthScore = incidents.total === 0 ? 100 : Math.max(0, 100 - (incidents.total * 10));
+                            document.getElementById('yesterdaySystemHealth').textContent = `${systemHealthScore}%`;
                             document.getElementById('yesterdayIncidents').textContent = `${incidents.total} incidents`;
-                            document.getElementById('yesterdayUptime').textContent = `${incidents.uptime}% uptime`;
+                            document.getElementById('yesterdayUptime').textContent = incidents.total === 0 ? '100% uptime' : `${incidents.resolved}/${incidents.total} resolved`;
+                        } else {
+                            // No incidents data available
+                            console.log('loadYesterdaySummaryMetrics: No incident data in yesterday section');
+                            document.getElementById('yesterdaySystemHealth').textContent = 'No data';
+                            document.getElementById('yesterdayIncidents').textContent = 'No incident data';
+                            document.getElementById('yesterdayUptime').textContent = 'No uptime data';
                         }
                     } else {
                         console.log('loadYesterdaySummaryMetrics: Yesterday data not available or waiting for ESP32 data');
