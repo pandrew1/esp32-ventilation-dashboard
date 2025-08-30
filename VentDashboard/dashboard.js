@@ -1,6 +1,15 @@
 // ESP32 Ventilation Dashboard JavaScript
 // Extracted from dashboard.html for easier debugging and maintenance
 
+/*
+🚨 CRITICAL DEPLOYMENT REMINDER:
+- This dashboard ONLY works on Azure Static Web App (has API keys)
+- Local file testing WILL FAIL - no API access locally
+- MUST GIT PUSH all changes before testing
+- Live site: https://agreeable-field-0a3c95710.5.azurestaticapps.net/
+- Wait 1-2 minutes after git push for Azure deployment to complete
+*/
+
 // Helper function to get API key from URL parameter (must be defined first)
 function getApiKeyFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1270,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     
                     // Process door activity events from history data
-                    const doorEvents = [];
+                    let doorEvents = [];
                     const doorActivityStats = {
                         activeDoors: 0,
                         totalSessions: 0,
