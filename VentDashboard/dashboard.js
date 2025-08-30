@@ -874,23 +874,61 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (doors && doors.doorActivity) {
                         console.log('updateEnhancedDoorActivity: Processing door activity data:', doors.doorActivity);
                         const doorActivity = doors.doorActivity;
-                        document.getElementById('activeDoorsCount').textContent = doorActivity.activeDoors || '0';
-                        document.getElementById('totalSessionsCount').textContent = doorActivity.totalSessions || '0';
-                        document.getElementById('lastActivityTime').textContent = doorActivity.lastActivity || 'No recent activity';
                         
-                        document.getElementById('firstActivityStat').textContent = doorActivity.firstActivity ? `First: ${doorActivity.firstActivity}` : 'No activity';
-                        document.getElementById('peakHourStat').textContent = doorActivity.peakHour ? `Peak: ${doorActivity.peakHour}` : 'No peak identified';
-                        document.getElementById('totalSessionsStat').textContent = `Sessions: ${doorActivity.totalSessions || 0}`;
+                        // Check if this is honest "no data" response or placeholder data
+                        const isNoDataResponse = (
+                            doors.status === 'no_door_sensors' ||
+                            doorActivity.activeDoors === 0 ||
+                            doorActivity.activeDoors === null ||
+                            !doorActivity.lastActivity
+                        );
+                        
+                        const isPlaceholderData = (
+                            doorActivity.activeDoors === 3 && 
+                            doorActivity.totalSessions === 15 && 
+                            doorActivity.peakHour === '7-8 PM' &&
+                            doorActivity.firstActivity === '6:23 AM'
+                        ) || (
+                            doorActivity.lastActivity === '2:34 PM' &&
+                            doorActivity.message && doorActivity.message.includes('placeholder')
+                        );
+                        
+                        if (isNoDataResponse) {
+                            console.log('updateEnhancedDoorActivity: No door sensor data available - showing honest message');
+                            // Show honest "data not available" instead of fake data
+                            document.getElementById('activeDoorsCount').textContent = '—';
+                            document.getElementById('totalSessionsCount').textContent = '—';
+                            document.getElementById('lastActivityTime').textContent = 'No door sensors configured';
+                        } else if (isPlaceholderData) {
+                            console.log('updateEnhancedDoorActivity: Detected old placeholder data - showing honest message');
+                            // Show honest "data not available" instead of fake data
+                            document.getElementById('activeDoorsCount').textContent = '—';
+                            document.getElementById('totalSessionsCount').textContent = '—';
+                            document.getElementById('lastActivityTime').textContent = 'Door data not available';
+                            
+                            document.getElementById('firstActivityStat').textContent = 'Data not available';
+                            document.getElementById('peakHourStat').textContent = 'Data not available';
+                            document.getElementById('totalSessionsStat').textContent = 'Data not available';
+                        } else {
+                            // Use real data
+                            document.getElementById('activeDoorsCount').textContent = doorActivity.activeDoors || '0';
+                            document.getElementById('totalSessionsCount').textContent = doorActivity.totalSessions || '0';
+                            document.getElementById('lastActivityTime').textContent = doorActivity.lastActivity || 'No recent activity';
+                            
+                            document.getElementById('firstActivityStat').textContent = doorActivity.firstActivity ? `First: ${doorActivity.firstActivity}` : 'No activity';
+                            document.getElementById('peakHourStat').textContent = doorActivity.peakHour ? `Peak: ${doorActivity.peakHour}` : 'No peak identified';
+                            document.getElementById('totalSessionsStat').textContent = `Sessions: ${doorActivity.totalSessions || 0}`;
+                        }
                     } else {
                         console.log('updateEnhancedDoorActivity: Door activity data not available');
                         // Handle case where doors data is not available
-                        document.getElementById('activeDoorsCount').textContent = '0';
-                        document.getElementById('totalSessionsCount').textContent = '0';
-                        document.getElementById('lastActivityTime').textContent = 'Waiting for data';
+                        document.getElementById('activeDoorsCount').textContent = '—';
+                        document.getElementById('totalSessionsCount').textContent = '—';
+                        document.getElementById('lastActivityTime').textContent = 'Data not available';
                         
-                        document.getElementById('firstActivityStat').textContent = 'Waiting for data';
-                        document.getElementById('peakHourStat').textContent = 'Waiting for data';
-                        document.getElementById('totalSessionsStat').textContent = 'Sessions: 0';
+                        document.getElementById('firstActivityStat').textContent = 'Data not available';
+                        document.getElementById('peakHourStat').textContent = 'Data not available';
+                        document.getElementById('totalSessionsStat').textContent = 'Data not available';
                     }
                 })
                 .catch(error => {
@@ -1147,10 +1185,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     return response.json();
                 })
                 .then(data => {
-                    console.log('TIMELINE: Received history data:', {
+                    console.log('TIMELINE: Received history data for', hours, 'hours:', {
                         dataPoints: data.data ? data.data.length : 0,
                         deviceId: data.deviceId,
-                        firstRecord: data.data && data.data.length > 0 ? data.data[0].timestamp : 'No data'
+                        aggregation: data.aggregation,
+                        timeRange: `${hours} hours requested`,
+                        firstRecord: data.data && data.data.length > 0 ? {
+                            timestamp: data.data[0].timestamp,
+                            doorCount: data.data[0].doors ? data.data[0].doors.length : 0
+                        } : 'No data',
+                        lastRecord: data.data && data.data.length > 0 ? {
+                            timestamp: data.data[data.data.length - 1].timestamp,
+                            doorCount: data.data[data.data.length - 1].doors ? data.data[data.data.length - 1].doors.length : 0
+                        } : 'No data'
                     });
                     
                     // Process door activity events from history data
@@ -1165,35 +1212,64 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (data.data && data.data.length > 0) {
                         // Extract door events from history data
-                        data.data.forEach(record => {
+                        data.data.forEach((record, recordIndex) => {
+                            console.log(`TIMELINE: Processing record ${recordIndex + 1}/${data.data.length}:`, {
+                                timestamp: record.timestamp,
+                                doorCount: record.doors ? record.doors.length : 0,
+                                hasDoors: !!(record.doors && record.doors.length > 0)
+                            });
+                            
                             if (record.doors && Array.isArray(record.doors)) {
-                                record.doors.forEach(door => {
-                                    // Track door state changes
+                                record.doors.forEach((door, doorIndex) => {
+                                    console.log(`  Door ${doorIndex + 1}: ${door.name}`, {
+                                        open: door.open,
+                                        wasOpenedToday: door.wasOpenedToday,
+                                        openedAt: door.openedAt,
+                                        firstOpenedToday: door.firstOpenedToday,
+                                        lastOpenedToday: door.lastOpenedToday,
+                                        minutesOpen: door.minutesOpen
+                                    });
+                                    
+                                    // Only add events with valid timestamps - skip invalid ones entirely
+                                    const addEventIfValid = (timestamp, action, duration = 0) => {
+                                        if (!timestamp) return;
+                                        
+                                        // Test if timestamp is valid before adding
+                                        let testDate;
+                                        try {
+                                            if (typeof timestamp === 'number') {
+                                                testDate = timestamp > 1000000000000 ? new Date(timestamp) : new Date(timestamp * 1000);
+                                            } else if (typeof timestamp === 'string') {
+                                                testDate = new Date(timestamp);
+                                                if (isNaN(testDate.getTime()) && !isNaN(timestamp)) {
+                                                    const numericTimestamp = parseFloat(timestamp);
+                                                    testDate = numericTimestamp > 1000000000000 ? new Date(numericTimestamp) : new Date(numericTimestamp * 1000);
+                                                }
+                                            }
+                                            
+                                            if (!testDate || isNaN(testDate.getTime()) || testDate.getFullYear() < 2020) {
+                                                console.log(`    Skipping ${action} - invalid timestamp:`, timestamp);
+                                                return;
+                                            }
+                                            
+                                            doorEvents.push({
+                                                timestamp: timestamp,
+                                                door: door.name || 'Unknown Door',
+                                                action: action,
+                                                duration: duration
+                                            });
+                                            console.log(`    Added ${action} event for ${door.name} at ${timestamp}`);
+                                            
+                                        } catch (e) {
+                                            console.log(`    Skipping ${action} - timestamp error:`, timestamp, e.message);
+                                        }
+                                    };
+                                    
+                                    // Track door state changes with validation
                                     if (door.wasOpenedToday || door.open) {
-                                        if (door.openedAt) {
-                                            doorEvents.push({
-                                                timestamp: door.openedAt,
-                                                door: door.name || 'Unknown Door',
-                                                action: 'opened',
-                                                duration: door.minutesOpen || 0
-                                            });
-                                        }
-                                        if (door.firstOpenedToday) {
-                                            doorEvents.push({
-                                                timestamp: door.firstOpenedToday,
-                                                door: door.name || 'Unknown Door',
-                                                action: 'first_open',
-                                                duration: 0
-                                            });
-                                        }
-                                        if (door.lastOpenedToday) {
-                                            doorEvents.push({
-                                                timestamp: door.lastOpenedToday,
-                                                door: door.name || 'Unknown Door',
-                                                action: 'last_open',
-                                                duration: 0
-                                            });
-                                        }
+                                        addEventIfValid(door.openedAt, 'opened', door.minutesOpen || 0);
+                                        addEventIfValid(door.firstOpenedToday, 'first_open', 0);
+                                        addEventIfValid(door.lastOpenedToday, 'last_open', 0);
                                     }
                                 });
                             }
@@ -1298,36 +1374,62 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="timeline-chart">
                             <div class="timeline-events">
                                 ${timeline.slice(-10).map((event, index) => {
-                                    // Better timestamp parsing with fallbacks
-                                    let timestamp, timeStr, dateStr;
+                                    // Parse timestamp with debugging - don't filter out errors
+                                    let timestamp;
+                                    let hasParsingError = false;
+                                    let parseErrorMessage = '';
+                                    
                                     try {
-                                        // Handle various timestamp formats
                                         if (typeof event.timestamp === 'number') {
-                                            // Unix timestamp (seconds or milliseconds)
                                             timestamp = event.timestamp > 1000000000000 ? new Date(event.timestamp) : new Date(event.timestamp * 1000);
                                         } else if (typeof event.timestamp === 'string') {
                                             timestamp = new Date(event.timestamp);
+                                            if (isNaN(timestamp.getTime()) && !isNaN(event.timestamp)) {
+                                                const numericTimestamp = parseFloat(event.timestamp);
+                                                timestamp = numericTimestamp > 1000000000000 ? new Date(numericTimestamp) : new Date(numericTimestamp * 1000);
+                                            }
                                         } else {
-                                            throw new Error('Invalid timestamp format');
+                                            hasParsingError = true;
+                                            parseErrorMessage = `Unknown timestamp type: ${typeof event.timestamp}`;
                                         }
                                         
-                                        if (isNaN(timestamp.getTime())) {
-                                            throw new Error('Invalid date');
+                                        // Check if timestamp is valid after parsing
+                                        if (timestamp && (isNaN(timestamp.getTime()) || timestamp.getFullYear() < 2020)) {
+                                            hasParsingError = true;
+                                            parseErrorMessage = `Invalid date parsed: ${timestamp} from ${event.timestamp}`;
                                         }
-                                        
-                                        timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-                                        dateStr = timestamp.toLocaleDateString([], {month: 'short', day: 'numeric'});
                                     } catch (e) {
-                                        console.warn('Timeline: Invalid timestamp for event:', event.timestamp, e);
-                                        timeStr = 'Unknown';
-                                        dateStr = 'Unknown';
+                                        hasParsingError = true;
+                                        parseErrorMessage = `Parse exception: ${e.message}`;
                                     }
                                     
-                                    const actionIcon = event.action === 'opened' || event.action === 'first_open' || event.action === 'last_open' ? '🔓' : '🔒';
-                                    const actionText = event.action ? event.action.replace('_', ' ') : 'activity';
+                                    // Debug logging for timestamp parsing issues
+                                    if (hasParsingError) {
+                                        console.warn(`Activity Timeline timestamp parsing error for event ${index}:`, {
+                                            originalTimestamp: event.timestamp,
+                                            timestampType: typeof event.timestamp,
+                                            parseErrorMessage: parseErrorMessage,
+                                            event: event
+                                        });
+                                    }
+                                    
+                                    // Display timestamp or error message
+                                    let timeStr, dateStr;
+                                    if (hasParsingError) {
+                                        timeStr = 'Parse Error';
+                                        dateStr = parseErrorMessage.substring(0, 20) + '...';
+                                    } else {
+                                        timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                                        dateStr = timestamp.toLocaleDateString([], {month: 'short', day: 'numeric'});
+                                    }
+                                    
+                                    const actionIcon = hasParsingError ? '⚠️' : 
+                                        (event.action === 'opened' || event.action === 'first_open' || event.action === 'last_open' ? '🔓' : '🔒');
+                                    const actionText = hasParsingError ? 'timestamp error' : 
+                                        (event.action ? event.action.replace('_', ' ') : 'activity');
                                     
                                     return `
-                                        <div class="timeline-event">
+                                        <div class="timeline-event${hasParsingError ? ' timeline-event-error' : ''}">
                                             <div class="event-time">
                                                 <div class="time">${timeStr}</div>
                                                 <div class="date">${dateStr}</div>
@@ -1337,7 +1439,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <div class="event-info">
                                                     <div class="event-door">${event.door || 'Unknown Door'}</div>
                                                     <div class="event-action">${actionText}</div>
-                                                    ${event.duration > 0 ? `<div class="event-duration">${event.duration} min</div>` : ''}
+                                                    ${event.duration > 0 && !hasParsingError ? `<div class="event-duration">${event.duration} min</div>` : ''}
+                                                    ${hasParsingError ? `<div class="event-error">Raw: ${JSON.stringify(event.timestamp)}</div>` : ''}
                                                 </div>
                                             </div>
                                         </div>
@@ -1412,6 +1515,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     .timeline-event:last-child {
                         margin-bottom: 0;
+                    }
+                    .timeline-event-error {
+                        background: #fff5f5 !important;
+                        border-color: #f56565 !important;
+                        box-shadow: 0 1px 3px rgba(245, 101, 101, 0.2) !important;
+                    }
+                    .timeline-event-error .event-time .time {
+                        color: #e53e3e !important;
+                    }
+                    .timeline-event-error .event-error {
+                        font-size: 0.7em;
+                        color: #e53e3e;
+                        font-family: monospace;
+                        background: #fed7d7;
+                        padding: 2px 6px;
+                        border-radius: 3px;
+                        margin-top: 4px;
                     }
                     .event-time {
                         min-width: 80px;
