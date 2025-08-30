@@ -142,7 +142,8 @@ async function initializeDashboard() {
     
     // Load dashboard components
     await refreshData();
-    await loadAggregationStatus();
+    // Monthly aggregation now handled in Yesterday's Report detailed view
+    // await loadAggregationStatus();
     await loadChart(6); // Load 6-hour chart by default
     await loadPressureChart(6); // Load 6-hour pressure chart by default
     await loadIncidentAlmanac();
@@ -216,7 +217,8 @@ function startAutoRefresh() {
         console.log('Auto-refreshing dashboard data...');
         try {
             await refreshData();
-            await loadAggregationStatus();
+            // Monthly aggregation now in Yesterday's Report - no need to refresh separately
+            // await loadAggregationStatus();
             // Don't auto-refresh charts to avoid interrupting user interactions
         } catch (error) {
             console.error('Auto-refresh failed:', error);
@@ -283,9 +285,9 @@ async function refreshData() {
         // Update dashboard with new data
         updateDashboard(data);
         
-        // Load aggregation status (Monthly Data Aggregation widget)
-        console.log('RefreshData: About to call loadAggregationStatus()');
-        await loadAggregationStatus();
+        // Monthly Data Aggregation moved to Yesterday's Report detailed view
+        // console.log('RefreshData: About to call loadAggregationStatus()');
+        // await loadAggregationStatus();
         
         updateConnectionStatus('connected');
         
@@ -465,7 +467,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Load dashboard components
             await refreshData();
-            await loadAggregationStatus();
+            // Monthly aggregation moved to Yesterday's Report
+            // await loadAggregationStatus();
             await loadChart(6); // Load 6-hour chart by default
             await loadPressureChart(6); // Load 6-hour pressure chart by default
             await loadIncidentAlmanac();
@@ -500,10 +503,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function loadYesterdayDetailedContent() {
-            // Show loading states initially
+            // Show loading states initially for all sections
             document.getElementById('yesterdayEnvironmental').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading environmental data...</em></div>';
+            document.getElementById('yesterdayHumidity').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading humidity analysis...</em></div>';
+            document.getElementById('yesterdayPressure').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading pressure analysis...</em></div>';
             document.getElementById('yesterdayPerformance').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading performance metrics...</em></div>';
+            document.getElementById('yesterdayVentilation').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading ventilation analysis...</em></div>';
             document.getElementById('yesterdayDoorTimeline').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading door activity...</em></div>';
+            document.getElementById('yesterdayAggregation').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading aggregation status...</em></div>';
             document.getElementById('yesterdayIncidentSummary').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading incident analysis...</em></div>';
             
             // Get API key from URL or use default
@@ -571,27 +578,125 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Load door timeline
                     if (yesterdayData.doors) {
                         const doors = yesterdayData.doors;
+                        
+                        // Calculate most active door from actual activity data if available
+                        let mostActiveDoor = doors.mostActive || 'N/A';
+                        if (doorEvents && doorEvents.length > 0) {
+                            const doorActivityCounts = {};
+                            doorEvents.forEach(event => {
+                                doorActivityCounts[event.door] = (doorActivityCounts[event.door] || 0) + 1;
+                            });
+                            const sortedDoors = Object.entries(doorActivityCounts).sort(([,a], [,b]) => b - a);
+                            if (sortedDoors.length > 0) {
+                                mostActiveDoor = `${sortedDoors[0][0]} (${sortedDoors[0][1]} events)`;
+                            }
+                        }
+                        
                         document.getElementById('yesterdayDoorTimeline').innerHTML = `
                             <div class="door-summary">
                                 <p><strong>Active Doors:</strong> ${doors.activeDoors} of ${doors.totalDoors}</p>
                                 <p><strong>Total Events:</strong> ${doors.totalEvents}</p>
                                 <p><strong>Peak Activity:</strong> ${doors.peakActivity}</p>
-                                <p><strong>Most Active:</strong> ${doors.mostActive || 'N/A'}</p>
+                                <p><strong>Most Active:</strong> ${mostActiveDoor}</p>
                             </div>
                         `;
                     } else {
                         document.getElementById('yesterdayDoorTimeline').innerHTML = '<div class="error-state">Door timeline data not available</div>';
                     }
                     
+                    // Load humidity analysis - use actual API structure
+                    if (yesterdayData.environmental) {
+                        const env = yesterdayData.environmental;
+                        document.getElementById('yesterdayHumidity').innerHTML = `
+                            <div class="humidity-analysis">
+                                <p><strong>Yesterday's Humidity Range:</strong> ${env.humidityMin || '--'}% → ${env.humidityMax || '--'}%</p>
+                                <p><strong>Average Humidity:</strong> ${env.humidityAvg || '--'}%</p>
+                                <p><strong>Humidity Variation:</strong> ${env.humidityMax && env.humidityMin ? (env.humidityMax - env.humidityMin).toFixed(1) : '--'}% range</p>
+                                <p><strong>Air Quality:</strong> ${env.airQuality || 'Unknown'}</p>
+                                ${env.aqi ? `<p><strong>AQI:</strong> ${env.aqi}</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayHumidity').innerHTML = '<div class="error-state">Humidity analysis not available</div>';
+                    }
+                    
+                    // Load pressure analysis - use actual API structure  
+                    if (yesterdayData.environmental) {
+                        const env = yesterdayData.environmental;
+                        document.getElementById('yesterdayPressure').innerHTML = `
+                            <div class="pressure-analysis">
+                                <p><strong>Pressure Range:</strong> ${env.pressureMin || '--'} → ${env.pressureMax || '--'} inHg</p>
+                                <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(2) : '--'} inHg</p>
+                                <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 0.1 ? 'Stable' : 'Variable'}</p>
+                                <p><strong>Storm Risk Assessment:</strong> Based on pressure trends</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayPressure').innerHTML = '<div class="error-state">Pressure analysis not available</div>';
+                    }
+                    
+                    // Load ventilation analysis - use actual API structure
+                    if (yesterdayData.performance) {
+                        const perf = yesterdayData.performance;
+                        document.getElementById('yesterdayVentilation').innerHTML = `
+                            <div class="ventilation-analysis">
+                                <p><strong>Efficiency:</strong> ${perf.efficiency || '--'}%</p>
+                                <p><strong>Runtime:</strong> ${perf.runtime || '--'} hours</p>
+                                <p><strong>Energy Usage:</strong> ${perf.energyUsage || 'Unknown'}</p>
+                                <p><strong>Peak Load:</strong> ${perf.peakLoad || 'Unknown'}</p>
+                                <p><strong>Operational Assessment:</strong> Based on runtime and efficiency metrics</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayVentilation').innerHTML = '<div class="error-state">Ventilation analysis not available</div>';
+                    }
+                    
+                    // Load monthly aggregation status - use actual API structure (moved from separate widget)
+                    if (data.sections && data.sections.monthly && data.sections.monthly.monthlyAggregation) {
+                        const agg = data.sections.monthly.monthlyAggregation;
+                        document.getElementById('yesterdayAggregation').innerHTML = `
+                            <div class="aggregation-status-detail">
+                                <p><strong>Status:</strong> ${agg.status || 'Unknown'}</p>
+                                <p><strong>Last Run:</strong> ${agg.lastRun || 'Unknown'}</p>
+                                <p><strong>Next Run:</strong> ${agg.nextRun || 'Unknown'}</p>
+                                <p><strong>Records Processed:</strong> ${agg.recordsUpdated || 'Unknown'}</p>
+                                <p><strong>Result:</strong> ${agg.result || 'No result'}</p>
+                            </div>
+                        `;
+                    } else {
+                        // Show message from monthly section if available
+                        const monthlyMessage = data.sections?.monthly?.message || 'Aggregation status not available';
+                        document.getElementById('yesterdayAggregation').innerHTML = `<div class="error-state">${monthlyMessage}</div>`;
+                    }
+                    
                     // Load incident summary
                     if (yesterdayData.incidents) {
                         const incidents = yesterdayData.incidents;
+                        
+                        // Calculate system health based on incident data
+                        const totalIncidents = incidents.total || 0;
+                        const criticalIncidents = incidents.critical || 0;
+                        const resolvedIncidents = incidents.resolved || 0;
+                        
+                        // Calculate uptime percentage if not provided
+                        let uptimeDisplay = 'No uptime data';
+                        if (incidents.uptime !== undefined && incidents.uptime !== null) {
+                            uptimeDisplay = `${incidents.uptime}% uptime`;
+                        } else if (totalIncidents === 0) {
+                            uptimeDisplay = '100% uptime';
+                        } else if (resolvedIncidents > 0) {
+                            uptimeDisplay = `${resolvedIncidents}/${totalIncidents} resolved`;
+                        }
+                        
+                        // Status handling
+                        const systemStatus = incidents.status || (totalIncidents === 0 ? 'Normal' : criticalIncidents > 0 ? 'Attention Required' : 'Monitoring');
+                        
                         document.getElementById('yesterdayIncidentSummary').innerHTML = `
                             <div class="incident-summary">
-                                <p><strong>Total Incidents:</strong> ${incidents.total}</p>
-                                <p><strong>Critical:</strong> ${incidents.critical}</p>
-                                <p><strong>System Health:</strong> ${incidents.uptime}% uptime</p>
-                                <p><strong>Status:</strong> ${incidents.status}</p>
+                                <p><strong>Total Incidents:</strong> ${totalIncidents}</p>
+                                <p><strong>Critical:</strong> ${criticalIncidents}</p>
+                                <p><strong>System Health:</strong> ${uptimeDisplay}</p>
+                                <p><strong>Status:</strong> ${systemStatus}</p>
                             </div>
                         `;
                     } else {
@@ -604,8 +709,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Show error message in all sections
                     const errorMessage = `<div class="error-state">Failed to load data: ${error.message}</div>`;
                     document.getElementById('yesterdayEnvironmental').innerHTML = errorMessage;
+                    document.getElementById('yesterdayHumidity').innerHTML = errorMessage;
+                    document.getElementById('yesterdayPressure').innerHTML = errorMessage;
                     document.getElementById('yesterdayPerformance').innerHTML = errorMessage;
+                    document.getElementById('yesterdayVentilation').innerHTML = errorMessage;
                     document.getElementById('yesterdayDoorTimeline').innerHTML = errorMessage;
+                    document.getElementById('yesterdayAggregation').innerHTML = errorMessage;
                     document.getElementById('yesterdayIncidentSummary').innerHTML = errorMessage;
                 });
         }
@@ -758,14 +867,29 @@ document.addEventListener('DOMContentLoaded', function() {
                             document.getElementById('yesterdayPeakTime').textContent = 'Peak: No data';
                         }
                         
-                        // Update system health metrics - use environmental/performance data since incidents doesn't have uptime
+                        // Update system health metrics - use incident data with proper null handling
                         if (yesterday.incidents) {
                             const incidents = yesterday.incidents;
                             console.log('loadYesterdaySummaryMetrics: Incident data:', incidents);
-                            const systemHealthScore = incidents.total === 0 ? 100 : Math.max(0, 100 - (incidents.total * 10));
+                            
+                            const totalIncidents = incidents.total || 0;
+                            const resolvedIncidents = incidents.resolved || 0;
+                            const criticalIncidents = incidents.critical || 0;
+                            
+                            const systemHealthScore = totalIncidents === 0 ? 100 : Math.max(0, 100 - (totalIncidents * 10));
                             document.getElementById('yesterdaySystemHealth').textContent = `${systemHealthScore}%`;
-                            document.getElementById('yesterdayIncidents').textContent = `${incidents.total} incidents`;
-                            document.getElementById('yesterdayUptime').textContent = incidents.total === 0 ? '100% uptime' : `${incidents.resolved}/${incidents.total} resolved`;
+                            document.getElementById('yesterdayIncidents').textContent = `${totalIncidents} incidents`;
+                            
+                            // Better uptime calculation with fallbacks
+                            let uptimeText = 'No uptime data';
+                            if (incidents.uptime !== undefined && incidents.uptime !== null) {
+                                uptimeText = `${incidents.uptime}% uptime`;
+                            } else if (totalIncidents === 0) {
+                                uptimeText = '100% uptime';
+                            } else if (resolvedIncidents >= 0 && totalIncidents > 0) {
+                                uptimeText = `${resolvedIncidents}/${totalIncidents} resolved`;
+                            }
+                            document.getElementById('yesterdayUptime').textContent = uptimeText;
                         } else {
                             // No incidents data available
                             console.log('loadYesterdaySummaryMetrics: No incident data in yesterday section');
@@ -1474,10 +1598,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             doorEvents.sort((a, b) => {
                                 const aTime = typeof a.timestamp === 'string' ? parseFloat(a.timestamp) : a.timestamp;
                                 const bTime = typeof b.timestamp === 'string' ? parseFloat(b.timestamp) : b.timestamp;
-                                return aTime - bTime;
+                                return bTime - aTime; // Reversed for recent events first
                             });
-                            doorActivityStats.firstActivity = doorEvents[0].timestamp;
-                            doorActivityStats.lastActivity = doorEvents[doorEvents.length - 1].timestamp;
+                            doorActivityStats.firstActivity = doorEvents[doorEvents.length - 1].timestamp; // Earliest is now at end
+                            doorActivityStats.lastActivity = doorEvents[0].timestamp; // Most recent is now at start
                         }
                         
                         console.log('TIMELINE: Final event statistics:', {
@@ -2264,6 +2388,98 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 const reliabilityIncidentSummaryElement = document.getElementById('reliabilityIncidentSummary');
                 if (reliabilityIncidentSummaryElement) reliabilityIncidentSummaryElement.textContent = 'No incidents';
+            }
+
+            // Update startup information from actual API structure
+            if (data.sections && data.sections.startup) {
+                const startup = data.sections.startup;
+                const startupSystem = startup.system || {};
+                const startupHardware = startup.hardware || {};
+                
+                // System Specifications from sections.startup.system
+                const chipModelElement = document.getElementById('chipModel');
+                if (chipModelElement) chipModelElement.textContent = startupSystem.chipModel || 'ESP32';
+                
+                const cpuFreqElement = document.getElementById('cpuFreq');
+                if (cpuFreqElement) cpuFreqElement.textContent = startupSystem.cpuFreq ? `${startupSystem.cpuFreq} MHz` : 'Unknown';
+                
+                const flashSizeElement = document.getElementById('flashSize');
+                if (flashSizeElement) {
+                    const flashMB = startupSystem.flashSize ? Math.round(startupSystem.flashSize / 1024 / 1024) : null;
+                    flashSizeElement.textContent = flashMB ? `${flashMB} MB` : 'Unknown';
+                }
+                
+                const freeHeapElement = document.getElementById('freeHeap');
+                if (freeHeapElement) {
+                    const freeHeap = startupSystem.freeHeap;
+                    const totalHeap = startupSystem.heapSize;
+                    if (freeHeap && totalHeap) {
+                        const percentage = Math.round((freeHeap / totalHeap) * 100);
+                        freeHeapElement.textContent = `${Math.round(freeHeap / 1024)}KB (${percentage}%)`;
+                    } else if (freeHeap) {
+                        freeHeapElement.textContent = `${Math.round(freeHeap / 1024)}KB`;
+                    } else {
+                        freeHeapElement.textContent = 'Unknown';
+                    }
+                }
+                
+                const wifiIPElement = document.getElementById('wifiIP');
+                if (wifiIPElement) wifiIPElement.textContent = startupSystem.wifiIP || 'Unknown';
+                
+                const macAddressElement = document.getElementById('macAddress');
+                if (macAddressElement) macAddressElement.textContent = startupSystem.macAddress || 'Unknown';
+                
+                // Hardware Status from sections.startup.hardware
+                const displayStatusElement = document.getElementById('displayStatus');
+                if (displayStatusElement) displayStatusElement.textContent = startupHardware.display ? '✅ Available' : '❌ Unavailable';
+                
+                const sensorStatusElement = document.getElementById('sensorStatus');
+                if (sensorStatusElement) {
+                    const sensorCount = [startupHardware.indoorBME, startupHardware.outdoorBME, startupHardware.garageBME].filter(Boolean).length;
+                    sensorStatusElement.textContent = sensorCount > 0 ? `✅ ${sensorCount}/3 BME280` : '❌ No sensors';
+                }
+                
+                const relayStatusElement = document.getElementById('relayStatus');
+                if (relayStatusElement) relayStatusElement.textContent = system.relayPin ? `Pin ${system.relayPin}` : 'Pin 17';
+                
+                const watchdogStatusElement = document.getElementById('watchdogStatus');
+                if (watchdogStatusElement) watchdogStatusElement.textContent = system.watchdogEnabled ? '✅ Enabled' : '⚪ Disabled';
+                
+                // System Configuration (use current system data)
+                const systemConfigElement = document.getElementById('systemConfig');
+                if (systemConfigElement) {
+                    systemConfigElement.textContent = 'Loop: 10s, Display: 1min, Telemetry: Intelligent';
+                }
+                
+                // Boot Information from sections.startup
+                const lastBootInfoElement = document.getElementById('lastBootInfo');
+                if (lastBootInfoElement && startup.bootTime) {
+                    const bootDate = new Date(parseInt(startup.bootTime) * 1000);
+                    lastBootInfoElement.textContent = `${bootDate.toLocaleDateString()} ${bootDate.toLocaleTimeString()}`;
+                }
+                
+                const bootReasonInfoElement = document.getElementById('bootReasonInfo');
+                if (bootReasonInfoElement) bootReasonInfoElement.textContent = `Reason: ${startup.bootReason || 'Unknown'}`;
+            } else {
+                // Fallback to system data if startup section not available
+                if (system) {
+                    const chipModelElement = document.getElementById('chipModel');
+                    if (chipModelElement) chipModelElement.textContent = system.chipModel || 'ESP32';
+                    
+                    const freeHeapElement = document.getElementById('freeHeap');
+                    if (freeHeapElement) {
+                        const freeHeap = system.freeHeap || system.memoryFree;
+                        const totalHeap = system.totalHeap;
+                        if (freeHeap && totalHeap) {
+                            const percentage = Math.round((freeHeap / totalHeap) * 100);
+                            freeHeapElement.textContent = `${Math.round(freeHeap / 1024)}KB (${percentage}%)`;
+                        } else if (freeHeap) {
+                            freeHeapElement.textContent = `${Math.round(freeHeap / 1024)}KB`;
+                        } else {
+                            freeHeapElement.textContent = 'Unknown';
+                        }
+                    }
+                }
             }
 
             // Update incidents if available

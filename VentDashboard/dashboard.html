@@ -1193,26 +1193,40 @@
                             
                             <!-- Startup Information -->
                             <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                                <div style="font-weight: bold; color: #2c3e50; margin-bottom: 8px;">🚀 System Specifications:</div>
+                                <div style="font-size: 0.8em; color: #666; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                                    <div>Chip: <strong id="chipModel">Loading...</strong></div>
+                                    <div>CPU: <strong id="cpuFreq">Loading...</strong></div>
+                                    <div>Flash: <strong id="flashSize">Loading...</strong></div>
+                                    <div>Free RAM: <strong id="freeHeap">Loading...</strong></div>
+                                    <div>WiFi IP: <strong id="wifiIP">Loading...</strong></div>
+                                    <div>MAC: <strong id="macAddress">Loading...</strong></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Hardware Status -->
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                                <div style="font-weight: bold; color: #2c3e50; margin-bottom: 8px;">🔧 Hardware Status:</div>
+                                <div style="font-size: 0.8em; color: #666;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
+                                        <div>Display: <strong id="displayStatus">Loading...</strong></div>
+                                        <div>Sensors: <strong id="sensorStatus">Loading...</strong></div>
+                                        <div>Relay: <strong id="relayStatus">Loading...</strong></div>
+                                        <div>Watchdog: <strong id="watchdogStatus">Loading...</strong></div>
+                                    </div>
+                                    <div style="font-size: 0.75em; color: #777; margin-top: 5px;">
+                                        Config: <span id="systemConfig">Loading configuration...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Boot Information -->
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
                                 <div style="font-weight: bold; color: #2c3e50; margin-bottom: 5px;">🚀 Last Boot:</div>
                                 <div style="font-size: 0.8em; color: #666;">
                                     <div id="lastBootInfo">Loading startup information...</div>
                                     <div id="bootReasonInfo" style="margin-top: 3px;">Reason: --</div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Monthly Data Aggregation -->
-                    <div class="card">
-                        <h3>📊 Monthly Data Aggregation</h3>
-                        <div class="system-status">
-                            <div class="aggregation-status" id="aggregationStatus">🔄</div>
-                            <div><strong id="aggregationStatusText">Checking...</strong></div>
-                            <div style="margin-top: 15px;" id="aggregationDetails">
-                                <div>Last Run: <strong id="lastAggregationRun">-</strong></div>
-                                <div>Records Updated: <strong id="recordsUpdated">-</strong></div>
-                                <div>Next Run: <strong id="nextAggregationRun">-</strong></div>
-                                <div>Status: <strong id="aggregationResult">-</strong></div>
                             </div>
                         </div>
                     </div>
@@ -1267,6 +1281,20 @@
                             </div>
                             
                             <div class="detail-section">
+                                <h4>💧 Humidity Analysis</h4>
+                                <div class="detail-content" id="yesterdayHumidity">
+                                    <p>Loading humidity analysis...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>🌪️ Pressure Analysis</h4>
+                                <div class="detail-content" id="yesterdayPressure">
+                                    <p>Loading pressure analysis...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
                                 <h4>⚡ System Performance</h4>
                                 <div class="detail-content" id="yesterdayPerformance">
                                     <p>Loading performance metrics...</p>
@@ -1274,9 +1302,23 @@
                             </div>
                             
                             <div class="detail-section">
+                                <h4>🌀 Ventilation Analysis</h4>
+                                <div class="detail-content" id="yesterdayVentilation">
+                                    <p>Loading ventilation analysis...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
                                 <h4>🚪 Door Activity Timeline</h4>
                                 <div class="detail-content" id="yesterdayDoorTimeline">
                                     <p>Loading door activity data...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h4>📊 Monthly Data Aggregation</h4>
+                                <div class="detail-content" id="yesterdayAggregation">
+                                    <p>Loading aggregation status...</p>
                                 </div>
                             </div>
                             
