@@ -602,6 +602,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function setupEnhancedDashboard() {
+            console.log('=== SETUP: setupEnhancedDashboard() started ===');
+            
             // Initialize yesterday's report with loading state
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
@@ -616,14 +618,19 @@ document.addEventListener('DOMContentLoaded', function() {
             loadYesterdaySummaryMetrics();
 
             // Set up door activity timeline controls
+            console.log('=== SETUP: Setting up time filter buttons ===');
             const timeFilters = document.querySelectorAll('.time-filter');
-            timeFilters.forEach(filter => {
+            console.log('=== SETUP: Found', timeFilters.length, 'time filter buttons ===');
+            
+            timeFilters.forEach((filter, index) => {
+                console.log(`=== SETUP: Button ${index}: data-hours="${filter.dataset.hours}" ===`);
                 filter.addEventListener('click', function() {
+                    console.log(`=== TIMELINE BUTTON CLICKED: ${this.dataset.hours}h ===`);
                     // Remove active class from all filters
                     timeFilters.forEach(f => f.classList.remove('active'));
                     // Add active class to clicked filter
                     this.classList.add('active');
-                    // Update timeline (placeholder for now)
+                    // Update timeline
                     updateDoorTimeline(this.dataset.hours);
                 });
             });
@@ -631,6 +638,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Load real data from API instead of using placeholders
             updateEnhancedDoorActivity();
             updateSystemHealthWidget();
+            
+            // Load initial activity timeline (24h by default)
+            console.log('=== SETUP: Loading initial 24h timeline ===');
+            updateDoorTimeline(24);
         }
 
         function loadYesterdaySummaryMetrics() {
@@ -1091,15 +1102,235 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function updateDoorTimeline(hours) {
-            // Placeholder function for timeline updates - will be implemented in Phase 3
-            const timelineViz = document.getElementById('doorTimelineViz');
-            const placeholder = timelineViz.querySelector('.timeline-placeholder p');
+            console.log(`=== ACTIVITY TIMELINE: updateDoorTimeline(${hours}) started ===`);
             
-            if (placeholder) {
-                placeholder.textContent = `Loading ${hours}h door activity timeline...`;
+            const timelineViz = document.getElementById('doorTimelineViz');
+            if (!timelineViz) {
+                console.error('TIMELINE ERROR: doorTimelineViz element not found in DOM');
+                return;
             }
             
-            // This will connect to the GetEnhancedDashboardData API to load actual timeline data
+            console.log('TIMELINE: Found doorTimelineViz element, setting loading state');
+            
+            // Show loading state
+            timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Loading ' + hours + 'h door activity timeline...</p></div>';
+            
+            // Get API key from URL or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            
+            console.log('TIMELINE: Using API key:', apiKey ? 'Found' : 'Default');
+            
+            // Call the enhanced dashboard API for door timeline data
+            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
+            
+            console.log('TIMELINE: Making API call to:', apiUrl);
+            
+            fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'X-API-Secret': apiKey,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => {
+                    console.log('TIMELINE: Received response, status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('TIMELINE: Received data structure:', {
+                        timestamp: data.timestamp,
+                        deviceId: data.deviceId,
+                        sectionsKeys: Object.keys(data.sections || {}),
+                        hasDoors: !!(data.sections && data.sections.doors)
+                    });
+                    
+                    // Extract doors timeline data from sections
+                    const doors = data.sections && data.sections.doors;
+                    console.log('TIMELINE: Doors section details:', {
+                        exists: !!doors,
+                        timeline: doors ? doors.timeline : 'N/A',
+                        count: doors ? doors.count : 'N/A',
+                        doorActivity: doors ? doors.doorActivity : 'N/A'
+                    });
+                    
+                    if (doors) {
+                        console.log('TIMELINE: Calling renderActivityTimeline with doors data');
+                        renderActivityTimeline(doors, hours);
+                    } else {
+                        console.log('TIMELINE: Doors section not available, showing error message');
+                        timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Door activity data not available</p></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('TIMELINE ERROR: Failed to load timeline data:', error);
+                    console.error('TIMELINE ERROR: Error details:', {
+                        message: error.message,
+                        stack: error.stack,
+                        name: error.name
+                    });
+                    timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Error loading timeline: ' + error.message + '</p></div>';
+                });
+        }
+
+        function renderActivityTimeline(doorsData, hours) {
+            console.log('renderActivityTimeline: Processing doors data:', doorsData);
+            
+            const timelineViz = document.getElementById('doorTimelineViz');
+            const timeline = doorsData.timeline || [];
+            const count = doorsData.count || 0;
+            const doorActivity = doorsData.doorActivity || {};
+            
+            // Create timeline visualization HTML
+            let timelineHtml = '';
+            
+            if (count === 0 || timeline.length === 0) {
+                // Show placeholder data when no real timeline available
+                timelineHtml = `
+                    <div class="timeline-content">
+                        <div class="timeline-stats">
+                            <div class="stat-row">
+                                <span class="stat-label">First Activity:</span>
+                                <span class="stat-value">${doorActivity.firstActivity || 'No activity'}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Peak Hour:</span>
+                                <span class="stat-value">${doorActivity.peakHour || 'No peak identified'}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Sessions:</span>
+                                <span class="stat-value">${doorActivity.totalSessions || 0}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-chart">
+                            <div class="timeline-placeholder-enhanced">
+                                <div style="text-align: center; padding: 20px; color: #6c757d;">
+                                    <div style="font-size: 2em; margin-bottom: 10px;">📊</div>
+                                    <div style="font-weight: bold; margin-bottom: 5px;">${hours}h Timeline</div>
+                                    <div style="font-size: 0.9em;">${doorsData.message || 'Loading door activity data...'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Create actual timeline visualization with real data
+                timelineHtml = `
+                    <div class="timeline-content">
+                        <div class="timeline-stats">
+                            <div class="stat-row">
+                                <span class="stat-label">Timespan:</span>
+                                <span class="stat-value">${doorsData.timeRange || hours + 'h'}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Events:</span>
+                                <span class="stat-value">${count} recorded</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Sessions:</span>
+                                <span class="stat-value">${doorActivity.totalSessions || count}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-chart">
+                            <div class="timeline-events">
+                                ${timeline.slice(-20).map((event, index) => {
+                                    const timestamp = new Date(event.timestamp);
+                                    const timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                                    const doors = event.doors || [];
+                                    const transitions = event.transitions || [];
+                                    
+                                    return `
+                                        <div class="timeline-event">
+                                            <div class="event-time">${timeStr}</div>
+                                            <div class="event-details">
+                                                ${doors.length > 0 ? `${doors.length} doors active` : ''}
+                                                ${transitions.length > 0 ? `${transitions.length} transitions` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Add CSS styles for timeline visualization
+            const timelineStyles = `
+                <style>
+                    .timeline-content {
+                        padding: 10px;
+                        background: white;
+                        border-radius: 8px;
+                    }
+                    .timeline-stats {
+                        display: flex;
+                        justify-content: space-around;
+                        margin-bottom: 15px;
+                        padding: 10px;
+                        background: #f8f9fa;
+                        border-radius: 5px;
+                    }
+                    .stat-row {
+                        text-align: center;
+                    }
+                    .stat-label {
+                        display: block;
+                        font-size: 0.8em;
+                        color: #6c757d;
+                        margin-bottom: 3px;
+                    }
+                    .stat-value {
+                        display: block;
+                        font-weight: bold;
+                        color: #2c3e50;
+                    }
+                    .timeline-chart {
+                        min-height: 120px;
+                        border: 1px solid #dee2e6;
+                        border-radius: 5px;
+                        background: #fff;
+                    }
+                    .timeline-placeholder-enhanced {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        height: 120px;
+                    }
+                    .timeline-events {
+                        padding: 10px;
+                        max-height: 120px;
+                        overflow-y: auto;
+                    }
+                    .timeline-event {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 5px 10px;
+                        border-bottom: 1px solid #f0f0f0;
+                        font-size: 0.9em;
+                    }
+                    .timeline-event:last-child {
+                        border-bottom: none;
+                    }
+                    .event-time {
+                        font-weight: bold;
+                        color: #007bff;
+                    }
+                    .event-details {
+                        color: #6c757d;
+                    }
+                </style>
+            `;
+            
+            timelineViz.innerHTML = timelineStyles + timelineHtml;
+            
+            console.log('renderActivityTimeline: Timeline rendered successfully');
         }
 
         async function loadAggregationStatus() {
