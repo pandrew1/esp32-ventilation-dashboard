@@ -1092,20 +1092,45 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         
                         if (healthWifi) {
-                            // Use signal strength from system data
+                            // Use signal strength from system data with quality indicator
                             const signalStrength = startup.system?.signalStrength;
-                            healthWifi.textContent = signalStrength ? `${signalStrength} dBm` : 'Unknown';
+                            if (signalStrength) {
+                                let signalQuality = 'Excellent';
+                                if (signalStrength < -70) signalQuality = 'Poor';
+                                else if (signalStrength < -60) signalQuality = 'Fair'; 
+                                else if (signalStrength < -50) signalQuality = 'Good';
+                                
+                                healthWifi.textContent = `${signalStrength} dBm`;
+                                healthWifi.title = `WiFi Signal: ${signalQuality} (${signalStrength} dBm)\nRange: Excellent > -50, Good > -60, Fair > -70, Poor < -70`;
+                            } else {
+                                healthWifi.textContent = 'Unknown';
+                                healthWifi.title = 'WiFi signal strength unavailable';
+                            }
                         }
                         
                         if (healthErrors) {
-                            // Calculate memory usage percentage from system data
+                            // Calculate memory usage percentage from system data with details
                             const freeHeap = startup.system?.freeHeap;
                             const heapSize = startup.system?.heapSize;
                             if (freeHeap && heapSize) {
                                 const memoryUsed = Math.round(((heapSize - freeHeap) / heapSize) * 100);
+                                const freeKB = Math.round(freeHeap / 1024);
+                                const totalKB = Math.round(heapSize / 1024);
+                                
                                 healthErrors.textContent = `${memoryUsed}%`;
+                                healthErrors.title = `Memory Usage: ${memoryUsed}% used\nFree: ${freeKB} KB of ${totalKB} KB total\nESP32 RAM utilization`;
+                                
+                                // Change color based on memory usage
+                                if (memoryUsed > 80) {
+                                    healthErrors.style.color = '#dc2626'; // Red
+                                } else if (memoryUsed > 60) {
+                                    healthErrors.style.color = '#ea580c'; // Orange  
+                                } else {
+                                    healthErrors.style.color = '#16a34a'; // Green
+                                }
                             } else {
                                 healthErrors.textContent = 'Unknown';
+                                healthErrors.title = 'Memory usage information unavailable';
                             }
                         }
                         
@@ -1165,10 +1190,40 @@ document.addEventListener('DOMContentLoaded', function() {
                             healthScore = Math.max(0, Math.min(100, healthScore));
                             gaugeContainer.style.setProperty('--health-percentage', `${healthScore}%`);
                             
-                            // Update the percentage text in the donut chart
+                            // Update the percentage text in the donut chart with detailed tooltip
                             const healthPercentageElement = document.getElementById('systemHealthPercentage');
                             if (healthPercentageElement) {
                                 healthPercentageElement.textContent = `${Math.round(healthScore)}%`;
+                                
+                                // Add detailed tooltip explaining the health score
+                                let healthDescription = 'Overall System Health Score\n';
+                                healthDescription += 'Factors: Hardware + WiFi + Memory\n\n';
+                                
+                                if (hardware) {
+                                    const workingComponents = [
+                                        hardware.indoorBME && 'Indoor BME280',
+                                        hardware.outdoorBME && 'Outdoor BME280', 
+                                        hardware.garageBME && 'Garage BME280',
+                                        hardware.display && 'eInk Display'
+                                    ].filter(Boolean);
+                                    healthDescription += `Hardware: ${workingComponents.length}/4 sensors working\n`;
+                                }
+                                
+                                const signal = startup.system?.signalStrength;
+                                if (signal) {
+                                    const signalImpact = signal < -70 ? '-20pts' : signal < -50 ? '-10pts' : '0pts';
+                                    healthDescription += `WiFi: ${signal} dBm (${signalImpact})\n`;
+                                }
+                                
+                                const freeHeap = startup.system?.freeHeap;
+                                const heapSize = startup.system?.heapSize;
+                                if (freeHeap && heapSize) {
+                                    const memoryUsed = Math.round(((heapSize - freeHeap) / heapSize) * 100);
+                                    const memoryImpact = memoryUsed > 80 ? '-20pts' : memoryUsed > 60 ? '-10pts' : '0pts';
+                                    healthDescription += `Memory: ${memoryUsed}% used (${memoryImpact})`;
+                                }
+                                
+                                healthPercentageElement.title = healthDescription;
                             }
                         }
                     } else {

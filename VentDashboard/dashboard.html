@@ -1,5 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+🚨 CRITICAL DEVELOPMENT REMINDER:
+- This dashboard ONLY works when deployed to Azure Static Web App
+- Local testing will FAIL - no API keys available locally  
+- MUST GIT PUSH all changes before testing
+- Live URL: https://agreeable-field-0a3c95710.5.azurestaticapps.net/
+- Wait 1-2 minutes after git push for Azure deployment
+-->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1151,21 +1159,21 @@
                         <div class="system-health-widget" style="margin-top: 20px;">
                             <div class="health-gauge">
                                 <div class="gauge-container" style="--health-percentage: 85%;">
-                                    <div class="gauge-value" id="systemHealthPercentage">--%</div>
+                                    <div class="gauge-value" id="systemHealthPercentage" title="Overall System Health Score: Calculated from hardware components + WiFi signal + memory usage. Hover for details.">--%</div>
                                 </div>
                             </div>
                             <div class="health-metrics">
                                 <div class="metric">
-                                    <span>Uptime</span>
-                                    <span id="healthUptime">99.2%</span>
+                                    <span title="System uptime since last boot">Uptime</span>
+                                    <span id="healthUptime" title="Time since ESP32 last booted">99.2%</span>
                                 </div>
                                 <div class="metric">
-                                    <span>WiFi</span>
-                                    <span id="healthWifi">98.5%</span>
+                                    <span title="WiFi signal strength in dBm (decibels relative to milliwatt)">WiFi Signal</span>
+                                    <span id="healthWifi" title="WiFi signal strength: Excellent > -50dBm, Good > -60dBm, Fair > -70dBm">98.5%</span>
                                 </div>
                                 <div class="metric">
-                                    <span>Memory</span>
-                                    <span id="healthErrors">75%</span>
+                                    <span title="ESP32 RAM memory usage percentage">Memory Used</span>
+                                    <span id="healthErrors" title="Percentage of ESP32 RAM currently in use">75%</span>
                                 </div>
                             </div>
                         </div>
