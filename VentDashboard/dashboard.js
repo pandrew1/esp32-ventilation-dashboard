@@ -1280,27 +1280,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                     
                     if (data.data && data.data.length > 0) {
+                        // Track unique door events to avoid duplication
+                        const uniqueEvents = new Map(); // key: "timestamp-door-action", value: event
+                        
+                        console.log(`TIMELINE: Processing ${data.data.length} API records for door events`);
+                        
                         // Extract door events from history data
                         data.data.forEach((record, recordIndex) => {
-                            console.log(`TIMELINE: Processing record ${recordIndex + 1}/${data.data.length}:`, {
-                                timestamp: record.timestamp,
-                                doorCount: record.doors ? record.doors.length : 0,
-                                hasDoors: !!(record.doors && record.doors.length > 0)
-                            });
+                            // Process explicit door transitions first (most accurate)
+                            if (record.doorTransitions && Array.isArray(record.doorTransitions)) {
+                                record.doorTransitions.forEach(transition => {
+                                    const eventKey = `${transition.timestamp}-door-${transition.doorId}-${transition.opened ? 'open' : 'close'}`;
+                                    if (!uniqueEvents.has(eventKey)) {
+                                        const event = {
+                                            timestamp: transition.timestamp,
+                                            door: transition.doorName || `Door ${transition.doorId}`,
+                                            action: transition.opened ? 'opened' : 'closed',
+                                            duration: 0,
+                                            source: 'transition'
+                                        };
+                                        uniqueEvents.set(eventKey, event);
+                                        console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp}`);
+                                    }
+                                });
+                            }
                             
+                            // Extract events from door summary data (firstOpenedToday, lastOpenedToday)
                             if (record.doors && Array.isArray(record.doors)) {
                                 record.doors.forEach((door, doorIndex) => {
-                                    console.log(`  Door ${doorIndex + 1}: ${door.name}`, {
-                                        open: door.open,
-                                        wasOpenedToday: door.wasOpenedToday,
-                                        openedAt: door.openedAt,
-                                        firstOpenedToday: door.firstOpenedToday,
-                                        lastOpenedToday: door.lastOpenedToday,
-                                        minutesOpen: door.minutesOpen
-                                    });
                                     
                                     // Only add events with valid timestamps - skip invalid ones entirely
-                                    const addEventIfValid = (timestamp, action, duration = 0) => {
+                                    const addEventIfValid = (timestamp, action, duration = 0, source = 'summary') => {
                                         if (!timestamp) return;
                                         
                                         // Test if timestamp is valid before adding
@@ -1317,31 +1327,50 @@ document.addEventListener('DOMContentLoaded', function() {
                                             }
                                             
                                             if (!testDate || isNaN(testDate.getTime()) || testDate.getFullYear() < 2020) {
-                                                console.log(`    Skipping ${action} - invalid timestamp:`, timestamp);
                                                 return;
                                             }
                                             
-                                            doorEvents.push({
-                                                timestamp: timestamp,
-                                                door: door.name || 'Unknown Door',
-                                                action: action,
-                                                duration: duration
-                                            });
-                                            console.log(`    Added ${action} event for ${door.name} at ${timestamp}`);
+                                            // Create unique key to prevent duplicates
+                                            const eventKey = `${timestamp}-${door.name}-${action}`;
+                                            if (!uniqueEvents.has(eventKey)) {
+                                                const event = {
+                                                    timestamp: timestamp,
+                                                    door: door.name || 'Unknown Door',
+                                                    action: action,
+                                                    duration: duration,
+                                                    source: source
+                                                };
+                                                uniqueEvents.set(eventKey, event);
+                                                console.log(`    Added unique ${action} event for ${door.name} at ${timestamp} (${testDate.toLocaleString()})`);
+                                            }
                                             
                                         } catch (e) {
                                             console.log(`    Skipping ${action} - timestamp error:`, timestamp, e.message);
                                         }
                                     };
                                     
-                                    // Track door state changes with validation
-                                    if (door.wasOpenedToday || door.open) {
-                                        addEventIfValid(door.openedAt, 'opened', door.minutesOpen || 0);
-                                        addEventIfValid(door.firstOpenedToday, 'first_open', 0);
-                                        addEventIfValid(door.lastOpenedToday, 'last_open', 0);
+                                    // Track door state changes with validation - only add unique events
+                                    if (door.open && door.openedAt) {
+                                        addEventIfValid(door.openedAt, 'opened', door.minutesOpen || 0, 'current_state');
+                                    }
+                                    if (door.firstOpenedToday) {
+                                        addEventIfValid(door.firstOpenedToday, 'first_opened_today', 0, 'daily_summary');
+                                    }
+                                    if (door.lastOpenedToday && door.lastOpenedToday !== door.firstOpenedToday) {
+                                        addEventIfValid(door.lastOpenedToday, 'last_opened_today', 0, 'daily_summary');
                                     }
                                 });
                             }
+                        });
+                        
+                        // Convert unique events to array
+                        doorEvents = Array.from(uniqueEvents.values());
+                        
+                        console.log(`TIMELINE: Deduplicated events: ${uniqueEvents.size} unique events from ${data.data.length} records`);
+                        console.log(`TIMELINE: Event sources:`, {
+                            transitions: doorEvents.filter(e => e.source === 'transition').length,
+                            daily_summary: doorEvents.filter(e => e.source === 'daily_summary').length,
+                            current_state: doorEvents.filter(e => e.source === 'current_state').length
                         });
                         
                         // Calculate statistics
@@ -1350,10 +1379,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         doorActivityStats.totalSessions = doorEvents.length;
                         
                         if (doorEvents.length > 0) {
-                            doorEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                            doorEvents.sort((a, b) => {
+                                const aTime = typeof a.timestamp === 'string' ? parseFloat(a.timestamp) : a.timestamp;
+                                const bTime = typeof b.timestamp === 'string' ? parseFloat(b.timestamp) : b.timestamp;
+                                return aTime - bTime;
+                            });
                             doorActivityStats.firstActivity = doorEvents[0].timestamp;
                             doorActivityStats.lastActivity = doorEvents[doorEvents.length - 1].timestamp;
                         }
+                        
+                        console.log('TIMELINE: Final event statistics:', {
+                            totalEvents: doorEvents.length,
+                            uniqueDoors: uniqueDoors.size,
+                            timeRange: `${hours} hours`,
+                            firstActivity: doorActivityStats.firstActivity,
+                            lastActivity: doorActivityStats.lastActivity
+                        });
                     }
                     
                     // Create doors data structure compatible with renderActivityTimeline
