@@ -732,25 +732,58 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Show waiting states for all metrics
                         const waitingText = 'Waiting for data';
                         
-                        // Temperature metrics
-                        document.getElementById('yesterdayAvgTemp').textContent = waitingText;
-                        document.getElementById('yesterdayTempRange').textContent = waitingText;
-                        document.getElementById('yesterdayTempTrend').textContent = 'Pending';
+                        // Temperature metrics - check if elements exist
+                        const tempAvgElement = document.getElementById('yesterdayAvgTemp');
+                        const tempRangeElement = document.getElementById('yesterdayTempRange');
+                        const tempTrendElement = document.getElementById('yesterdayTempTrend');
                         
-                        // Efficiency metrics
-                        document.getElementById('yesterdayEfficiency').textContent = waitingText;
-                        document.getElementById('yesterdayRuntime').textContent = waitingText;
-                        document.getElementById('yesterdayEfficiencyTrend').textContent = 'Pending';
+                        console.log('loadYesterdaySummaryMetrics: DOM elements found:');
+                        console.log('  yesterdayAvgTemp:', tempAvgElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayTempRange:', tempRangeElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayTempTrend:', tempTrendElement ? 'EXISTS' : 'NULL');
                         
-                        // Door activity metrics
-                        document.getElementById('yesterdayDoorsActive').textContent = waitingText;
-                        document.getElementById('yesterdaySessions').textContent = waitingText;
-                        document.getElementById('yesterdayPeakTime').textContent = 'Pending';
+                        if (tempAvgElement) tempAvgElement.textContent = waitingText;
+                        if (tempRangeElement) tempRangeElement.textContent = waitingText;
+                        if (tempTrendElement) tempTrendElement.textContent = 'Pending';
                         
-                        // System health metrics
-                        document.getElementById('yesterdaySystemHealth').textContent = waitingText;
-                        document.getElementById('yesterdayIncidents').textContent = waitingText;
-                        document.getElementById('yesterdayUptime').textContent = 'Pending';
+                        // Efficiency metrics - check if elements exist
+                        const efficiencyElement = document.getElementById('yesterdayEfficiency');
+                        const runtimeElement = document.getElementById('yesterdayRuntime');
+                        const efficiencyTrendElement = document.getElementById('yesterdayEfficiencyTrend');
+                        
+                        console.log('  yesterdayEfficiency:', efficiencyElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayRuntime:', runtimeElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayEfficiencyTrend:', efficiencyTrendElement ? 'EXISTS' : 'NULL');
+                        
+                        if (efficiencyElement) efficiencyElement.textContent = waitingText;
+                        if (runtimeElement) runtimeElement.textContent = waitingText;
+                        if (efficiencyTrendElement) efficiencyTrendElement.textContent = 'Pending';
+                        
+                        // Door activity metrics - check if elements exist
+                        const doorsActiveElement = document.getElementById('yesterdayDoorsActive');
+                        const sessionsElement = document.getElementById('yesterdaySessions');
+                        const peakTimeElement = document.getElementById('yesterdayPeakTime');
+                        
+                        console.log('  yesterdayDoorsActive:', doorsActiveElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdaySessions:', sessionsElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayPeakTime:', peakTimeElement ? 'EXISTS' : 'NULL');
+                        
+                        if (doorsActiveElement) doorsActiveElement.textContent = waitingText;
+                        if (sessionsElement) sessionsElement.textContent = waitingText;
+                        if (peakTimeElement) peakTimeElement.textContent = 'Pending';
+                        
+                        // System health metrics - check if elements exist
+                        const systemHealthElement = document.getElementById('yesterdaySystemHealth');
+                        const incidentsElement = document.getElementById('yesterdayIncidents');
+                        const uptimeElement = document.getElementById('yesterdayUptime');
+                        
+                        console.log('  yesterdaySystemHealth:', systemHealthElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayIncidents:', incidentsElement ? 'EXISTS' : 'NULL');
+                        console.log('  yesterdayUptime:', uptimeElement ? 'EXISTS' : 'NULL');
+                        
+                        if (systemHealthElement) systemHealthElement.textContent = waitingText;
+                        if (incidentsElement) incidentsElement.textContent = waitingText;
+                        if (uptimeElement) uptimeElement.textContent = 'Pending';
                         
                         console.log('loadYesterdaySummaryMetrics: Set all yesterday metrics to waiting state');
                     }
