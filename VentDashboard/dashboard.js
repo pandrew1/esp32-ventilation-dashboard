@@ -1048,6 +1048,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             healthScore = Math.max(0, Math.min(100, healthScore));
                             gaugeContainer.style.setProperty('--health-percentage', `${healthScore}%`);
+                            
+                            // Update the percentage text in the donut chart
+                            const healthPercentageElement = document.getElementById('systemHealthPercentage');
+                            if (healthPercentageElement) {
+                                healthPercentageElement.textContent = `${Math.round(healthScore)}%`;
+                            }
                         }
                     } else {
                         // Handle case where startup data is not available
@@ -1121,8 +1127,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('TIMELINE: Using API key:', apiKey ? 'Found' : 'Default');
             
-            // Call the enhanced dashboard API for door timeline data
-            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
+            // Call the ventilation history API for door timeline data
+            const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=${hours}`;
             
             console.log('TIMELINE: Making API call to:', apiUrl);
             
@@ -1141,29 +1147,82 @@ document.addEventListener('DOMContentLoaded', function() {
                     return response.json();
                 })
                 .then(data => {
-                    console.log('TIMELINE: Received data structure:', {
-                        timestamp: data.timestamp,
+                    console.log('TIMELINE: Received history data:', {
+                        dataPoints: data.data ? data.data.length : 0,
                         deviceId: data.deviceId,
-                        sectionsKeys: Object.keys(data.sections || {}),
-                        hasDoors: !!(data.sections && data.sections.doors)
+                        firstRecord: data.data && data.data.length > 0 ? data.data[0].timestamp : 'No data'
                     });
                     
-                    // Extract doors timeline data from sections
-                    const doors = data.sections && data.sections.doors;
-                    console.log('TIMELINE: Doors section details:', {
-                        exists: !!doors,
-                        timeline: doors ? doors.timeline : 'N/A',
-                        count: doors ? doors.count : 'N/A',
-                        doorActivity: doors ? doors.doorActivity : 'N/A'
-                    });
+                    // Process door activity events from history data
+                    const doorEvents = [];
+                    const doorActivityStats = {
+                        activeDoors: 0,
+                        totalSessions: 0,
+                        firstActivity: null,
+                        lastActivity: null,
+                        peakHour: null
+                    };
                     
-                    if (doors) {
-                        console.log('TIMELINE: Calling renderActivityTimeline with doors data');
-                        renderActivityTimeline(doors, hours);
-                    } else {
-                        console.log('TIMELINE: Doors section not available, showing error message');
-                        timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Door activity data not available</p></div>';
+                    if (data.data && data.data.length > 0) {
+                        // Extract door events from history data
+                        data.data.forEach(record => {
+                            if (record.doors && Array.isArray(record.doors)) {
+                                record.doors.forEach(door => {
+                                    // Track door state changes
+                                    if (door.wasOpenedToday || door.open) {
+                                        if (door.openedAt) {
+                                            doorEvents.push({
+                                                timestamp: door.openedAt,
+                                                door: door.name || 'Unknown Door',
+                                                action: 'opened',
+                                                duration: door.minutesOpen || 0
+                                            });
+                                        }
+                                        if (door.firstOpenedToday) {
+                                            doorEvents.push({
+                                                timestamp: door.firstOpenedToday,
+                                                door: door.name || 'Unknown Door',
+                                                action: 'first_open',
+                                                duration: 0
+                                            });
+                                        }
+                                        if (door.lastOpenedToday) {
+                                            doorEvents.push({
+                                                timestamp: door.lastOpenedToday,
+                                                door: door.name || 'Unknown Door',
+                                                action: 'last_open',
+                                                duration: 0
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        
+                        // Calculate statistics
+                        const uniqueDoors = new Set(doorEvents.map(e => e.door));
+                        doorActivityStats.activeDoors = uniqueDoors.size;
+                        doorActivityStats.totalSessions = doorEvents.length;
+                        
+                        if (doorEvents.length > 0) {
+                            doorEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                            doorActivityStats.firstActivity = doorEvents[0].timestamp;
+                            doorActivityStats.lastActivity = doorEvents[doorEvents.length - 1].timestamp;
+                        }
                     }
+                    
+                    // Create doors data structure compatible with renderActivityTimeline
+                    const doorsData = {
+                        timeline: doorEvents,
+                        count: doorEvents.length,
+                        timeRange: `${hours} hours`,
+                        doorActivity: doorActivityStats,
+                        message: doorEvents.length === 0 ? 'No recent door activity data available - using placeholder' : null
+                    };
+                    
+                    console.log('TIMELINE: Processed door events:', doorsData);
+                    console.log('TIMELINE: Calling renderActivityTimeline with processed data');
+                    renderActivityTimeline(doorsData, hours);
                 })
                 .catch(error => {
                     console.error('TIMELINE ERROR: Failed to load timeline data:', error);
@@ -1241,16 +1300,22 @@ document.addEventListener('DOMContentLoaded', function() {
                                 ${timeline.slice(-20).map((event, index) => {
                                     const timestamp = new Date(event.timestamp);
                                     const timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-                                    const doors = event.doors || [];
-                                    const transitions = event.transitions || [];
+                                    const dateStr = timestamp.toLocaleDateString();
+                                    const actionIcon = event.action === 'opened' || event.action === 'first_open' || event.action === 'last_open' ? '🔓' : '🔒';
+                                    const actionText = event.action.replace('_', ' ');
                                     
                                     return `
                                         <div class="timeline-event">
                                             <div class="event-time">${timeStr}</div>
                                             <div class="event-details">
-                                                ${doors.length > 0 ? `${doors.length} doors active` : ''}
-                                                ${transitions.length > 0 ? `${transitions.length} transitions` : ''}
+                                                <div class="event-icon">${actionIcon}</div>
+                                                <div class="event-info">
+                                                    <div class="event-door">${event.door}</div>
+                                                    <div class="event-action">${actionText}</div>
+                                                    ${event.duration > 0 ? `<div class="event-duration">(${event.duration} min)</div>` : ''}
+                                                </div>
                                             </div>
+                                            <div class="event-date">${dateStr}</div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -1311,7 +1376,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
-                        padding: 5px 10px;
+                        padding: 8px 10px;
                         border-bottom: 1px solid #f0f0f0;
                         font-size: 0.9em;
                     }
@@ -1321,9 +1386,42 @@ document.addEventListener('DOMContentLoaded', function() {
                     .event-time {
                         font-weight: bold;
                         color: #007bff;
+                        min-width: 60px;
                     }
                     .event-details {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        flex: 1;
+                        margin: 0 10px;
+                    }
+                    .event-icon {
+                        font-size: 1.2em;
+                    }
+                    .event-info {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                    }
+                    .event-door {
+                        font-weight: 600;
+                        color: #2c3e50;
+                    }
+                    .event-action {
+                        font-size: 0.8em;
                         color: #6c757d;
+                        text-transform: capitalize;
+                    }
+                    .event-duration {
+                        font-size: 0.8em;
+                        color: #28a745;
+                        font-style: italic;
+                    }
+                    .event-date {
+                        font-size: 0.8em;
+                        color: #6c757d;
+                        min-width: 80px;
+                        text-align: right;
                     }
                 </style>
             `;
@@ -1709,7 +1807,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const m = mins % 60;
                 return m > 0 ? `${h}h ${m}m` : `${h}h`;
             };
-            const uptimeMinutes = reliability.uptimeMinutes != null ? reliability.uptimeMinutes : (system.uptime != null ? Math.floor(system.uptime / 60) : null);
+            const uptimeMinutes = reliability.uptimeMinutes != null ? reliability.uptimeMinutes : (system.uptime != null ? system.uptime : null);
             const reliabilityUptimeElement = document.getElementById('reliabilityUptime');
             if (reliabilityUptimeElement) reliabilityUptimeElement.textContent = uptimeMinutes != null ? formatMinutes(uptimeMinutes) : 'No data';
             const reliabilityRebootsElement = document.getElementById('reliabilityReboots');
