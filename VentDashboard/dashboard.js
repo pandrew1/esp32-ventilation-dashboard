@@ -1297,25 +1297,49 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         <div class="timeline-chart">
                             <div class="timeline-events">
-                                ${timeline.slice(-20).map((event, index) => {
-                                    const timestamp = new Date(event.timestamp);
-                                    const timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-                                    const dateStr = timestamp.toLocaleDateString();
+                                ${timeline.slice(-10).map((event, index) => {
+                                    // Better timestamp parsing with fallbacks
+                                    let timestamp, timeStr, dateStr;
+                                    try {
+                                        // Handle various timestamp formats
+                                        if (typeof event.timestamp === 'number') {
+                                            // Unix timestamp (seconds or milliseconds)
+                                            timestamp = event.timestamp > 1000000000000 ? new Date(event.timestamp) : new Date(event.timestamp * 1000);
+                                        } else if (typeof event.timestamp === 'string') {
+                                            timestamp = new Date(event.timestamp);
+                                        } else {
+                                            throw new Error('Invalid timestamp format');
+                                        }
+                                        
+                                        if (isNaN(timestamp.getTime())) {
+                                            throw new Error('Invalid date');
+                                        }
+                                        
+                                        timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                                        dateStr = timestamp.toLocaleDateString([], {month: 'short', day: 'numeric'});
+                                    } catch (e) {
+                                        console.warn('Timeline: Invalid timestamp for event:', event.timestamp, e);
+                                        timeStr = 'Unknown';
+                                        dateStr = 'Unknown';
+                                    }
+                                    
                                     const actionIcon = event.action === 'opened' || event.action === 'first_open' || event.action === 'last_open' ? '🔓' : '🔒';
-                                    const actionText = event.action.replace('_', ' ');
+                                    const actionText = event.action ? event.action.replace('_', ' ') : 'activity';
                                     
                                     return `
                                         <div class="timeline-event">
-                                            <div class="event-time">${timeStr}</div>
+                                            <div class="event-time">
+                                                <div class="time">${timeStr}</div>
+                                                <div class="date">${dateStr}</div>
+                                            </div>
                                             <div class="event-details">
                                                 <div class="event-icon">${actionIcon}</div>
                                                 <div class="event-info">
-                                                    <div class="event-door">${event.door}</div>
+                                                    <div class="event-door">${event.door || 'Unknown Door'}</div>
                                                     <div class="event-action">${actionText}</div>
-                                                    ${event.duration > 0 ? `<div class="event-duration">(${event.duration} min)</div>` : ''}
+                                                    ${event.duration > 0 ? `<div class="event-duration">${event.duration} min</div>` : ''}
                                                 </div>
                                             </div>
-                                            <div class="event-date">${dateStr}</div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -1369,59 +1393,72 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     .timeline-events {
                         padding: 10px;
-                        max-height: 120px;
+                        min-height: 200px;
+                        max-height: 300px;
                         overflow-y: auto;
+                        background: #f8f9fa;
+                        border-radius: 5px;
                     }
                     .timeline-event {
                         display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        padding: 8px 10px;
-                        border-bottom: 1px solid #f0f0f0;
+                        align-items: flex-start;
+                        padding: 12px 15px;
+                        margin-bottom: 8px;
+                        background: white;
+                        border-radius: 8px;
+                        border: 1px solid #e9ecef;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                         font-size: 0.9em;
                     }
                     .timeline-event:last-child {
-                        border-bottom: none;
+                        margin-bottom: 0;
                     }
                     .event-time {
+                        min-width: 80px;
+                        margin-right: 15px;
+                        text-align: center;
+                    }
+                    .event-time .time {
                         font-weight: bold;
                         color: #007bff;
-                        min-width: 60px;
+                        font-size: 1em;
+                    }
+                    .event-time .date {
+                        font-size: 0.8em;
+                        color: #6c757d;
+                        margin-top: 2px;
                     }
                     .event-details {
                         display: flex;
                         align-items: center;
-                        gap: 8px;
+                        gap: 12px;
                         flex: 1;
-                        margin: 0 10px;
                     }
                     .event-icon {
-                        font-size: 1.2em;
+                        font-size: 1.4em;
+                        line-height: 1;
                     }
                     .event-info {
                         display: flex;
                         flex-direction: column;
-                        gap: 2px;
+                        gap: 3px;
+                        flex: 1;
                     }
                     .event-door {
                         font-weight: 600;
                         color: #2c3e50;
+                        font-size: 1em;
                     }
                     .event-action {
-                        font-size: 0.8em;
+                        font-size: 0.85em;
                         color: #6c757d;
                         text-transform: capitalize;
+                        font-style: italic;
                     }
                     .event-duration {
                         font-size: 0.8em;
                         color: #28a745;
-                        font-style: italic;
-                    }
-                    .event-date {
-                        font-size: 0.8em;
-                        color: #6c757d;
-                        min-width: 80px;
-                        text-align: right;
+                        font-weight: 500;
                     }
                 </style>
             `;
