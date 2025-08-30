@@ -1532,22 +1532,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="timeline-content">
                         <div class="timeline-stats">
                             <div class="stat-row">
-                                <span class="stat-label">Timespan:</span>
-                                <span class="stat-value">${doorsData.timeRange || hours + 'h'}</span>
+                                <span class="stat-label">Time Range:</span>
+                                <span class="stat-value">${hours}h</span>
                             </div>
                             <div class="stat-row">
-                                <span class="stat-label">Events:</span>
-                                <span class="stat-value">${count} recorded</span>
+                                <span class="stat-label">Total Events:</span>
+                                <span class="stat-value">${count} found</span>
                             </div>
                             <div class="stat-row">
-                                <span class="stat-label">Sessions:</span>
-                                <span class="stat-value">${doorActivity.totalSessions || count}</span>
+                                <span class="stat-label">Active Doors:</span>
+                                <span class="stat-value">${doorActivity.activeDoors || 0}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Displayed:</span>
+                                <span class="stat-value">${timeline.length} events</span>
                             </div>
                         </div>
                         
                         <div class="timeline-chart">
-                            <div class="timeline-events">
-                                ${timeline.slice(-10).map((event, index) => {
+                            <div class="timeline-events-scrollable">
+                                ${timeline.map((event, index) => {
                                     // Parse timestamp with debugging - don't filter out errors
                                     let timestamp;
                                     let hasParsingError = false;
@@ -1577,45 +1581,31 @@ document.addEventListener('DOMContentLoaded', function() {
                                         parseErrorMessage = `Parse exception: ${e.message}`;
                                     }
                                     
-                                    // Debug logging for timestamp parsing issues
-                                    if (hasParsingError) {
-                                        console.warn(`Activity Timeline timestamp parsing error for event ${index}:`, {
-                                            originalTimestamp: event.timestamp,
-                                            timestampType: typeof event.timestamp,
-                                            parseErrorMessage: parseErrorMessage,
-                                            event: event
-                                        });
-                                    }
-                                    
                                     // Display timestamp or error message
                                     let timeStr, dateStr;
                                     if (hasParsingError) {
-                                        timeStr = 'Parse Error';
-                                        dateStr = parseErrorMessage.substring(0, 20) + '...';
+                                        timeStr = 'Invalid';
+                                        dateStr = 'Error';
                                     } else {
                                         timeStr = timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
                                         dateStr = timestamp.toLocaleDateString([], {month: 'short', day: 'numeric'});
                                     }
                                     
                                     const actionIcon = hasParsingError ? '⚠️' : 
-                                        (event.action === 'opened' || event.action === 'first_open' || event.action === 'last_open' ? '🔓' : '🔒');
-                                    const actionText = hasParsingError ? 'timestamp error' : 
-                                        (event.action ? event.action.replace('_', ' ') : 'activity');
+                                        (event.action === 'opened' || event.action === 'first_opened_today' || event.action === 'last_opened_today' ? '🔓' : '🔒');
+                                    const actionText = hasParsingError ? 'Parse Error' : 
+                                        (event.action ? event.action.replace(/_/g, ' ') : 'activity');
                                     
                                     return `
-                                        <div class="timeline-event${hasParsingError ? ' timeline-event-error' : ''}">
-                                            <div class="event-time">
-                                                <div class="time">${timeStr}</div>
-                                                <div class="date">${dateStr}</div>
+                                        <div class="timeline-event-compact${hasParsingError ? ' timeline-event-error' : ''}">
+                                            <div class="event-time-compact">
+                                                <span class="time">${timeStr}</span>
+                                                <span class="date">${dateStr}</span>
                                             </div>
-                                            <div class="event-details">
-                                                <div class="event-icon">${actionIcon}</div>
-                                                <div class="event-info">
-                                                    <div class="event-door">${event.door || 'Unknown Door'}</div>
-                                                    <div class="event-action">${actionText}</div>
-                                                    ${event.duration > 0 && !hasParsingError ? `<div class="event-duration">${event.duration} min</div>` : ''}
-                                                    ${hasParsingError ? `<div class="event-error">Raw: ${JSON.stringify(event.timestamp)}</div>` : ''}
-                                                </div>
+                                            <div class="event-icon">${actionIcon}</div>
+                                            <div class="event-info-compact">
+                                                <span class="event-door">${event.door || 'Unknown'}</span>
+                                                <span class="event-action">${actionText}</span>
                                             </div>
                                         </div>
                                     `;
@@ -1667,6 +1657,85 @@ document.addEventListener('DOMContentLoaded', function() {
                         align-items: center;
                         justify-content: center;
                         height: 120px;
+                    }
+                    .timeline-events-scrollable {
+                        padding: 8px;
+                        height: 280px;
+                        overflow-y: auto;
+                        background: #f8f9fa;
+                        border-radius: 5px;
+                        scrollbar-width: thin;
+                        scrollbar-color: #cbd5e0 #f8f9fa;
+                    }
+                    .timeline-events-scrollable::-webkit-scrollbar {
+                        width: 6px;
+                    }
+                    .timeline-events-scrollable::-webkit-scrollbar-track {
+                        background: #f8f9fa;
+                        border-radius: 3px;
+                    }
+                    .timeline-events-scrollable::-webkit-scrollbar-thumb {
+                        background: #cbd5e0;
+                        border-radius: 3px;
+                    }
+                    .timeline-event-compact {
+                        display: flex;
+                        align-items: center;
+                        padding: 6px 10px;
+                        margin-bottom: 4px;
+                        background: white;
+                        border-radius: 6px;
+                        border: 1px solid #e9ecef;
+                        font-size: 0.85em;
+                        min-height: 36px;
+                    }
+                    .timeline-event-compact:last-child {
+                        margin-bottom: 0;
+                    }
+                    .timeline-event-compact:hover {
+                        background: #f1f3f4;
+                        border-color: #d1ecf1;
+                    }
+                    .timeline-event-compact.timeline-event-error {
+                        background: #fff5f5 !important;
+                        border-color: #f56565 !important;
+                    }
+                    .event-time-compact {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        margin-right: 12px;
+                        min-width: 60px;
+                        font-size: 0.75em;
+                    }
+                    .event-time-compact .time {
+                        font-weight: bold;
+                        color: #2c3e50;
+                        line-height: 1.1;
+                    }
+                    .event-time-compact .date {
+                        color: #6c757d;
+                        line-height: 1.1;
+                    }
+                    .timeline-event-compact .event-icon {
+                        margin-right: 10px;
+                        font-size: 1.2em;
+                    }
+                    .event-info-compact {
+                        display: flex;
+                        flex-direction: column;
+                        flex: 1;
+                        line-height: 1.2;
+                    }
+                    .event-info-compact .event-door {
+                        font-weight: bold;
+                        color: #2c3e50;
+                        font-size: 0.9em;
+                    }
+                    .event-info-compact .event-action {
+                        color: #6c757d;
+                        font-size: 0.8em;
+                        text-transform: capitalize;
                     }
                     .timeline-events {
                         padding: 10px;
