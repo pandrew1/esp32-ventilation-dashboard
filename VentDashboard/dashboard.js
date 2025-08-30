@@ -690,6 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('loadYesterdaySummaryMetrics: Yesterday section:', yesterday);
                     
                     if (yesterday && yesterday.status !== 'waiting_for_esp32_data') {
+                        console.log('loadYesterdaySummaryMetrics: Yesterday data available, status:', yesterday.status);
                         console.log('loadYesterdaySummaryMetrics: Processing yesterday data');
                         // Update temperature metrics
                         if (yesterday.environmental) {
@@ -725,6 +726,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             document.getElementById('yesterdayUptime').textContent = `${incidents.uptime}% uptime`;
                         }
                     } else {
+                        console.log('loadYesterdaySummaryMetrics: Yesterday data not available or waiting for ESP32 data');
+                        console.log('loadYesterdaySummaryMetrics: Yesterday status:', yesterday ? yesterday.status : 'yesterday object is null/undefined');
+                        
                         // Show waiting states for all metrics
                         const waitingText = 'Waiting for data';
                         
@@ -747,10 +751,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('yesterdaySystemHealth').textContent = waitingText;
                         document.getElementById('yesterdayIncidents').textContent = waitingText;
                         document.getElementById('yesterdayUptime').textContent = 'Pending';
+                        
+                        console.log('loadYesterdaySummaryMetrics: Set all yesterday metrics to waiting state');
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading yesterday summary metrics:', error);
+                    console.error('loadYesterdaySummaryMetrics: Error loading data:', error);
                     
                     // Show error state for all metrics
                     const errorText = 'Error';
