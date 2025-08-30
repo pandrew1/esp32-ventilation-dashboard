@@ -830,7 +830,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function updateEnhancedDoorActivity() {
-            console.log('=== ENHANCED API: updateEnhancedDoorActivity() started ===');
+            console.log('=== DOOR ACTIVITY CENTER: updateEnhancedDoorActivity() started - using real data ===');
             
             // Show loading states
             document.getElementById('activeDoorsCount').textContent = '...';
@@ -845,8 +845,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
             
-            // Call the enhanced dashboard API for door activity data
-            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
+            // Use GetVentilationHistory API (same as Activity Timeline) for real door data
+            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=24';
             
             console.log('updateEnhancedDoorActivity: Making API call to:', apiUrl);
             
@@ -865,83 +865,132 @@ document.addEventListener('DOMContentLoaded', function() {
                     return response.json();
                 })
                 .then(data => {
-                    console.log('updateEnhancedDoorActivity: Received data:', data);
+                    console.log('updateEnhancedDoorActivity: Received history data:', data);
                     
-                    // Extract doors data from sections - correct API structure
-                    const doors = data.sections && data.sections.doors;
-                    console.log('updateEnhancedDoorActivity: Doors section:', doors);
+                    // Process door data same way as Activity Timeline
+                    const doorEvents = [];
+                    const doorNames = new Set();
+                    const todaysOpenings = new Set(); // Track unique door opening sessions
+                    const hourlyActivity = {}; // Track activity by hour
                     
-                    if (doors && doors.doorActivity) {
-                        console.log('updateEnhancedDoorActivity: Processing door activity data:', doors.doorActivity);
-                        const doorActivity = doors.doorActivity;
+                    let latestActivity = null;
+                    let earliestActivity = null;
+                    
+                    if (data.data && Array.isArray(data.data)) {
+                        data.data.forEach(record => {
+                            if (record.doors && Array.isArray(record.doors)) {
+                                record.doors.forEach(door => {
+                                    doorNames.add(door.name);
+                                    
+                                    // Track current open doors
+                                    if (door.openedAt) {
+                                        const openTimestamp = parseInt(door.openedAt);
+                                        const openTime = new Date(openTimestamp * 1000);
+                                        const hour = openTime.getHours();
+                                        
+                                        doorEvents.push({
+                                            timestamp: openTimestamp,
+                                            door: door.name,
+                                            action: 'opened'
+                                        });
+                                        
+                                        // Update latest/earliest activity
+                                        if (!latestActivity || openTimestamp > latestActivity) {
+                                            latestActivity = openTimestamp;
+                                        }
+                                        if (!earliestActivity || openTimestamp < earliestActivity) {
+                                            earliestActivity = openTimestamp;
+                                        }
+                                        
+                                        // Count hourly activity
+                                        hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
+                                    }
+                                    
+                                    // Track today's openings for session count
+                                    if (door.firstOpenedToday) {
+                                        todaysOpenings.add(`${door.name}-${door.firstOpenedToday}`);
+                                    }
+                                    if (door.lastOpenedToday && door.lastOpenedToday !== door.firstOpenedToday) {
+                                        todaysOpenings.add(`${door.name}-${door.lastOpenedToday}`);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
+                    console.log('updateEnhancedDoorActivity: Processed door events:', {
+                        totalEvents: doorEvents.length,
+                        uniqueDoors: doorNames.size,
+                        todaysSessions: todaysOpenings.size,
+                        latestActivity: latestActivity,
+                        earliestActivity: earliestActivity
+                    });
+                    
+                    // Update Door Activity Center with real calculated data
+                    if (doorEvents.length > 0) {
+                        console.log('updateEnhancedDoorActivity: Displaying real door activity data');
                         
-                        // Check if this is honest "no data" response or placeholder data
-                        const isNoDataResponse = (
-                            doors.status === 'no_door_sensors' ||
-                            doorActivity.activeDoors === 0 ||
-                            doorActivity.activeDoors === null ||
-                            !doorActivity.lastActivity
+                        // Calculate peak activity hour
+                        const peakHour = Object.keys(hourlyActivity).reduce((a, b) => 
+                            hourlyActivity[a] > hourlyActivity[b] ? a : b
                         );
+                        const peakHourFormatted = `${peakHour}:00-${parseInt(peakHour)+1}:00`;
                         
-                        const isPlaceholderData = (
-                            doorActivity.activeDoors === 3 && 
-                            doorActivity.totalSessions === 15 && 
-                            doorActivity.peakHour === '7-8 PM' &&
-                            doorActivity.firstActivity === '6:23 AM'
-                        ) || (
-                            doorActivity.lastActivity === '2:34 PM' &&
-                            doorActivity.message && doorActivity.message.includes('placeholder')
-                        );
+                        // Update main door activity stats
+                        document.getElementById('activeDoorsCount').textContent = doorNames.size;
+                        document.getElementById('totalSessionsCount').textContent = todaysOpenings.size;
                         
-                        if (isNoDataResponse) {
-                            console.log('updateEnhancedDoorActivity: No door sensor data available - showing honest message');
-                            // Show honest "data not available" instead of fake data
-                            document.getElementById('activeDoorsCount').textContent = '—';
-                            document.getElementById('totalSessionsCount').textContent = '—';
-                            document.getElementById('lastActivityTime').textContent = 'No door sensors configured';
-                        } else if (isPlaceholderData) {
-                            console.log('updateEnhancedDoorActivity: Detected old placeholder data - showing honest message');
-                            // Show honest "data not available" instead of fake data
-                            document.getElementById('activeDoorsCount').textContent = '—';
-                            document.getElementById('totalSessionsCount').textContent = '—';
-                            document.getElementById('lastActivityTime').textContent = 'Door data not available';
-                            
-                            document.getElementById('firstActivityStat').textContent = 'Data not available';
-                            document.getElementById('peakHourStat').textContent = 'Data not available';
-                            document.getElementById('totalSessionsStat').textContent = 'Data not available';
-                        } else {
-                            // Use real data
-                            document.getElementById('activeDoorsCount').textContent = doorActivity.activeDoors || '0';
-                            document.getElementById('totalSessionsCount').textContent = doorActivity.totalSessions || '0';
-                            document.getElementById('lastActivityTime').textContent = doorActivity.lastActivity || 'No recent activity';
-                            
-                            document.getElementById('firstActivityStat').textContent = doorActivity.firstActivity ? `First: ${doorActivity.firstActivity}` : 'No activity';
-                            document.getElementById('peakHourStat').textContent = doorActivity.peakHour ? `Peak: ${doorActivity.peakHour}` : 'No peak identified';
-                            document.getElementById('totalSessionsStat').textContent = `Sessions: ${doorActivity.totalSessions || 0}`;
-                        }
+                        // Format last activity time
+                        const lastActivityDate = new Date(latestActivity * 1000);
+                        const lastActivityFormatted = lastActivityDate.toLocaleString([], {
+                            month: 'short', day: 'numeric', 
+                            hour: '2-digit', minute: '2-digit'
+                        });
+                        document.getElementById('lastActivityTime').textContent = lastActivityFormatted;
+                        
+                        // Update detailed stats in summary section
+                        const firstActivityDate = new Date(earliestActivity * 1000);
+                        const firstActivityFormatted = firstActivityDate.toLocaleString([], {
+                            month: 'short', day: 'numeric', 
+                            hour: '2-digit', minute: '2-digit'
+                        });
+                        
+                        document.getElementById('firstActivityStat').textContent = `First: ${firstActivityFormatted}`;
+                        document.getElementById('peakHourStat').textContent = `Peak: ${peakHourFormatted}`;
+                        document.getElementById('totalSessionsStat').textContent = `${todaysOpenings.size} sessions`;
+                        
+                        console.log('updateEnhancedDoorActivity: Updated Door Activity Center with real data:', {
+                            activeDoors: doorNames.size,
+                            totalSessions: todaysOpenings.size,
+                            lastActivity: lastActivityFormatted,
+                            firstActivity: firstActivityFormatted,
+                            peakHour: peakHourFormatted
+                        });
+                        
                     } else {
-                        console.log('updateEnhancedDoorActivity: Door activity data not available');
-                        // Handle case where doors data is not available
-                        document.getElementById('activeDoorsCount').textContent = '—';
-                        document.getElementById('totalSessionsCount').textContent = '—';
-                        document.getElementById('lastActivityTime').textContent = 'Data not available';
+                        console.log('updateEnhancedDoorActivity: No door activity events found - showing honest message');
                         
-                        document.getElementById('firstActivityStat').textContent = 'Data not available';
-                        document.getElementById('peakHourStat').textContent = 'Data not available';
-                        document.getElementById('totalSessionsStat').textContent = 'Data not available';
+                        // Update with honest "no data" message
+                        document.getElementById('activeDoorsCount').textContent = '0';
+                        document.getElementById('totalSessionsCount').textContent = '0';
+                        document.getElementById('lastActivityTime').textContent = 'No recent activity';
+                        
+                        document.getElementById('firstActivityStat').textContent = 'No data';
+                        document.getElementById('peakHourStat').textContent = 'No data';
+                        document.getElementById('totalSessionsStat').textContent = '0 sessions';
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading door activity data:', error);
+                    console.error('updateEnhancedDoorActivity: Error:', error);
                     
-                    // Show error states
-                    document.getElementById('activeDoorsCount').textContent = '?';
-                    document.getElementById('totalSessionsCount').textContent = '?';
-                    document.getElementById('lastActivityTime').textContent = 'Error loading';
+                    // Show error state
+                    document.getElementById('activeDoorsCount').textContent = 'Error';
+                    document.getElementById('totalSessionsCount').textContent = 'Error';
+                    document.getElementById('lastActivityTime').textContent = 'Data unavailable';
                     
-                    document.getElementById('firstActivityStat').textContent = 'Data unavailable';
-                    document.getElementById('peakHourStat').textContent = 'Data unavailable';
-                    document.getElementById('totalSessionsStat').textContent = 'Data unavailable';
+                    document.getElementById('firstActivityStat').textContent = 'Error loading';
+                    document.getElementById('peakHourStat').textContent = 'Error loading';
+                    document.getElementById('totalSessionsStat').textContent = 'Error loading';
                 });
         }
 
@@ -1006,11 +1055,31 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Map API response fields to display elements
                         if (healthUptime) {
-                            // Convert uptime to readable format (startup.uptime is in minutes)
-                            const uptimeMinutes = startup.uptime || 0;
-                            const hours = Math.floor(uptimeMinutes / 60);
-                            const minutes = uptimeMinutes % 60;
-                            healthUptime.textContent = `${hours}h ${minutes}m`;
+                            // Calculate actual uptime from boot time instead of trusting ESP32's uptime value
+                            if (startup.bootTime) {
+                                const bootTimestamp = parseInt(startup.bootTime);
+                                const currentTimestamp = Math.floor(Date.now() / 1000);
+                                const actualUptimeMinutes = Math.floor((currentTimestamp - bootTimestamp) / 60);
+                                
+                                const hours = Math.floor(actualUptimeMinutes / 60);
+                                const minutes = actualUptimeMinutes % 60;
+                                
+                                console.log('updateSystemHealthWidget: Uptime calculation:', {
+                                    bootTimestamp: bootTimestamp,
+                                    currentTimestamp: currentTimestamp,
+                                    reportedUptime: startup.uptime,
+                                    calculatedUptimeMinutes: actualUptimeMinutes,
+                                    display: `${hours}h ${minutes}m`
+                                });
+                                
+                                healthUptime.textContent = `${hours}h ${minutes}m`;
+                            } else {
+                                // Fallback to ESP32's reported uptime if no boot time available
+                                const uptimeMinutes = startup.uptime || 0;
+                                const hours = Math.floor(uptimeMinutes / 60);
+                                const minutes = uptimeMinutes % 60;
+                                healthUptime.textContent = `${hours}h ${minutes}m`;
+                            }
                         }
                         
                         if (healthWifi) {
