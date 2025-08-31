@@ -6,7 +6,6 @@
 - This dashboard ONLY works on Azure Static Web App (has API keys)
 - Local file testing WILL FAIL - no API access locally
 - MUST GIT PUSH all changes before testing
-- Live site: https://agreeable-field-0a3c95710.5.azurestaticapps.net/
 - Wait 1-2 minutes after git push for Azure deployment to complete
 */
 
@@ -1337,8 +1336,24 @@ document.addEventListener('DOMContentLoaded', function() {
                             ].filter(Boolean).length;
                             sensorStatus.textContent = `${workingSensors}/3 OK`;
                         }
-                        if (relayStatus) relayStatus.textContent = startup.hardware?.relay ? 'OK' : 'Error';
-                        if (watchdogStatus) watchdogStatus.textContent = startup.hardware?.watchdog ? 'OK' : 'Error';
+                        // Handle relay status - show "Unknown" if not reported by ESP32
+                        if (relayStatus) {
+                            if (startup.hardware?.relay !== undefined) {
+                                relayStatus.textContent = startup.hardware.relay ? 'OK' : 'Error';
+                            } else {
+                                relayStatus.textContent = 'Unknown';
+                                relayStatus.title = 'Relay status not reported by ESP32';
+                            }
+                        }
+                        // Handle watchdog status - show "Unknown" if not reported by ESP32  
+                        if (watchdogStatus) {
+                            if (startup.hardware?.watchdog !== undefined) {
+                                watchdogStatus.textContent = startup.hardware.watchdog ? 'OK' : 'Error';
+                            } else {
+                                watchdogStatus.textContent = 'Unknown';
+                                watchdogStatus.title = 'Watchdog status not reported by ESP32';
+                            }
+                        }
                         
                         // Calculate health percentage based on available metrics
                         const gaugeContainer = document.querySelector('.gauge-container');
@@ -1454,8 +1469,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         if (displayStatus) displayStatus.textContent = 'Waiting...';
                         if (sensorStatus) sensorStatus.textContent = 'Waiting...';
-                        if (relayStatus) relayStatus.textContent = 'Waiting...';
-                        if (watchdogStatus) watchdogStatus.textContent = 'Waiting...';
+                        if (relayStatus) relayStatus.textContent = 'Unknown';
+                        if (watchdogStatus) watchdogStatus.textContent = 'Unknown';
                     }
                 })
                 .catch(error => {
@@ -1497,8 +1512,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (displayStatus) displayStatus.textContent = 'Error';
                     if (sensorStatus) sensorStatus.textContent = 'Error';
-                    if (relayStatus) relayStatus.textContent = 'Error';
-                    if (watchdogStatus) watchdogStatus.textContent = 'Error';
+                    if (relayStatus) relayStatus.textContent = 'Unknown';
+                    if (watchdogStatus) watchdogStatus.textContent = 'Unknown';
                     
                     // Show error state in gauge
                     updateSystemHealthGauge(0);
@@ -2326,6 +2341,12 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('forecastHigh').textContent = 'No data';
             document.getElementById('stormRisk').textContent = 'No data';
             document.getElementById('stormRiskExplanation').textContent = 'Storm risk status will be explained here.';
+            
+            // Set enhanced forecast to no data
+            const forecastHumidityElement = document.getElementById('forecastHumidity');
+            if (forecastHumidityElement) forecastHumidityElement.textContent = 'No data';
+            const forecastPrecipitationElement = document.getElementById('forecastPrecipitation');
+            if (forecastPrecipitationElement) forecastPrecipitationElement.textContent = 'No data';
 
             // Set system info to no data with null checks
             const uptimeElement = document.getElementById('uptime');
@@ -2419,18 +2440,52 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('forecastHigh').textContent = weather.forecastHigh != null ? `${weather.forecastHigh.toFixed(0)}°F` : 'No data';
             document.getElementById('stormRisk').textContent = stormRiskValue;
             
-            // Update storm risk explanation based on the actual value
-            const stormRiskExplanation = document.getElementById('stormRiskExplanation');
-            if (stormRiskValue && stormRiskValue !== 'No data') {
-                const explanations = {
-                    'Clear': 'Stable pressure - no significant changes over 3 hours.',
-                    'Possible': 'Low pressure below 1000 hPa detected.',
-                    'Likely': 'Pressure drop >3 hPa over 3 hours detected.',
-                    'Imminent': 'Rapid pressure drop >5 hPa over 3 hours detected!'
-                };
-                stormRiskExplanation.textContent = explanations[stormRiskValue] || `${stormRiskValue} - pressure trend indicates weather change.`;
+            // Enhanced forecast data display (PHASE 1)
+            const enhancedForecast = weather.enhancedForecast;
+            if (enhancedForecast && enhancedForecast.valid) {
+                // Update humidity forecast (could add new dashboard element)
+                const humidityElement = document.getElementById('forecastHumidity');
+                if (humidityElement) {
+                    humidityElement.textContent = `${enhancedForecast.humidity.toFixed(0)}% (Forecast)`;
+                }
+                
+                // Update precipitation forecast (could add new dashboard element) 
+                const precipElement = document.getElementById('forecastPrecipitation');
+                if (precipElement) {
+                    precipElement.textContent = `${enhancedForecast.precipitationProb.toFixed(0)}% (Forecast)`;
+                }
+                
+                // Enhanced storm risk explanation with more detailed forecast data
+                const stormRiskExplanation = document.getElementById('stormRiskExplanation');
+                if (stormRiskExplanation) {
+                    let explanation = '';
+                    if (stormRiskValue === 'Clear') {
+                        explanation = `Stable pressure - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
+                    } else if (stormRiskValue === 'Possible') {
+                        explanation = `Low pressure detected - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, wind increasing to ${enhancedForecast.windSpeed.toFixed(1)} m/s (Forecast).`;
+                    } else if (stormRiskValue === 'Likely') {
+                        explanation = `Pressure dropping rapidly - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds expected (Forecast).`;
+                    } else if (stormRiskValue === 'Imminent') {
+                        explanation = `Rapid pressure drop! ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
+                    } else {
+                        explanation = `${stormRiskValue} - ${enhancedForecast.precipitationProb.toFixed(0)}% rain, ${enhancedForecast.windSpeed.toFixed(1)} m/s wind (Forecast).`;
+                    }
+                    stormRiskExplanation.textContent = explanation;
+                }
             } else {
-                stormRiskExplanation.textContent = 'Storm risk status will be explained here.';
+                // Fallback to basic explanation when enhanced forecast not available
+                const stormRiskExplanation = document.getElementById('stormRiskExplanation');
+                if (stormRiskValue && stormRiskValue !== 'No data') {
+                    const explanations = {
+                        'Clear': 'Stable pressure - no significant changes over 3 hours.',
+                        'Possible': 'Low pressure below 1000 hPa detected.',
+                        'Likely': 'Pressure drop >3 hPa over 3 hours detected.',
+                        'Imminent': 'Rapid pressure drop >5 hPa over 3 hours detected!'
+                    };
+                    stormRiskExplanation.textContent = explanations[stormRiskValue] || `${stormRiskValue} - pressure trend indicates weather change.`;
+                } else {
+                    stormRiskExplanation.textContent = 'Storm risk status will be explained here.';
+                }
             }
             
             // Update system info with proper null/undefined handling

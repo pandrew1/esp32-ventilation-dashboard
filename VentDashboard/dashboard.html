@@ -5,7 +5,6 @@
 - This dashboard ONLY works when deployed to Azure Static Web App
 - Local testing will FAIL - no API keys available locally  
 - MUST GIT PUSH all changes before testing
-- Live URL: https://agreeable-field-0a3c95710.5.azurestaticapps.net/
 - Wait 1-2 minutes after git push for Azure deployment
 -->
 <head>
@@ -1051,6 +1050,14 @@
                             <div class="sensor-reading">
                                 <span>Forecast High</span>
                                 <span class="sensor-value temperature" id="forecastHigh">-°F</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Humidity Forecast</span>
+                                <span class="sensor-value humidity" id="forecastHumidity">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Rain Chance</span>
+                                <span class="sensor-value" id="forecastPrecipitation">-%</span>
                             </div>
                             <div class="sensor-reading">
                                 <span>Storm Risk</span>
