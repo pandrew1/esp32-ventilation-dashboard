@@ -1240,6 +1240,38 @@
                             </div>
                         </div>
                         
+                        <!-- PHASE 4: Health Monitoring Panel -->
+                        <div class="health-monitoring-section" style="margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border-radius: 8px; border-left: 4px solid #4CAF50;">
+                            <h4 style="margin: 0 0 12px 0; color: #2e7d32;">💊 Barometric Health Monitoring</h4>
+                            <div style="font-size: 11px; color: #666; margin-bottom: 10px; font-style: italic;">INFORMATIONAL ONLY - Consult healthcare providers for medical decisions</div>
+                            
+                            <div class="health-metrics" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0;">
+                                <div class="metric-item">
+                                    <div style="font-size: 13px; color: #555; font-weight: bold;">Health Risk Level</div>
+                                    <div id="health-risk-level" style="font-size: 16px; color: #4CAF50; font-weight: bold;">--</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div style="font-size: 13px; color: #555; font-weight: bold;">Migraine Risk</div>
+                                    <div id="migraine-risk" style="font-size: 16px; color: #4CAF50; font-weight: bold;">--%</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pressure-trends" style="margin: 12px 0;">
+                                <div style="font-size: 13px; color: #555; font-weight: bold; margin-bottom: 6px;">Pressure Change Rates:</div>
+                                <div style="font-size: 12px; color: #333; line-height: 1.4;">
+                                    <div>1-Hour: <span id="pressure-1h" style="color: #2e7d32; font-weight: bold;">-- hPa/hr</span></div>
+                                    <div>3-Hour: <span id="pressure-3h" style="color: #2e7d32; font-weight: bold;">-- hPa/hr</span></div>
+                                    <div>24-Hour: <span id="pressure-24h" style="color: #2e7d32; font-weight: bold;">-- hPa/hr</span></div>
+                                    <div>Rapid Alert: <span id="rapid-alert" style="color: #4CAF50; font-weight: bold;">--</span></div>
+                                </div>
+                            </div>
+                            
+                            <div style="margin: 10px 0 0 0;">
+                                <div style="font-size: 13px; color: #555; font-weight: bold;">Health Recommendation:</div>
+                                <div id="health-recommendation" style="font-size: 12px; color: #2e7d32; font-style: italic; margin-top: 4px;">Loading health analysis...</div>
+                            </div>
+                        </div>
+                        
                         <!-- System Reliability & Startup Info -->
                         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef;">
                             <div style="font-weight: bold; color: #2c3e50; margin-bottom: 8px;">🛡️ System Reliability:</div>

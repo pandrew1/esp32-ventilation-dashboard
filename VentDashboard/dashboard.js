@@ -2723,6 +2723,129 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // PHASE 4: Health Monitoring Analysis Display
+            const healthMonitoring = data.healthMonitoring;
+            if (healthMonitoring && healthMonitoring.valid) {
+                // Update health risk level with color coding
+                const healthRiskElement = document.getElementById('health-risk-level');
+                if (healthRiskElement && healthMonitoring.healthRiskLevel != null) {
+                    const riskNames = ['Low', 'Moderate', 'High', 'Severe'];
+                    const riskName = riskNames[healthMonitoring.healthRiskLevel] || 'Unknown';
+                    healthRiskElement.textContent = riskName;
+                    
+                    // Color code the health risk level
+                    if (healthMonitoring.healthRiskLevel === 0) {
+                        healthRiskElement.style.color = '#4CAF50'; // Low - Green
+                    } else if (healthMonitoring.healthRiskLevel === 1) {
+                        healthRiskElement.style.color = '#FF9800'; // Moderate - Orange
+                    } else if (healthMonitoring.healthRiskLevel === 2) {
+                        healthRiskElement.style.color = '#FF5722'; // High - Deep Orange
+                    } else {
+                        healthRiskElement.style.color = '#F44336'; // Severe - Red
+                    }
+                }
+                
+                // Update migraine risk
+                const migraineriskElement = document.getElementById('migraine-risk');
+                if (migraineriskElement && healthMonitoring.migraineRisk != null) {
+                    const risk = healthMonitoring.migraineRisk.toFixed(0);
+                    migraineriskElement.textContent = `${risk}%`;
+                    
+                    // Color code migraine risk
+                    if (healthMonitoring.migraineRisk < 30) {
+                        migraineriskElement.style.color = '#4CAF50'; // Low - Green
+                    } else if (healthMonitoring.migraineRisk < 60) {
+                        migraineriskElement.style.color = '#FF9800'; // Moderate - Orange
+                    } else {
+                        migraineriskElement.style.color = '#F44336'; // High - Red
+                    }
+                }
+                
+                // Update pressure change rates
+                const pressure1hElement = document.getElementById('pressure-1h');
+                if (pressure1hElement && healthMonitoring.pressureChangeRate1h != null) {
+                    const rate = healthMonitoring.pressureChangeRate1h.toFixed(2);
+                    pressure1hElement.textContent = `${rate} hPa/hr`;
+                    // Color code based on change rate magnitude
+                    const absRate = Math.abs(healthMonitoring.pressureChangeRate1h);
+                    if (absRate < 1.0) {
+                        pressure1hElement.style.color = '#4CAF50'; // Stable - Green
+                    } else if (absRate < 2.0) {
+                        pressure1hElement.style.color = '#FF9800'; // Moderate - Orange
+                    } else {
+                        pressure1hElement.style.color = '#F44336'; // Rapid - Red
+                    }
+                }
+                
+                const pressure3hElement = document.getElementById('pressure-3h');
+                if (pressure3hElement && healthMonitoring.pressureChangeRate3h != null) {
+                    const rate = healthMonitoring.pressureChangeRate3h.toFixed(2);
+                    pressure3hElement.textContent = `${rate} hPa/hr`;
+                }
+                
+                const pressure24hElement = document.getElementById('pressure-24h');
+                if (pressure24hElement && healthMonitoring.pressureChangeRate24h != null) {
+                    const rate = healthMonitoring.pressureChangeRate24h.toFixed(2);
+                    pressure24hElement.textContent = `${rate} hPa/hr`;
+                }
+                
+                // Update rapid change alert
+                const rapidAlertElement = document.getElementById('rapid-alert');
+                if (rapidAlertElement) {
+                    const alertStatus = healthMonitoring.rapidChangeAlert ? 'YES' : 'No';
+                    rapidAlertElement.textContent = alertStatus;
+                    rapidAlertElement.style.color = healthMonitoring.rapidChangeAlert ? '#F44336' : '#4CAF50';
+                }
+                
+                // Update health recommendation
+                const healthRecommendationElement = document.getElementById('health-recommendation');
+                if (healthRecommendationElement && healthMonitoring.healthRecommendation) {
+                    healthRecommendationElement.textContent = healthMonitoring.healthRecommendation;
+                }
+            } else {
+                // Fallback when health monitoring data not available
+                const healthRiskElement = document.getElementById('health-risk-level');
+                if (healthRiskElement) {
+                    healthRiskElement.textContent = '--';
+                    healthRiskElement.style.color = '#666';
+                }
+                
+                const migraineriskElement = document.getElementById('migraine-risk');
+                if (migraineriskElement) {
+                    migraineriskElement.textContent = '--%';
+                    migraineriskElement.style.color = '#666';
+                }
+                
+                const pressure1hElement = document.getElementById('pressure-1h');
+                if (pressure1hElement) {
+                    pressure1hElement.textContent = '-- hPa/hr';
+                    pressure1hElement.style.color = '#666';
+                }
+                
+                const pressure3hElement = document.getElementById('pressure-3h');
+                if (pressure3hElement) {
+                    pressure3hElement.textContent = '-- hPa/hr';
+                    pressure3hElement.style.color = '#666';
+                }
+                
+                const pressure24hElement = document.getElementById('pressure-24h');
+                if (pressure24hElement) {
+                    pressure24hElement.textContent = '-- hPa/hr';
+                    pressure24hElement.style.color = '#666';
+                }
+                
+                const rapidAlertElement = document.getElementById('rapid-alert');
+                if (rapidAlertElement) {
+                    rapidAlertElement.textContent = '--';
+                    rapidAlertElement.style.color = '#666';
+                }
+                
+                const healthRecommendationElement = document.getElementById('health-recommendation');
+                if (healthRecommendationElement) {
+                    healthRecommendationElement.textContent = 'Health analysis not available [INFORMATIONAL ONLY]';
+                }
+            }
+            
             // Update system info with proper null/undefined handling
             const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
             const uptimeElement = document.getElementById('uptime');
