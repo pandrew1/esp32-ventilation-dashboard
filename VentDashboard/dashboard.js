@@ -2613,6 +2613,116 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // PHASE 3: Building Performance Analysis Display
+            const buildingPerformance = data.buildingPerformance;
+            if (buildingPerformance && buildingPerformance.valid) {
+                // Update building efficiency score with color coding
+                const buildingScoreElement = document.getElementById('building-score');
+                if (buildingScoreElement && buildingPerformance.buildingScore != null) {
+                    const score = buildingPerformance.buildingScore.toFixed(1);
+                    buildingScoreElement.textContent = `${score}/10`;
+                    
+                    // Color code the building score
+                    if (buildingPerformance.buildingScore >= 8.0) {
+                        buildingScoreElement.style.color = '#4CAF50'; // Excellent - Green
+                    } else if (buildingPerformance.buildingScore >= 6.5) {
+                        buildingScoreElement.style.color = '#2196F3'; // Good - Blue
+                    } else if (buildingPerformance.buildingScore >= 5.0) {
+                        buildingScoreElement.style.color = '#FF9800'; // Fair - Orange
+                    } else {
+                        buildingScoreElement.style.color = '#F44336'; // Poor - Red
+                    }
+                }
+                
+                // Update air tightness score
+                const airTightnessElement = document.getElementById('air-tightness');
+                if (airTightnessElement && buildingPerformance.airTightnessScore != null) {
+                    const score = buildingPerformance.airTightnessScore.toFixed(1);
+                    airTightnessElement.textContent = `${score}/10`;
+                    
+                    // Color code air tightness
+                    if (buildingPerformance.airTightnessScore >= 8.0) {
+                        airTightnessElement.style.color = '#4CAF50'; // Excellent - Green
+                    } else if (buildingPerformance.airTightnessScore >= 6.5) {
+                        airTightnessElement.style.color = '#2196F3'; // Good - Blue
+                    } else {
+                        airTightnessElement.style.color = '#FF9800'; // Fair - Orange
+                    }
+                }
+                
+                // Update pressure differentials
+                const indoorOutdoorElement = document.getElementById('indoor-outdoor-diff');
+                if (indoorOutdoorElement && buildingPerformance.indoorOutdoorDiff != null) {
+                    const diff = buildingPerformance.indoorOutdoorDiff.toFixed(2);
+                    indoorOutdoorElement.textContent = `${diff} hPa`;
+                    // Color code based on pressure difference magnitude
+                    const absDiff = Math.abs(buildingPerformance.indoorOutdoorDiff);
+                    if (absDiff < 0.5) {
+                        indoorOutdoorElement.style.color = '#4CAF50'; // Good - Green
+                    } else if (absDiff < 1.0) {
+                        indoorOutdoorElement.style.color = '#FF9800'; // Fair - Orange
+                    } else {
+                        indoorOutdoorElement.style.color = '#F44336'; // Poor - Red
+                    }
+                }
+                
+                const garageOutdoorElement = document.getElementById('garage-outdoor-diff');
+                if (garageOutdoorElement && buildingPerformance.garageOutdoorDiff != null) {
+                    const diff = buildingPerformance.garageOutdoorDiff.toFixed(2);
+                    garageOutdoorElement.textContent = `${diff} hPa`;
+                }
+                
+                // Update HVAC status
+                const hvacStatusElement = document.getElementById('hvac-status');
+                if (hvacStatusElement) {
+                    const hvacStatus = buildingPerformance.hvacActive ? 'Active' : 'Inactive';
+                    hvacStatusElement.textContent = hvacStatus;
+                    hvacStatusElement.style.color = buildingPerformance.hvacActive ? '#FF9800' : '#4CAF50';
+                }
+                
+                // Update building performance status
+                const buildingStatusElement = document.getElementById('building-status');
+                if (buildingStatusElement && buildingPerformance.performanceStatus) {
+                    buildingStatusElement.textContent = buildingPerformance.performanceStatus;
+                }
+            } else {
+                // Fallback when building performance data not available
+                const buildingScoreElement = document.getElementById('building-score');
+                if (buildingScoreElement) {
+                    buildingScoreElement.textContent = '--/10';
+                    buildingScoreElement.style.color = '#666';
+                }
+                
+                const airTightnessElement = document.getElementById('air-tightness');
+                if (airTightnessElement) {
+                    airTightnessElement.textContent = '--/10';
+                    airTightnessElement.style.color = '#666';
+                }
+                
+                const indoorOutdoorElement = document.getElementById('indoor-outdoor-diff');
+                if (indoorOutdoorElement) {
+                    indoorOutdoorElement.textContent = '-- hPa';
+                    indoorOutdoorElement.style.color = '#666';
+                }
+                
+                const garageOutdoorElement = document.getElementById('garage-outdoor-diff');
+                if (garageOutdoorElement) {
+                    garageOutdoorElement.textContent = '-- hPa';
+                    garageOutdoorElement.style.color = '#666';
+                }
+                
+                const hvacStatusElement = document.getElementById('hvac-status');
+                if (hvacStatusElement) {
+                    hvacStatusElement.textContent = '--';
+                    hvacStatusElement.style.color = '#666';
+                }
+                
+                const buildingStatusElement = document.getElementById('building-status');
+                if (buildingStatusElement) {
+                    buildingStatusElement.textContent = 'Building analysis not available';
+                }
+            }
+            
             // Update system info with proper null/undefined handling
             const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
             const uptimeElement = document.getElementById('uptime');
