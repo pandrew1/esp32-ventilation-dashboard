@@ -2537,6 +2537,82 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // PHASE 2: Pacific NW Comfort Intelligence Display
+            const comfortIntelligence = weather.comfortIntelligence;
+            if (comfortIntelligence && comfortIntelligence.valid) {
+                // Update comfort score with color coding
+                const comfortScoreElement = document.getElementById('comfort-score');
+                if (comfortScoreElement && comfortIntelligence.comfortIndex != null) {
+                    const score = comfortIntelligence.comfortIndex.toFixed(1);
+                    comfortScoreElement.textContent = `${score}/10`;
+                    
+                    // Color code the comfort score
+                    if (comfortIntelligence.comfortIndex >= 8.0) {
+                        comfortScoreElement.style.color = '#4CAF50'; // Excellent - Green
+                    } else if (comfortIntelligence.comfortIndex >= 6.5) {
+                        comfortScoreElement.style.color = '#2196F3'; // Good - Blue
+                    } else if (comfortIntelligence.comfortIndex >= 5.0) {
+                        comfortScoreElement.style.color = '#FF9800'; // Fair - Orange
+                    } else {
+                        comfortScoreElement.style.color = '#F44336'; // Poor - Red
+                    }
+                }
+                
+                // Update fog risk with color coding
+                const fogRiskElement = document.getElementById('fog-risk');
+                if (fogRiskElement && comfortIntelligence.fogRisk != null) {
+                    const fogRisk = comfortIntelligence.fogRisk.toFixed(0);
+                    fogRiskElement.textContent = `${fogRisk}%`;
+                    
+                    // Color code fog risk
+                    if (comfortIntelligence.fogRisk >= 70) {
+                        fogRiskElement.style.color = '#F44336'; // High - Red
+                    } else if (comfortIntelligence.fogRisk >= 40) {
+                        fogRiskElement.style.color = '#FF9800'; // Medium - Orange
+                    } else {
+                        fogRiskElement.style.color = '#4CAF50'; // Low - Green
+                    }
+                }
+                
+                // Update marine layer status
+                const marineLayerElement = document.getElementById('marine-layer');
+                if (marineLayerElement) {
+                    const marineStatus = comfortIntelligence.marineLayerActive ? 'Active' : 'Clear';
+                    marineLayerElement.textContent = marineStatus;
+                    marineLayerElement.style.color = comfortIntelligence.marineLayerActive ? '#2196F3' : '#4CAF50';
+                }
+                
+                // Update ventilation window recommendation
+                const ventilationWindowElement = document.getElementById('ventilation-window');
+                if (ventilationWindowElement && comfortIntelligence.ventilationWindow) {
+                    ventilationWindowElement.textContent = comfortIntelligence.ventilationWindow;
+                }
+            } else {
+                // Fallback when comfort intelligence data not available
+                const comfortScoreElement = document.getElementById('comfort-score');
+                if (comfortScoreElement) {
+                    comfortScoreElement.textContent = '--/10';
+                    comfortScoreElement.style.color = '#666';
+                }
+                
+                const fogRiskElement = document.getElementById('fog-risk');
+                if (fogRiskElement) {
+                    fogRiskElement.textContent = '--%';
+                    fogRiskElement.style.color = '#666';
+                }
+                
+                const marineLayerElement = document.getElementById('marine-layer');
+                if (marineLayerElement) {
+                    marineLayerElement.textContent = '--';
+                    marineLayerElement.style.color = '#666';
+                }
+                
+                const ventilationWindowElement = document.getElementById('ventilation-window');
+                if (ventilationWindowElement) {
+                    ventilationWindowElement.textContent = 'Comfort analysis not available';
+                }
+            }
+            
             // Update system info with proper null/undefined handling
             const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
             const uptimeElement = document.getElementById('uptime');
