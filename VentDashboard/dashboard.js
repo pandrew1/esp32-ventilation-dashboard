@@ -552,7 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <p><strong>Temperature Range:</strong> ${env.tempMin}°F - ${env.tempMax}°F (Avg: ${env.tempAvg}°F)</p>
                                 <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
                                 <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} inHg</p>
-                                <p><strong>Air Quality:</strong> ${env.airQuality} (AQI: ${env.aqi})</p>
+                                <p><strong>Air Quality:</strong> ${env.airQuality}${env.aqi ? ` (AQI: ${env.aqi})` : ''}${env.aqiNote ? ` - ${env.aqiNote}` : ''}</p>
                             </div>
                         `;
                     } else {
@@ -572,6 +572,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         `;
                     } else {
                         document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available</div>';
+                    }
+                    
+                    // Load system assessments (new data from enhanced ESP32)
+                    if (yesterdayData.assessments) {
+                        const assess = yesterdayData.assessments;
+                        document.getElementById('yesterdayAssessments').innerHTML = `
+                            <div class="assessment-summary">
+                                <p><strong>Storm Risk:</strong> ${assess.stormRisk} (Level ${assess.stormLevel})</p>
+                                <p><strong>Operational Status:</strong> ${assess.operational} (${assess.operationalEfficiency}% efficiency)</p>
+                                <p><strong>System Health:</strong> ${assess.systemHealth}</p>
+                                <p><strong>Data Quality:</strong> ${assess.dataQuality} samples collected</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('yesterdayAssessments').innerHTML = '<div class="info-state">Assessment data not available - using legacy ESP32 firmware</div>';
                     }
                     
                     // Load door timeline
@@ -879,10 +894,36 @@ document.addEventListener('DOMContentLoaded', function() {
                             const totalIncidents = incidents.total || 0;
                             const resolvedIncidents = incidents.resolved || 0;
                             const criticalIncidents = incidents.critical || 0;
+                            const pendingIncidents = incidents.pending || 0;
                             
-                            const systemHealthScore = totalIncidents === 0 ? 100 : Math.max(0, 100 - (totalIncidents * 10));
+                            // Enhanced system health calculation
+                            let systemHealthScore = 100;
+                            if (totalIncidents > 0) {
+                                // More sophisticated health scoring based on incident severity
+                                systemHealthScore = Math.max(0, 100 - (criticalIncidents * 20) - (incidents.high * 10) - (incidents.medium * 5) - (incidents.low * 2));
+                            }
+                            
                             document.getElementById('yesterdaySystemHealth').textContent = `${systemHealthScore}%`;
-                            document.getElementById('yesterdayIncidents').textContent = `${totalIncidents} incidents`;
+                            
+                            // Enhanced incident reporting with severity breakdown
+                            let incidentText = `${totalIncidents} incidents`;
+                            if (totalIncidents > 0) {
+                                const severityBreakdown = [];
+                                if (criticalIncidents > 0) severityBreakdown.push(`${criticalIncidents} critical`);
+                                if (incidents.high > 0) severityBreakdown.push(`${incidents.high} high`);
+                                if (incidents.medium > 0) severityBreakdown.push(`${incidents.medium} medium`);
+                                if (incidents.low > 0) severityBreakdown.push(`${incidents.low} low`);
+                                
+                                if (severityBreakdown.length > 0) {
+                                    incidentText += ` (${severityBreakdown.join(', ')})`;
+                                }
+                            }
+                            // Add note about data source for transparency
+                            if (incidents.realDataNote) {
+                                incidentText += ' ✓';
+                            }
+                            
+                            document.getElementById('yesterdayIncidents').textContent = incidentText;
                             
                             // Better uptime calculation with fallbacks
                             let uptimeText = 'No uptime data';
@@ -1503,6 +1544,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (freeHeap) freeHeap.textContent = 'Error';
                     if (wifiIP) wifiIP.textContent = 'Error';
                     if (macAddress) macAddress.textContent = 'Error';
+                    
+                    // Handle System Configuration error state - FIX for stuck "Loading configuration..."
+                    const systemConfigElement = document.getElementById('systemConfig');
+                    if (systemConfigElement) systemConfigElement.textContent = 'Configuration unavailable';
                     
                     // Handle Hardware Status error states
                     const displayStatus = document.getElementById('displayStatus');
@@ -2352,6 +2397,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const uptimeElement = document.getElementById('uptime');
             if (uptimeElement) uptimeElement.textContent = 'No data';
             
+            // Fix the stuck "Loading configuration..." text with honest "No data"
+            const systemConfigElement = document.getElementById('systemConfig');
+            if (systemConfigElement) systemConfigElement.textContent = 'No data';
+            
             // Set reliability info to no data (only elements that still exist) with null checks
             const rebootCountElement = document.getElementById('rebootCount');
             if (rebootCountElement) rebootCountElement.textContent = 'No data';
@@ -2594,10 +2643,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const watchdogStatusElement = document.getElementById('watchdogStatus');
                 if (watchdogStatusElement) watchdogStatusElement.textContent = system.watchdogEnabled ? '✅ Enabled' : '⚪ Disabled';
                 
-                // System Configuration (use current system data)
+                // System Configuration (use actual system data, not hardcoded values)
                 const systemConfigElement = document.getElementById('systemConfig');
                 if (systemConfigElement) {
-                    systemConfigElement.textContent = 'Loop: 10s, Display: 1min, Telemetry: Intelligent';
+                    // Show real configuration data if available, otherwise be honest
+                    if (startupSystem.loopInterval && startupSystem.displayInterval && startupSystem.telemetryMode) {
+                        systemConfigElement.textContent = `Loop: ${startupSystem.loopInterval}s, Display: ${startupSystem.displayInterval}min, Telemetry: ${startupSystem.telemetryMode}`;
+                    } else {
+                        systemConfigElement.textContent = 'Configuration data not available';
+                    }
                 }
                 
                 // Boot Information from sections.startup
@@ -2627,6 +2681,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else {
                             freeHeapElement.textContent = 'Unknown';
                         }
+                    }
+                    
+                    // Fallback: Update system configuration when enhanced startup data isn't available
+                    const systemConfigElement = document.getElementById('systemConfig');
+                    if (systemConfigElement) {
+                        systemConfigElement.textContent = 'No data loaded';
                     }
                 }
             }
@@ -2675,6 +2735,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('lastUpdate').innerHTML = `${timestamp.combined}<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - No ESP32 timestamp]</small>`;
                 document.getElementById('lastUpdate').style.color = '#dc3545'; // Red for browser fallback
                 document.getElementById('lastUpdate').title = 'Browser time fallback - ESP32 did not provide timestamp';
+            }
+            
+            // Fallback: Ensure systemConfig is never stuck on "Loading configuration..."
+            const systemConfigElement = document.getElementById('systemConfig');
+            if (systemConfigElement && systemConfigElement.textContent === 'Loading configuration...') {
+                systemConfigElement.textContent = 'No data loaded';
             }
         }
 
