@@ -6910,7 +6910,20 @@ function generateSeasonalDisplay(climate) {
     const marineLayer = climate.marineLayerSeason || {};
     const rainSeason = climate.rainSeasonAnalysis || {};
     const pressurePatterns = climate.highPressurePatterns || {};
-    const insights = climate.climateInsights || [];
+    const insights = climate.climateInsights || {};
+    
+    // Handle error cases
+    if (climate.error) {
+        return `
+            <div class="seasonal-intelligence-panel">
+                <h4>🌊 Pacific NW Seasonal Intelligence</h4>
+                <div class="climate-insight">
+                    <p><strong>⚠️ Analysis Error:</strong> ${climate.error}</p>
+                    ${climate.recommendation ? `<p><strong>💡 Recommendation:</strong> ${climate.recommendation}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
     
     return `
         <div class="seasonal-intelligence-panel">
@@ -6926,27 +6939,27 @@ function generateSeasonalDisplay(climate) {
             
             <div class="climate-metric-grid">
                 <div class="climate-metric-card">
-                    <div class="climate-metric-value">${marineLayer.currentStatus || '--'}</div>
+                    <div class="climate-metric-value">${marineLayer.currentStatus || marineLayer.seasonStatistics?.marineLayerFrequency || '--'}</div>
                     <div class="climate-metric-label">Marine Layer Status</div>
-                    <div style="font-size: 0.8em; color: #666;">${marineLayer.typicalSeason || 'Analysis pending'}</div>
+                    <div style="font-size: 0.8em; color: #666;">${marineLayer.typicalSeason || marineLayer.peakPeriod || 'Analysis pending'}</div>
                 </div>
                 
                 <div class="climate-metric-card">
                     <div class="climate-metric-value">${rainSeason.currentPhase || '--'}</div>
                     <div class="climate-metric-label">Rain Season Phase</div>
-                    <div style="font-size: 0.8em; color: #666;">${rainSeason.typicalStart || 'Analysis pending'}</div>
+                    <div style="font-size: 0.8em; color: #666;">${rainSeason.typicalStart || rainSeason.wetSeasonDuration || 'Analysis pending'}</div>
                 </div>
                 
                 <div class="climate-metric-card">
                     <div class="climate-metric-value">${pressurePatterns.currentStatus || '--'}</div>
                     <div class="climate-metric-label">Pressure Pattern</div>
-                    <div style="font-size: 0.8em; color: #666;">${pressurePatterns.stableSeasons || 'Analysis pending'}</div>
+                    <div style="font-size: 0.8em; color: #666;">${pressurePatterns.stableSeasons || pressurePatterns.pacificNWPattern || 'Analysis pending'}</div>
                 </div>
             </div>
             
             <div class="seasonal-insights" style="margin-top: 20px;">
                 <h5 style="color: #2e7d32; margin-bottom: 10px;">📊 Pattern Analysis</h5>
-                ${generateInsightsList(insights)}
+                ${generateInsightsList(insights.primaryInsights || [])}
                 
                 ${rainSeason.prediction ? `
                     <div class="climate-insight">
@@ -6975,9 +6988,22 @@ function generateSeasonalDisplay(climate) {
  */
 function generateMicroclimatteDisplay(climate) {
     const advantages = climate.locationAdvantages || {};
-    const localPatterns = climate.localPatterns || {};
+    const localPatterns = climate.localPatterns || [];
     const comparison = climate.regionalComparison || {};
     const energyImplications = climate.energyImplications || {};
+    
+    // Handle error cases
+    if (climate.error) {
+        return `
+            <div class="microclimate-profile-panel">
+                <h4>🏠 Your Microclimate Profile</h4>
+                <div class="climate-insight">
+                    <p><strong>⚠️ Analysis Error:</strong> ${climate.error}</p>
+                    ${climate.recommendation ? `<p><strong>💡 Recommendation:</strong> ${climate.recommendation}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
     
     return `
         <div class="microclimate-profile-panel">
@@ -6988,7 +7014,7 @@ function generateMicroclimatteDisplay(climate) {
                 
                 <div class="climate-metric-grid">
                     <div class="climate-metric-card">
-                        <div class="climate-metric-value">${advantages.temperatureBias?.averageBias || '--'}</div>
+                        <div class="climate-metric-value">${advantages.temperatureBias || '--'}</div>
                         <div class="climate-metric-label">Temperature Bias</div>
                         <div style="font-size: 0.8em; color: #666;">vs regional forecasts</div>
                     </div>
@@ -7016,14 +7042,21 @@ function generateMicroclimatteDisplay(climate) {
                     </div>
                 ` : ''}
                 
-                ${energyImplications ? `
+                ${energyImplications.heatingReduction || energyImplications.coolingReduction ? `
                     <div class="climate-insight">
-                        <p><strong>⚡ Energy Advantage:</strong> ${energyImplications} <em>(Historical Analysis)</em></p>
+                        <p><strong>⚡ Heating Efficiency:</strong> ${energyImplications.heatingReduction || 'Analysis pending'} <em>(Analysis)</em></p>
+                        <p><strong>❄️ Cooling Efficiency:</strong> ${energyImplications.coolingReduction || 'Analysis pending'} <em>(Analysis)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${localPatterns && localPatterns.length > 0 ? `
+                    <div class="climate-insight">
+                        <p><strong>📈 Local Patterns:</strong> ${localPatterns.join(', ')} <em>(Historical Analysis)</em></p>
                     </div>
                 ` : ''}
                 
                 <div class="climate-insight">
-                    <p><strong>📈 Data Quality:</strong> Analysis based on forecast accuracy vs actual sensor readings <em>(Forecast vs Historical)</em></p>
+                    <p><strong>� Data Quality:</strong> Analysis based on forecast accuracy vs actual sensor readings <em>(Forecast vs Historical)</em></p>
                 </div>
             </div>
         </div>
@@ -7039,6 +7072,26 @@ function generateForecastDisplay(climate) {
     const recommendations = climate.recommendations || [];
     const dataQuality = climate.dataQuality || {};
     
+    // Handle error cases
+    if (climate.error) {
+        return `
+            <div class="forecast-performance-panel">
+                <h4>📊 Forecast Performance for Your Location</h4>
+                <div class="climate-insight">
+                    <p><strong>⚠️ Analysis Error:</strong> ${climate.error}</p>
+                    ${climate.recommendation ? `<p><strong>💡 Recommendation:</strong> ${climate.recommendation}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Extract accuracy percentages from strings like "75% within ±2°F, 90% within ±5°F"
+    function extractAccuracyPercentage(accuracyString) {
+        if (!accuracyString) return '--';
+        const match = accuracyString.match(/(\d+)%/);
+        return match ? match[1] : '--';
+    }
+    
     return `
         <div class="forecast-performance-panel">
             <h4>📊 Forecast Performance for Your Location</h4>
@@ -7048,21 +7101,21 @@ function generateForecastDisplay(climate) {
                 
                 <div class="climate-metric-grid">
                     <div class="climate-metric-card">
-                        <div class="climate-metric-value">${accuracy.temperature?.percentage || '--'}%</div>
+                        <div class="climate-metric-value">${extractAccuracyPercentage(accuracy.temperature?.accuracy)}%</div>
                         <div class="climate-metric-label">Temperature Accuracy</div>
-                        <div style="font-size: 0.8em; color: #666;">${accuracy.temperature?.tolerance || 'within ±2°F'}</div>
+                        <div style="font-size: 0.8em; color: #666;">${accuracy.temperature?.accuracy || 'Analysis pending'}</div>
                     </div>
                     
                     <div class="climate-metric-card">
-                        <div class="climate-metric-value">${accuracy.pressure?.percentage || '--'}%</div>
+                        <div class="climate-metric-value">${extractAccuracyPercentage(accuracy.pressure?.accuracy)}%</div>
                         <div class="climate-metric-label">Pressure Accuracy</div>
-                        <div style="font-size: 0.8em; color: #666;">${accuracy.pressure?.tolerance || 'within ±1 hPa'}</div>
+                        <div style="font-size: 0.8em; color: #666;">${accuracy.pressure?.accuracy || 'Analysis pending'}</div>
                     </div>
                     
                     <div class="climate-metric-card">
-                        <div class="climate-metric-value">${accuracy.humidity?.percentage || '--'}%</div>
+                        <div class="climate-metric-value">${extractAccuracyPercentage(accuracy.humidity?.accuracy)}%</div>
                         <div class="climate-metric-label">Humidity Accuracy</div>
-                        <div style="font-size: 0.8em; color: #666;">${accuracy.humidity?.tolerance || 'within ±5%'}</div>
+                        <div style="font-size: 0.8em; color: #666;">${accuracy.humidity?.accuracy || 'Analysis pending'}</div>
                     </div>
                 </div>
             </div>
@@ -7070,27 +7123,36 @@ function generateForecastDisplay(climate) {
             <div class="forecast-insights" style="margin-top: 20px;">
                 <h5 style="color: #2e7d32; margin-bottom: 10px;">🎯 Forecast Calibration Insights</h5>
                 
-                ${biases.temperatureOverestimate ? `
+                ${biases.temperatureBias ? `
                     <div class="climate-insight">
-                        <p><strong>🌡️ Temperature Bias:</strong> ${biases.temperatureOverestimate} <em>(Forecast vs Historical)</em></p>
+                        <p><strong>🌡️ Temperature Bias:</strong> ${biases.temperatureBias} <em>(Forecast vs Historical)</em></p>
                     </div>
                 ` : ''}
                 
-                ${biases.humidityUnderestimate ? `
+                ${biases.humidityBias ? `
                     <div class="climate-insight">
-                        <p><strong>💧 Humidity Gap:</strong> ${biases.humidityUnderestimate} <em>(Forecast vs Historical)</em></p>
+                        <p><strong>💧 Humidity Bias:</strong> ${biases.humidityBias} <em>(Forecast vs Historical)</em></p>
                     </div>
                 ` : ''}
                 
-                ${biases.pressureExcellent ? `
+                ${biases.pressureBias ? `
                     <div class="climate-insight">
-                        <p><strong>🌪️ Pressure Excellence:</strong> ${biases.pressureExcellent} <em>(Forecast vs Historical)</em></p>
+                        <p><strong>🌪️ Pressure Accuracy:</strong> ${biases.pressureBias} <em>(Forecast vs Historical)</em></p>
                     </div>
                 ` : ''}
                 
                 <div class="climate-insight">
                     <p><strong>📊 Data Quality:</strong> ${dataQuality.totalComparisons || 0} forecast comparisons analyzed (${dataQuality.dataReliability || 'Unknown'} reliability) <em>(Forecast vs Historical)</em></p>
                 </div>
+                
+                ${recommendations && recommendations.length > 0 ? `
+                    <div class="climate-insight">
+                        <p><strong>💡 Recommendations:</strong></p>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;
@@ -7106,6 +7168,21 @@ function generateClimateIntelligenceSummary(climate) {
     const forecast = climate.forecastReliability || {};
     const insights = climate.actionableInsights || [];
     const summary = climate.climateSummary || {};
+    const systemStatus = climate.systemStatus || {};
+    const dataAvailability = climate.dataAvailability || {};
+    
+    // Handle error cases
+    if (climate.error) {
+        return `
+            <div class="climate-summary-panel">
+                <h4>⭐ Complete Climate Intelligence Summary</h4>
+                <div class="climate-insight">
+                    <p><strong>⚠️ Analysis Error:</strong> ${climate.error}</p>
+                    ${climate.recommendation ? `<p><strong>💡 Recommendation:</strong> ${climate.recommendation}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
     
     return `
         <div class="climate-summary-panel">
@@ -7113,27 +7190,52 @@ function generateClimateIntelligenceSummary(climate) {
             
             <div class="current-climate-status" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #2196F3;">
                 <h5 style="margin: 0 0 10px 0; color: #1976d2;">📊 Current Climate Status</h5>
-                <p style="margin: 0; color: #333; font-size: 1.1em;">${summary.executiveSummary || currentStatus.summary || 'Climate analysis in progress...'}</p>
+                <p style="margin: 0; color: #333; font-size: 1.1em;">${summary || currentStatus.summary || currentStatus || 'Climate analysis in progress...'}</p>
             </div>
             
-            <div class="climate-metric-grid">
-                <div class="climate-metric-card" style="border-color: #4CAF50;">
-                    <div class="climate-metric-value" style="color: #2e7d32;">Pacific NW</div>
-                    <div class="climate-metric-label">Seasonal Mastery</div>
-                    <div style="font-size: 0.8em; color: #666;">Marine layer + rain patterns</div>
+            <div class="system-readiness" style="margin: 15px 0;">
+                <h5 style="color: #2e7d32; margin-bottom: 10px;">🎯 System Status</h5>
+                <div class="climate-metric-grid">
+                    <div class="climate-metric-card" style="border-color: #4CAF50;">
+                        <div class="climate-metric-value" style="color: #2e7d32;">${systemStatus.overallReadiness || 'Unknown'}</div>
+                        <div class="climate-metric-label">System Readiness</div>
+                        <div style="font-size: 0.8em; color: #666;">Overall data status</div>
+                    </div>
+                    
+                    <div class="climate-metric-card" style="border-color: #FF9800;">
+                        <div class="climate-metric-value" style="color: #f57c00;">${systemStatus.monthlyStats || dataAvailability.monthlyStatistics || 'Unknown'}</div>
+                        <div class="climate-metric-label">Monthly Data</div>
+                        <div style="font-size: 0.8em; color: #666;">Historical patterns</div>
+                    </div>
+                    
+                    <div class="climate-metric-card" style="border-color: #2196F3;">
+                        <div class="climate-metric-value" style="color: #1976d2;">${systemStatus.forecastData || dataAvailability.forecastComparisons || 'Unknown'}</div>
+                        <div class="climate-metric-label">Forecast Data</div>
+                        <div style="font-size: 0.8em; color: #666;">Accuracy tracking</div>
+                    </div>
                 </div>
+            </div>
+            
+            <div class="climate-intelligence-highlights" style="margin: 20px 0;">
+                <h5 style="color: #2e7d32; margin-bottom: 15px;">🌿 Climate Intelligence Highlights</h5>
                 
-                <div class="climate-metric-card" style="border-color: #FF9800;">
-                    <div class="climate-metric-value" style="color: #f57c00;">Microclimate</div>
-                    <div class="climate-metric-label">Location Analysis</div>
-                    <div style="font-size: 0.8em; color: #666;">Your home vs regional</div>
-                </div>
+                ${seasonal && typeof seasonal === 'string' ? `
+                    <div class="climate-insight">
+                        <p><strong>🌊 Seasonal Intelligence:</strong> ${seasonal} <em>(Historical)</em></p>
+                    </div>
+                ` : ''}
                 
-                <div class="climate-metric-card" style="border-color: #2196F3;">
-                    <div class="climate-metric-value" style="color: #1976d2;">Forecast</div>
-                    <div class="climate-metric-label">Accuracy Tracking</div>
-                    <div style="font-size: 0.8em; color: #666;">Open-Meteo performance</div>
-                </div>
+                ${microclimate && typeof microclimate === 'string' ? `
+                    <div class="climate-insight">
+                        <p><strong>🏠 Microclimate Advantages:</strong> ${microclimate} <em>(Analysis)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${forecast && (typeof forecast === 'string' || forecast.reliability) ? `
+                    <div class="climate-insight">
+                        <p><strong>📊 Forecast Reliability:</strong> ${forecast.reliability || forecast} <em>(Forecast vs Historical)</em></p>
+                    </div>
+                ` : ''}
             </div>
             
             <div class="actionable-insights" style="margin-top: 25px;">
