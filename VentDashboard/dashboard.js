@@ -28,7 +28,7 @@ const CONFIG = {
 // Initialize API secret from URL parameter
 function initializeApiSecret() {
     if (!CONFIG.apiSecret) {
-        CONFIG.apiSecret = getApiKeyFromUrl() || 'VentilationSystem2025SecretKey';
+        CONFIG.apiSecret = getApiKeyFromUrl();
     }
     return CONFIG.apiSecret;
 }
@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!CONFIG.apiSecret && !token) {
                 const noDataNotice = document.createElement('div');
                 noDataNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
-                noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> Data is currently unavailable. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=VentilationSystem2025SecretKey</code> to URL for live data.';
+                noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> Data is currently unavailable. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=YOUR_API_KEY</code> to URL for live data.';
                 if (header) header.appendChild(noDataNotice);
             }
             
@@ -512,9 +512,14 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('yesterdayAggregation').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading aggregation status...</em></div>';
             document.getElementById('yesterdayIncidentSummary').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading incident analysis...</em></div>';
             
-            // Get API key from URL or use default
+            // Get API key from URL (no hardcoded secrets in public repo)
             const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            
+            if (!apiKey) {
+                console.warn('No API key provided in URL - API calls may fail');
+                return;
+            }
             
             // Call the enhanced dashboard API
             const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
@@ -808,9 +813,14 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('yesterdayIncidents').textContent = loadingText;
             document.getElementById('yesterdayUptime').textContent = loadingText;
             
-            // Get API key from URL or use default
+            // Get API key from URL (no hardcoded secrets in public repo)
             const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            
+            if (!apiKey) {
+                console.warn('loadYesterdaySummaryMetrics: No API key provided in URL - API calls may fail');
+                return;
+            }
             
             // Call the enhanced dashboard API for summary data
             const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
@@ -1048,9 +1058,14 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('peakHourStat').textContent = 'Loading...';
             document.getElementById('totalSessionsStat').textContent = 'Loading...';
             
-            // Get API key from URL or use default
+            // Get API key from URL (no hardcoded secrets in public repo)
             const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            
+            if (!apiKey) {
+                console.warn('updateEnhancedDoorActivity: No API key provided in URL - API calls may fail');
+                return;
+            }
             
             // Use GetVentilationHistory API (same as Activity Timeline) for real door data
             const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=24';
@@ -1218,9 +1233,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const bootReasonInfo = document.getElementById('bootReasonInfo');
             if (bootReasonInfo) bootReasonInfo.textContent = 'Loading...';
             
-            // Get API key from URL or use default
+            // Get API key from URL (no hardcoded secrets in public repo)
             const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            
+            if (!apiKey) {
+                console.warn('updateSystemHealthWidget: No API key provided in URL - API calls may fail');
+                return;
+            }
             
             // Call the enhanced dashboard API for system health data
             const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
@@ -1596,11 +1616,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show loading state
             timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Loading ' + hours + 'h door activity timeline...</p></div>';
             
-            // Get API key from URL or use default
+            // Get API key from URL (no hardcoded secrets in public repo)
             const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
             
-            console.log('TIMELINE: Using API key:', apiKey ? 'Found' : 'Default');
+            if (!apiKey) {
+                console.warn('updateDoorTimeline: No API key provided in URL - API calls may fail');
+                timelineViz.innerHTML = '<div class="timeline-error">No API key provided in URL. Add ?apikey=YOUR_API_KEY to the URL.</div>';
+                return;
+            }
+            
+            console.log('TIMELINE: Using API key from URL parameter');
             
             // Call the ventilation history API for door timeline data
             const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=${hours}`;
