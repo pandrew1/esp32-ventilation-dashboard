@@ -6754,7 +6754,23 @@ function showAnalyticsTab(tabName) {
 /**
  * Load Climate Intelligence Analysis
  */
+let climateAnalysisLoading = false;
+let climateAnalysisTimeout = null;
+
 async function loadClimateAnalysis() {
+    // Prevent multiple simultaneous calls
+    if (climateAnalysisLoading) {
+        console.log('Climate analysis already loading, ignoring duplicate call');
+        return;
+    }
+    
+    // Clear any pending timeout
+    if (climateAnalysisTimeout) {
+        clearTimeout(climateAnalysisTimeout);
+        climateAnalysisTimeout = null;
+    }
+    
+    climateAnalysisLoading = true;
     const analysisTypeElement = document.getElementById('climateAnalysisType');
     const timePeriodElement = document.getElementById('climatePeriod');
     
@@ -6846,6 +6862,9 @@ async function loadClimateAnalysis() {
         // Show data source indicator
         showClimateDataSource(climateData, analysisType, timePeriod);
         
+        // Reset loading flag on success
+        climateAnalysisLoading = false;
+        
     } catch (error) {
         console.error('Climate analysis loading failed:', error);
         
@@ -6870,6 +6889,9 @@ async function loadClimateAnalysis() {
                 </div>
             `;
         }
+        
+        // Reset loading flag on error
+        climateAnalysisLoading = false;
     }
 }
 
