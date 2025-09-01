@@ -574,19 +574,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available</div>';
                     }
                     
-                    // Load system assessments (new data from enhanced ESP32)
-                    if (yesterdayData.assessments) {
-                        const assess = yesterdayData.assessments;
+                    // Load system assessments (enhanced ESP32 sends as dailySummary.assessments)
+                    const assessments = yesterdayData.dailySummary?.assessments || yesterdayData.assessments;
+                    if (assessments) {
+                        const assess = assessments;
                         document.getElementById('yesterdayAssessments').innerHTML = `
                             <div class="assessment-summary">
-                                <p><strong>Storm Risk:</strong> ${assess.stormRisk} (Level ${assess.stormLevel})</p>
-                                <p><strong>Operational Status:</strong> ${assess.operational} (${assess.operationalEfficiency}% efficiency)</p>
-                                <p><strong>System Health:</strong> ${assess.systemHealth}</p>
-                                <p><strong>Data Quality:</strong> ${assess.dataQuality} samples collected</p>
+                                <p><strong>Storm Risk Assessment:</strong> ${assess.stormRisk} (Level ${assess.stormLevel}) <em>(Real-time)</em></p>
+                                <p><strong>Operational Assessment:</strong> ${assess.operational} - ${assess.operationalEfficiency}% efficiency <em>(Analysis)</em></p>
+                                <p><strong>System Health:</strong> ${assess.systemHealth} <em>(Real-time)</em></p>
+                                <p><strong>Data Quality:</strong> ${assess.dataQuality} samples collected <em>(Historical)</em></p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayAssessments').innerHTML = '<div class="info-state">Assessment data not available - using legacy ESP32 firmware</div>';
+                        document.getElementById('yesterdayAssessments').innerHTML = '<div class="info-state">Assessment data not available - enhanced ESP32 firmware required</div>';
                     }
                     
                     // Load door timeline
