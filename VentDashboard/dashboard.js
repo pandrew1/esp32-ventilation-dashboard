@@ -6768,6 +6768,16 @@ async function loadClimateAnalysis() {
         const headers = getAuthHeaders();
         console.log('Using authentication headers for Climate API:', Object.keys(headers));
         
+        // DEBUG: Log the actual API key being sent in the header
+        if (headers['X-API-Secret']) {
+            console.log('DEBUG: Climate API X-API-Secret header value:', headers['X-API-Secret']);
+        } else if (headers['Authorization']) {
+            console.log('DEBUG: Climate API Authorization header value:', headers['Authorization']);
+        } else {
+            console.log('DEBUG: Climate API - No authentication header found!');
+        }
+        console.log('DEBUG: Full headers object for Climate API:', headers);
+        
         const response = await fetch(apiUrl, {
             method: 'GET',
             headers: headers
