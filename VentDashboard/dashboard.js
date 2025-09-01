@@ -6648,8 +6648,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             return `~${hourlyRate}°F/hr rate${status}`;
+        }
 
-}); // End of main DOMContentLoaded event listener
+        // Continue with other functions...
 
 // ===================================================================
 // PHASE 5: CLIMATE INTELLIGENCE FUNCTIONS
