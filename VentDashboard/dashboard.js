@@ -2739,7 +2739,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const buildingStatusElement = document.getElementById('building-status');
                 if (buildingStatusElement) {
-                    buildingStatusElement.textContent = 'Building analysis not available';
+                    const uptimeMinutes = data.reliability ? data.reliability.uptimeMinutes : null;
+                    const isEarlyStartup = uptimeMinutes != null && uptimeMinutes < 10; // Less than 10 minutes
+                    
+                    if (isEarlyStartup) {
+                        buildingStatusElement.textContent = 'Building analysis initializing... sensor stabilization in progress';
+                        buildingStatusElement.style.color = '#FF9800'; // Orange for initialization
+                    } else {
+                        buildingStatusElement.textContent = 'Building analysis not available';
+                        buildingStatusElement.style.color = '#666'; // Gray for unavailable
+                    }
                 }
             }
             
@@ -2823,6 +2832,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     healthRecommendationElement.textContent = healthMonitoring.healthRecommendation;
                 }
             } else {
+                // Check system uptime to determine appropriate message
+                const uptimeMinutes = data.reliability ? data.reliability.uptimeMinutes : null;
+                const isCollectingData = uptimeMinutes != null && uptimeMinutes < 120; // Less than 2 hours
+                
                 // Fallback when health monitoring data not available
                 const healthRiskElement = document.getElementById('health-risk-level');
                 if (healthRiskElement) {
@@ -2862,7 +2875,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const healthRecommendationElement = document.getElementById('health-recommendation');
                 if (healthRecommendationElement) {
-                    healthRecommendationElement.textContent = 'Health analysis not available [INFORMATIONAL ONLY]';
+                    if (isCollectingData) {
+                        const remainingMinutes = Math.max(0, 60 - uptimeMinutes);
+                        if (remainingMinutes > 0) {
+                            healthRecommendationElement.textContent = `Collecting health data... ${remainingMinutes} minutes remaining for valid analysis [INFORMATIONAL ONLY]`;
+                            healthRecommendationElement.style.color = '#FF9800'; // Orange to indicate waiting
+                        } else {
+                            healthRecommendationElement.textContent = 'Health data collection complete, analysis pending... [INFORMATIONAL ONLY]';
+                            healthRecommendationElement.style.color = '#2196F3'; // Blue to indicate processing
+                        }
+                    } else {
+                        healthRecommendationElement.textContent = 'Health analysis not available [INFORMATIONAL ONLY]';
+                        healthRecommendationElement.style.color = '#666'; // Gray for unavailable
+                    }
                 }
             }
             
