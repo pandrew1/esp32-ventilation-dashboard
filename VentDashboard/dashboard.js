@@ -6738,10 +6738,17 @@ async function loadClimateAnalysis() {
         
         console.log(`Calling Climate API: ${apiUrl}`);
         
-        const headers = getAuthHeaders();
+        // Get API key from URL or use default (same pattern as working functions)
+        const urlParams = new URLSearchParams(window.location.search);
+        const apiKey = urlParams.get('apikey') || 'VentilationSystem2025SecretKey';
+        
+        console.log('Using API key for Climate API:', apiKey ? 'Found' : 'Missing');
         const response = await fetch(apiUrl, {
             method: 'GET',
-            headers: headers
+            headers: {
+                'X-API-Secret': apiKey,
+                'Content-Type': 'application/json'
+            }
         });
         
         if (!response.ok) {
