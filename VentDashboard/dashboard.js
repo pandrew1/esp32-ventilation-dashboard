@@ -6755,12 +6755,23 @@ function showAnalyticsTab(tabName) {
  * Load Climate Intelligence Analysis
  */
 async function loadClimateAnalysis() {
-    const analysisType = document.getElementById('climateAnalysisType')?.value || 'seasonal';
-    const timePeriod = document.getElementById('climatePeriod')?.value || '12';
+    const analysisTypeElement = document.getElementById('climateAnalysisType');
+    const timePeriodElement = document.getElementById('climatePeriod');
+    
+    const analysisType = analysisTypeElement?.value || 'seasonal';
+    const timePeriod = timePeriodElement?.value || '12';
     const statusElement = document.getElementById('climateAnalysisStatus');
     const displayElement = document.getElementById('climateAnalysisDisplay');
     
     console.log(`Loading climate analysis: ${analysisType} for ${timePeriod} months`);
+    console.log(`Analysis type selector current value: "${analysisType}"`);
+    
+    // Debug: Log all available options
+    if (analysisTypeElement) {
+        const options = Array.from(analysisTypeElement.options);
+        console.log('Available analysis types:', options.map(opt => `${opt.value}="${opt.text}"`));
+        console.log('Selected index:', analysisTypeElement.selectedIndex);
+    }
     
     if (statusElement) {
         statusElement.textContent = `Loading ${analysisType} analysis...`;
@@ -6951,9 +6962,9 @@ function generateSeasonalDisplay(climate) {
                 </div>
                 
                 <div class="climate-metric-card">
-                    <div class="climate-metric-value">${pressurePatterns.currentStatus || '--'}</div>
+                    <div class="climate-metric-value">${pressurePatterns.currentStatus || pressurePatterns.error ? 'Data Unavailable' : '--'}</div>
                     <div class="climate-metric-label">Pressure Pattern</div>
-                    <div style="font-size: 0.8em; color: #666;">${pressurePatterns.stableSeasons || pressurePatterns.pacificNWPattern || 'Analysis pending'}</div>
+                    <div style="font-size: 0.8em; color: #666;">${pressurePatterns.error || pressurePatterns.stableSeasons || pressurePatterns.pacificNWPattern || 'Analysis pending'}</div>
                 </div>
             </div>
             
@@ -7321,6 +7332,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (climateAnalysisType) {
         climateAnalysisType.addEventListener('change', loadClimateAnalysis);
+        
+        // Add debugging for unwanted changes
+        let lastValue = climateAnalysisType.value;
+        setInterval(() => {
+            if (climateAnalysisType.value !== lastValue) {
+                console.warn(`Climate analysis type changed unexpectedly from "${lastValue}" to "${climateAnalysisType.value}"`);
+                lastValue = climateAnalysisType.value;
+            }
+        }, 1000);
     }
     
     if (climatePeriod) {
