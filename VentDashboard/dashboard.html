@@ -422,6 +422,165 @@
             color: #dc3545;
         }
 
+        /* PHASE 5: Climate Intelligence Tab Styling */
+        .analytics-tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+        }
+
+        .tab-btn {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            margin-right: 5px;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .tab-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+        }
+
+        .tab-btn.climate-tab {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        .tab-btn.climate-tab:hover {
+            background: #45a049;
+            box-shadow: 0 2px 8px rgba(76,175,80,0.3);
+        }
+
+        .analytics-tab-content {
+            display: block;
+        }
+
+        .climate-controls {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%);
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .climate-controls label {
+            color: #2e7d32;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .climate-controls select {
+            border: 2px solid #4CAF50;
+            border-radius: 5px;
+            padding: 6px 12px;
+            background: white;
+            color: #2e7d32;
+            font-weight: 500;
+            margin-right: 15px;
+        }
+
+        .climate-controls select:focus {
+            outline: none;
+            box-shadow: 0 0 5px rgba(76,175,80,0.5);
+        }
+
+        #climateAnalysisDisplay {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            min-height: 400px;
+            padding: 20px;
+        }
+
+        .seasonal-intelligence-panel,
+        .microclimate-profile-panel,
+        .forecast-performance-panel,
+        .climate-summary-panel {
+            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+            border: 1px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .seasonal-intelligence-panel h4,
+        .microclimate-profile-panel h4,
+        .forecast-performance-panel h4,
+        .climate-summary-panel h4 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .climate-metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .climate-metric-card {
+            background: white;
+            border: 1px solid #c8e6c9;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .climate-metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 5px;
+        }
+
+        .climate-metric-label {
+            font-size: 0.9em;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .climate-insight {
+            background: #f0f8f0;
+            border-left: 4px solid #4CAF50;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 0 5px 5px 0;
+        }
+
+        .climate-insight p {
+            margin: 0;
+            color: #2e7d32;
+            line-height: 1.5;
+        }
+
+        .loading-climate {
+            text-align: center;
+            padding: 80px 20px;
+            color: #666;
+        }
+
+        .loading-climate h4 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
         /* Mobile responsiveness for new sections */
         @media (max-width: 768px) {
             .summary-metrics-row {
@@ -1551,16 +1710,29 @@
                     <div id="doorList"></div>
                 </div>
 
-                <!-- Incident Trends Chart -->
+                <!-- PHASE 5: Enhanced Almanac with Climate Intelligence -->
                 <div class="card">
-                    <h3>📊 Incident Almanac</h3>
-                    <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
-                        <label style="font-weight: bold; margin-right: 10px; color: #333;">View:</label>
-                        <select id="almanacViewType" onchange="loadIncidentAlmanac()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
-                            <option value="timeline" selected>Timeline Swimlane</option>
-                            <option value="correlation">Correlation Matrix</option>
-                            <option value="monthly">Monthly Summary</option>
-                        </select>
+                    <h3>📊 Advanced Analytics & Climate Intelligence</h3>
+                    
+                    <!-- Tab Navigation for Enhanced Almanac -->
+                    <div class="analytics-tabs" style="margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 5px;">
+                        <button class="tab-btn active" id="incidentsTabBtn" onclick="showAnalyticsTab('incidents')" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-right: 5px; border-radius: 5px 5px 0 0; cursor: pointer;">
+                            📊 Incident Almanac
+                        </button>
+                        <button class="tab-btn" id="climateTabBtn" onclick="showAnalyticsTab('climate')" style="background: #f8f9fa; color: #333; border: 1px solid #ddd; padding: 8px 16px; border-radius: 5px 5px 0 0; cursor: pointer;">
+                            🌤️ Climate Intelligence
+                        </button>
+                    </div>
+                    
+                    <!-- EXISTING INCIDENT ALMANAC TAB (Preserved exactly as-is) -->
+                    <div id="incidentsTab" class="analytics-tab-content">
+                        <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
+                            <label style="font-weight: bold; margin-right: 10px; color: #333;">View:</label>
+                            <select id="almanacViewType" onchange="loadIncidentAlmanac()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
+                                <option value="timeline" selected>Timeline Swimlane</option>
+                                <option value="correlation">Correlation Matrix</option>
+                                <option value="monthly">Monthly Summary</option>
+                            </select>
                         
                         <label style="font-weight: bold; margin-right: 10px; color: #333;">Period:</label>
                         <select id="almanacPeriodFilter" onchange="loadIncidentAlmanac()" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: white; margin-right: 15px;">
@@ -1616,6 +1788,47 @@
                     <div class="chart-container" id="chartContainer" style="height: 400px;">
                         <canvas id="incidentTrendsChart"></canvas>
                     </div>
+                    </div>
+                    
+                    <!-- NEW PHASE 5: CLIMATE INTELLIGENCE TAB -->
+                    <div id="climateTab" class="analytics-tab-content" style="display: none;">
+                        
+                        <!-- Climate Analysis Controls -->
+                        <div class="climate-controls" style="margin-bottom: 15px; padding: 10px; background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border-radius: 5px; border: 1px solid #4CAF50;">
+                            <label style="font-weight: bold; margin-right: 10px; color: #2e7d32;">Analysis Type:</label>
+                            <select id="climateAnalysisType" onchange="loadClimateAnalysis()" style="padding: 5px 10px; border: 1px solid #4CAF50; border-radius: 4px; background: white; margin-right: 15px;">
+                                <option value="seasonal" selected>🌊 Pacific NW Seasonal Patterns</option>
+                                <option value="microclimate">🏠 Your Microclimate Profile</option>
+                                <option value="forecast_accuracy">📊 Forecast Performance</option>
+                                <option value="summary">⭐ Climate Intelligence Summary</option>
+                            </select>
+                            
+                            <label style="font-weight: bold; margin-right: 10px; color: #2e7d32;">Time Period:</label>
+                            <select id="climatePeriod" onchange="loadClimateAnalysis()" style="padding: 5px 10px; border: 1px solid #4CAF50; border-radius: 4px; background: white; margin-right: 15px;">
+                                <option value="12" selected>Last 12 Months</option>
+                                <option value="24">Last 2 Years</option>
+                                <option value="36">Last 3 Years</option>
+                            </select>
+                            
+                            <span id="climateAnalysisStatus" style="font-size: 0.85em; color: #2e7d32; font-style: italic;">Loading Pacific NW climate intelligence...</span>
+                        </div>
+                        
+                        <!-- Climate Analysis Display Area -->
+                        <div id="climateAnalysisDisplay" style="min-height: 400px; padding: 15px; background: white; border: 1px solid #e9ecef; border-radius: 5px;">
+                            <div class="loading-climate" style="text-align: center; padding: 100px 0; color: #666;">
+                                <h4>🌤️ Initializing Pacific NW Climate Analysis...</h4>
+                                <p>Analyzing historical sensor data and forecast patterns for your location</p>
+                                <p style="font-size: 0.9em; margin-top: 15px;">📊 Data Sources: Historical sensor readings, forecast accuracy, seasonal patterns</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Climate Data Source Indicator -->
+                        <div id="climateDataSourceIndicator" style="margin-top: 10px; padding: 8px 12px; background: #e8f5e8; border-left: 4px solid #4CAF50; border-radius: 4px; font-size: 0.85em; color: #2e7d32; display: none;">
+                            <strong>🌿 Climate Data Sources:</strong>
+                            <div id="climateDataSourceDetails" style="margin-top: 5px; font-family: monospace; font-size: 0.9em;"></div>
+                        </div>
+                    </div>
+                    
                 </div>
 
                     <!-- System Incidents -->

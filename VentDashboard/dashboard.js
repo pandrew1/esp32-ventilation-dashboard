@@ -6648,4 +6648,508 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             return `~${hourlyRate}°F/hr rate${status}`;
+
+
+// ===================================================================
+// PHASE 5: CLIMATE INTELLIGENCE FUNCTIONS
+// ===================================================================
+
+/**
+ * Show/hide analytics tabs (Incidents vs Climate Intelligence)
+ */
+function showAnalyticsTab(tabName) {
+    console.log(`Switching to ${tabName} analytics tab`);
+    
+    // Hide all tab content
+    const incidentsTab = document.getElementById('incidentsTab');
+    const climateTab = document.getElementById('climateTab');
+    
+    if (incidentsTab) incidentsTab.style.display = 'none';
+    if (climateTab) climateTab.style.display = 'none';
+    
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = '#f8f9fa';
+        btn.style.color = '#333';
+    });
+    
+    // Show selected tab and update button state
+    if (tabName === 'incidents') {
+        if (incidentsTab) incidentsTab.style.display = 'block';
+        const incidentsBtn = document.getElementById('incidentsTabBtn');
+        if (incidentsBtn) {
+            incidentsBtn.classList.add('active');
+            incidentsBtn.style.background = '#007bff';
+            incidentsBtn.style.color = 'white';
+        }
+        
+        // Load incident almanac if not already loaded
+        if (typeof loadIncidentAlmanac === 'function') {
+            loadIncidentAlmanac();
+        }
+        
+    } else if (tabName === 'climate') {
+        if (climateTab) climateTab.style.display = 'block';
+        const climateBtn = document.getElementById('climateTabBtn');
+        if (climateBtn) {
+            climateBtn.classList.add('active', 'climate-tab');
+            climateBtn.style.background = '#4CAF50';
+            climateBtn.style.color = 'white';
+        }
+        
+        // Load climate analysis
+        loadClimateAnalysis();
+    }
+}
+
+/**
+ * Load Climate Intelligence Analysis
+ */
+async function loadClimateAnalysis() {
+    const analysisType = document.getElementById('climateAnalysisType')?.value || 'seasonal';
+    const timePeriod = document.getElementById('climatePeriod')?.value || '12';
+    const statusElement = document.getElementById('climateAnalysisStatus');
+    const displayElement = document.getElementById('climateAnalysisDisplay');
+    
+    console.log(`Loading climate analysis: ${analysisType} for ${timePeriod} months`);
+    
+    if (statusElement) {
+        statusElement.textContent = `Loading ${analysisType} analysis...`;
+    }
+    
+    if (displayElement) {
+        displayElement.innerHTML = `
+            <div class="loading-climate">
+                <h4>🌤️ Analyzing Climate Patterns...</h4>
+                <p>Processing ${timePeriod} months of historical data for ${analysisType} analysis</p>
+                <p style="font-size: 0.9em; margin-top: 15px; color: #666;">This may take a few moments...</p>
+            </div>
+        `;
+    }
+    
+    try {
+        // Build API URL for new PacificNWClimateAnalyzer function
+        const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/PacificNWClimateAnalyzer?type=${analysisType}&period=${timePeriod}&deviceId=${CONFIG.deviceId}`;
+        
+        console.log(`Calling Climate API: ${apiUrl}`);
+        
+        const headers = getAuthHeaders();
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: headers
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Climate API returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const climateData = await response.json();
+        console.log('Climate analysis data received:', climateData);
+        
+        // Display the climate analysis
+        displayClimateAnalysis(climateData, analysisType);
+        
+        if (statusElement) {
+            statusElement.textContent = `${analysisType} analysis completed - ${timePeriod} months analyzed`;
+        }
+        
+        // Show data source indicator
+        showClimateDataSource(climateData, analysisType, timePeriod);
+        
+    } catch (error) {
+        console.error('Climate analysis loading failed:', error);
+        
+        if (statusElement) {
+            statusElement.textContent = `Error loading ${analysisType} analysis`;
+        }
+        
+        if (displayElement) {
+            displayElement.innerHTML = `
+                <div class="error-climate" style="text-align: center; padding: 60px 20px; color: #dc3545;">
+                    <h4>❌ Climate Analysis Error</h4>
+                    <p><strong>Failed to load ${analysisType} analysis:</strong></p>
+                    <p style="color: #666; font-family: monospace; font-size: 0.9em;">${error.message}</p>
+                    <p style="margin-top: 20px;">
+                        <button onclick="loadClimateAnalysis()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">
+                            🔄 Try Again
+                        </button>
+                    </p>
+                    <p style="font-size: 0.8em; color: #666; margin-top: 15px;">
+                        Note: Climate intelligence requires Azure Function deployment
+                    </p>
+                </div>
+            `;
+        }
+    }
+}
+
+/**
+ * Display Climate Analysis Results
+ */
+function displayClimateAnalysis(data, analysisType) {
+    const displayElement = document.getElementById('climateAnalysisDisplay');
+    if (!displayElement) return;
+    
+    console.log(`Displaying ${analysisType} climate analysis`);
+    
+    if (data.error) {
+        displayElement.innerHTML = `
+            <div class="error-climate" style="text-align: center; padding: 40px 20px; color: #dc3545;">
+                <h4>⚠️ Analysis Error</h4>
+                <p>${data.error}</p>
+                ${data.message ? `<p style="color: #666; font-size: 0.9em;">${data.message}</p>` : ''}
+            </div>
+        `;
+        return;
+    }
+    
+    const climate = data.climate || {};
+    
+    switch (analysisType) {
+        case 'seasonal':
+            displayElement.innerHTML = generateSeasonalDisplay(climate);
+            break;
+        case 'microclimate':
+            displayElement.innerHTML = generateMicroclimatteDisplay(climate);
+            break;
+        case 'forecast_accuracy':
+            displayElement.innerHTML = generateForecastDisplay(climate);
+            break;
+        case 'summary':
+            displayElement.innerHTML = generateClimateIntelligenceSummary(climate);
+            break;
+        default:
+            displayElement.innerHTML = generateDefaultClimateDisplay(climate);
+    }
+}
+
+/**
+ * Generate Seasonal Pattern Display
+ */
+function generateSeasonalDisplay(climate) {
+    const currentSeason = climate.currentSeason || {};
+    const marineLayer = climate.marineLayerSeason || {};
+    const rainSeason = climate.rainSeasonAnalysis || {};
+    const pressurePatterns = climate.highPressurePatterns || {};
+    const insights = climate.climateInsights || [];
+    
+    return `
+        <div class="seasonal-intelligence-panel">
+            <h4>🌊 Pacific NW Seasonal Intelligence</h4>
+            
+            <div class="current-season-status" style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #2196F3;">
+                <h5 style="margin: 0 0 10px 0; color: #1976d2;">Current Season: ${currentSeason.season || 'Unknown'}</h5>
+                <p style="margin: 5px 0; color: #666;">${currentSeason.typical_weather || 'Season analysis unavailable'}</p>
+                <div style="margin-top: 10px;">
+                    ${(currentSeason.characteristics || []).map(char => `<span style="background: #e3f2fd; color: #1976d2; padding: 3px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 8px;">${char}</span>`).join('')}
+                </div>
+            </div>
+            
+            <div class="climate-metric-grid">
+                <div class="climate-metric-card">
+                    <div class="climate-metric-value">${marineLayer.currentStatus || '--'}</div>
+                    <div class="climate-metric-label">Marine Layer Status</div>
+                    <div style="font-size: 0.8em; color: #666;">${marineLayer.typicalSeason || 'Analysis pending'}</div>
+                </div>
+                
+                <div class="climate-metric-card">
+                    <div class="climate-metric-value">${rainSeason.currentPhase || '--'}</div>
+                    <div class="climate-metric-label">Rain Season Phase</div>
+                    <div style="font-size: 0.8em; color: #666;">${rainSeason.typicalStart || 'Analysis pending'}</div>
+                </div>
+                
+                <div class="climate-metric-card">
+                    <div class="climate-metric-value">${pressurePatterns.currentStatus || '--'}</div>
+                    <div class="climate-metric-label">Pressure Pattern</div>
+                    <div style="font-size: 0.8em; color: #666;">${pressurePatterns.stableSeasons || 'Analysis pending'}</div>
+                </div>
+            </div>
+            
+            <div class="seasonal-insights" style="margin-top: 20px;">
+                <h5 style="color: #2e7d32; margin-bottom: 10px;">📊 Pattern Analysis</h5>
+                ${generateInsightsList(insights)}
+                
+                ${rainSeason.prediction ? `
+                    <div class="climate-insight">
+                        <p><strong>🌧️ Rain Season Prediction:</strong> ${rainSeason.prediction} <em>(Historical)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${marineLayer.insight ? `
+                    <div class="climate-insight">
+                        <p><strong>🌊 Marine Layer Insight:</strong> ${marineLayer.insight} <em>(Historical)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${pressurePatterns.insight ? `
+                    <div class="climate-insight">
+                        <p><strong>🌪️ Pressure Insight:</strong> ${pressurePatterns.insight} <em>(Historical)</em></p>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate Microclimate Profile Display
+ */
+function generateMicroclimatteDisplay(climate) {
+    const advantages = climate.locationAdvantages || {};
+    const localPatterns = climate.localPatterns || {};
+    const comparison = climate.regionalComparison || {};
+    const energyImplications = climate.energyImplications || {};
+    
+    return `
+        <div class="microclimate-profile-panel">
+            <h4>🏠 Your Microclimate Profile</h4>
+            
+            <div class="microclimate-comparison" style="margin: 20px 0;">
+                <h5 style="color: #2e7d32; margin-bottom: 15px;">📊 Your Location vs Regional Weather</h5>
+                
+                <div class="climate-metric-grid">
+                    <div class="climate-metric-card">
+                        <div class="climate-metric-value">${advantages.temperatureBias?.averageBias || '--'}</div>
+                        <div class="climate-metric-label">Temperature Bias</div>
+                        <div style="font-size: 0.8em; color: #666;">vs regional forecasts</div>
+                    </div>
+                    
+                    <div class="climate-metric-card">
+                        <div class="climate-metric-value">${comparison.marineLayerClearance || '--'}</div>
+                        <div class="climate-metric-label">Marine Layer Clearance</div>
+                        <div style="font-size: 0.8em; color: #666;">vs regional average</div>
+                    </div>
+                    
+                    <div class="climate-metric-card">
+                        <div class="climate-metric-value">${comparison.weatherProtection || '--'}</div>
+                        <div class="climate-metric-label">Weather Protection</div>
+                        <div style="font-size: 0.8em; color: #666;">pressure stability</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="microclimate-insights" style="margin-top: 20px;">
+                <h5 style="color: #2e7d32; margin-bottom: 10px;">🎯 Your Location's Climate Signature</h5>
+                
+                ${advantages.microclimateFactor ? `
+                    <div class="climate-insight">
+                        <p><strong>🏠 Microclimate Factor:</strong> ${advantages.microclimateFactor} <em>(Analysis)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${energyImplications ? `
+                    <div class="climate-insight">
+                        <p><strong>⚡ Energy Advantage:</strong> ${energyImplications} <em>(Historical Analysis)</em></p>
+                    </div>
+                ` : ''}
+                
+                <div class="climate-insight">
+                    <p><strong>📈 Data Quality:</strong> Analysis based on forecast accuracy vs actual sensor readings <em>(Forecast vs Historical)</em></p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate Forecast Performance Display
+ */
+function generateForecastDisplay(climate) {
+    const accuracy = climate.accuracyMetrics || {};
+    const biases = climate.consistentBiases || {};
+    const recommendations = climate.recommendations || [];
+    const dataQuality = climate.dataQuality || {};
+    
+    return `
+        <div class="forecast-performance-panel">
+            <h4>📊 Forecast Performance for Your Location</h4>
+            
+            <div class="accuracy-metrics" style="margin: 20px 0;">
+                <h5 style="color: #2e7d32; margin-bottom: 15px;">🎯 Open-Meteo Accuracy Analysis</h5>
+                
+                <div class="climate-metric-grid">
+                    <div class="climate-metric-card">
+                        <div class="climate-metric-value">${accuracy.temperature?.percentage || '--'}%</div>
+                        <div class="climate-metric-label">Temperature Accuracy</div>
+                        <div style="font-size: 0.8em; color: #666;">${accuracy.temperature?.tolerance || 'within ±2°F'}</div>
+                    </div>
+                    
+                    <div class="climate-metric-card">
+                        <div class="climate-metric-value">${accuracy.pressure?.percentage || '--'}%</div>
+                        <div class="climate-metric-label">Pressure Accuracy</div>
+                        <div style="font-size: 0.8em; color: #666;">${accuracy.pressure?.tolerance || 'within ±1 hPa'}</div>
+                    </div>
+                    
+                    <div class="climate-metric-card">
+                        <div class="climate-metric-value">${accuracy.humidity?.percentage || '--'}%</div>
+                        <div class="climate-metric-label">Humidity Accuracy</div>
+                        <div style="font-size: 0.8em; color: #666;">${accuracy.humidity?.tolerance || 'within ±5%'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="forecast-insights" style="margin-top: 20px;">
+                <h5 style="color: #2e7d32; margin-bottom: 10px;">🎯 Forecast Calibration Insights</h5>
+                
+                ${biases.temperatureOverestimate ? `
+                    <div class="climate-insight">
+                        <p><strong>🌡️ Temperature Bias:</strong> ${biases.temperatureOverestimate} <em>(Forecast vs Historical)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${biases.humidityUnderestimate ? `
+                    <div class="climate-insight">
+                        <p><strong>💧 Humidity Gap:</strong> ${biases.humidityUnderestimate} <em>(Forecast vs Historical)</em></p>
+                    </div>
+                ` : ''}
+                
+                ${biases.pressureExcellent ? `
+                    <div class="climate-insight">
+                        <p><strong>🌪️ Pressure Excellence:</strong> ${biases.pressureExcellent} <em>(Forecast vs Historical)</em></p>
+                    </div>
+                ` : ''}
+                
+                <div class="climate-insight">
+                    <p><strong>📊 Data Quality:</strong> ${dataQuality.totalComparisons || 0} forecast comparisons analyzed (${dataQuality.dataReliability || 'Unknown'} reliability) <em>(Forecast vs Historical)</em></p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate Climate Intelligence Summary
+ */
+function generateClimateIntelligenceSummary(climate) {
+    const currentStatus = climate.currentClimateStatus || {};
+    const seasonal = climate.seasonalIntelligence || {};
+    const microclimate = climate.microclimatAdvantages || {};
+    const forecast = climate.forecastReliability || {};
+    const insights = climate.actionableInsights || [];
+    const summary = climate.climateSummary || {};
+    
+    return `
+        <div class="climate-summary-panel">
+            <h4>⭐ Complete Climate Intelligence Summary</h4>
+            
+            <div class="current-climate-status" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #2196F3;">
+                <h5 style="margin: 0 0 10px 0; color: #1976d2;">📊 Current Climate Status</h5>
+                <p style="margin: 0; color: #333; font-size: 1.1em;">${summary.executiveSummary || currentStatus.summary || 'Climate analysis in progress...'}</p>
+            </div>
+            
+            <div class="climate-metric-grid">
+                <div class="climate-metric-card" style="border-color: #4CAF50;">
+                    <div class="climate-metric-value" style="color: #2e7d32;">Pacific NW</div>
+                    <div class="climate-metric-label">Seasonal Mastery</div>
+                    <div style="font-size: 0.8em; color: #666;">Marine layer + rain patterns</div>
+                </div>
+                
+                <div class="climate-metric-card" style="border-color: #FF9800;">
+                    <div class="climate-metric-value" style="color: #f57c00;">Microclimate</div>
+                    <div class="climate-metric-label">Location Analysis</div>
+                    <div style="font-size: 0.8em; color: #666;">Your home vs regional</div>
+                </div>
+                
+                <div class="climate-metric-card" style="border-color: #2196F3;">
+                    <div class="climate-metric-value" style="color: #1976d2;">Forecast</div>
+                    <div class="climate-metric-label">Accuracy Tracking</div>
+                    <div style="font-size: 0.8em; color: #666;">Open-Meteo performance</div>
+                </div>
+            </div>
+            
+            <div class="actionable-insights" style="margin-top: 25px;">
+                <h5 style="color: #2e7d32; margin-bottom: 15px;">💡 Actionable Climate Insights</h5>
+                ${generateInsightsList(insights)}
+                
+                <div class="climate-insight">
+                    <p><strong>📈 Intelligence Sources:</strong> Combining Historical sensor data, Forecast accuracy analysis, and Real-time pattern recognition for comprehensive Pacific NW climate mastery</p>
+                </div>
+            </div>
+            
+            <div class="specialization-summary" style="margin-top: 20px; background: #f0f8f0; padding: 15px; border-radius: 8px; border: 1px solid #4CAF50;">
+                <h6 style="color: #2e7d32; margin-bottom: 10px;">🌿 Pacific NW Climate Specialization</h6>
+                <p style="margin: 0; color: #333; font-size: 0.9em;">Advanced marine layer detection, rain season timing predictions, and pressure intelligence calibrated specifically for Pacific Northwest climate patterns.</p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate default climate display for unknown analysis types
+ */
+function generateDefaultClimateDisplay(climate) {
+    return `
+        <div class="climate-summary-panel">
+            <h4>🌤️ Climate Analysis Results</h4>
+            <div class="climate-insight">
+                <p>Climate analysis data received. Analysis type not recognized.</p>
+                <pre style="background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 0.8em;">
+${JSON.stringify(climate, null, 2)}
+                </pre>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate insights list HTML
+ */
+function generateInsightsList(insights) {
+    if (!insights || !Array.isArray(insights) || insights.length === 0) {
+        return `
+            <div class="climate-insight">
+                <p>📊 Climate insights are being analyzed from your historical data...</p>
+            </div>
+        `;
+    }
+    
+    return insights.map(insight => `
+        <div class="climate-insight">
+            <p>${insight}</p>
+        </div>
+    `).join('');
+}
+
+/**
+ * Show climate data source information
+ */
+function showClimateDataSource(data, analysisType, timePeriod) {
+    const indicator = document.getElementById('climateDataSourceIndicator');
+    const details = document.getElementById('climateDataSourceDetails');
+    
+    if (!indicator || !details) return;
+    
+    const dataSource = data.dataSource || 'Climate analysis data';
+    const timestamp = data.timestamp || new Date().toISOString();
+    
+    details.innerHTML = `
+        Analysis: ${analysisType} | Period: ${timePeriod} months | Source: ${dataSource}
+        <br>Generated: ${new Date(timestamp).toLocaleString()} | Data Tags: (Historical), (Forecast vs Historical), (Analysis)
+    `;
+    
+    indicator.style.display = 'block';
+}
+
+// Initialize Climate Intelligence on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Climate Intelligence module loaded');
+    
+    // Set up event listeners for climate controls if they exist
+    const climateAnalysisType = document.getElementById('climateAnalysisType');
+    const climatePeriod = document.getElementById('climatePeriod');
+    
+    if (climateAnalysisType) {
+        climateAnalysisType.addEventListener('change', loadClimateAnalysis);
+    }
+    
+    if (climatePeriod) {
+        climatePeriod.addEventListener('change', loadClimateAnalysis);
+    }
+});
+
+// Export functions for global access
+window.showAnalyticsTab = showAnalyticsTab;
+window.loadClimateAnalysis = loadClimateAnalysis;
         }
