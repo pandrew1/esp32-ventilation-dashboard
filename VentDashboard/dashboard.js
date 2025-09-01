@@ -7149,7 +7149,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Export functions for global access
-window.showAnalyticsTab = showAnalyticsTab;
-window.loadClimateAnalysis = loadClimateAnalysis;
-        }
+// Export functions for global access (ensure they're available)
+if (typeof showAnalyticsTab === 'function') {
+    window.showAnalyticsTab = showAnalyticsTab;
+    console.log('showAnalyticsTab exported to window');
+} else {
+    console.error('showAnalyticsTab function not found');
+}
+
+if (typeof loadClimateAnalysis === 'function') {
+    window.loadClimateAnalysis = loadClimateAnalysis;
+    console.log('loadClimateAnalysis exported to window');
+} else {
+    console.error('loadClimateAnalysis function not found');
+}
