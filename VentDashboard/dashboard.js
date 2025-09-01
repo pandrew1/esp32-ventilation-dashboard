@@ -422,12 +422,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 header.appendChild(userSection);
             }
             
-            // Add no-data notice if no authentication is provided
+            // Only show no-data notice if user has neither Bearer token nor API key
             const token = localStorage.getItem('ventilation_auth_token');
             if (!CONFIG.apiSecret && !token) {
                 const noDataNotice = document.createElement('div');
                 noDataNotice.style.cssText = 'background: rgba(255,193,7,0.9); color: #212529; padding: 10px; text-align: center; font-size: 0.9em; border-radius: 5px; margin-top: 10px;';
-                noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> Data is currently unavailable. <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> or add <code>?apikey=YOUR_API_KEY</code> to URL for live data.';
+                noDataNotice.innerHTML = '📊 <strong>No Data Available:</strong> <a href="login.html" style="color: #0056b3; text-decoration: underline;">Log in</a> to access live data.';
                 if (header) header.appendChild(noDataNotice);
             }
             
@@ -516,8 +516,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
             
-            if (!apiKey) {
-                console.warn('No API key provided in URL - API calls may fail');
+            // Check if we have any authentication method (Bearer token or API key)
+            const headers = getAuthHeaders();
+            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+            
+            if (!hasAuth) {
+                console.log('loadYesterdayDetailedContent: No authentication available - Bearer token or API key required');
                 return;
             }
             
@@ -526,10 +530,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             fetch(apiUrl, {
                 method: 'GET',
-                headers: {
-                    'X-API-Secret': apiKey,
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             })
                 .then(response => {
                     if (!response.ok) {
@@ -817,8 +818,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
             
-            if (!apiKey) {
-                console.warn('loadYesterdaySummaryMetrics: No API key provided in URL - API calls may fail');
+            // Check if we have any authentication method (Bearer token or API key)
+            const headers = getAuthHeaders();
+            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+            
+            if (!hasAuth) {
+                console.log('loadYesterdaySummaryMetrics: No authentication available - Bearer token or API key required');
                 return;
             }
             
@@ -829,10 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             fetch(apiUrl, {
                 method: 'GET',
-                headers: {
-                    'X-API-Secret': apiKey,
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             })
                 .then(response => {
                     console.log('loadYesterdaySummaryMetrics: Received response, status:', response.status);
@@ -1058,12 +1060,12 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('peakHourStat').textContent = 'Loading...';
             document.getElementById('totalSessionsStat').textContent = 'Loading...';
             
-            // Get API key from URL (no hardcoded secrets in public repo)
-            const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            // Check if we have any authentication method (Bearer token or API key)  
+            const headers = getAuthHeaders();
+            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
-            if (!apiKey) {
-                console.warn('updateEnhancedDoorActivity: No API key provided in URL - API calls may fail');
+            if (!hasAuth) {
+                console.log('updateEnhancedDoorActivity: No authentication available - Bearer token or API key required');
                 return;
             }
             
@@ -1074,10 +1076,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             fetch(apiUrl, {
                 method: 'GET',
-                headers: {
-                    'X-API-Secret': apiKey,
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             })
                 .then(response => {
                     console.log('updateEnhancedDoorActivity: Received response, status:', response.status);
@@ -1233,12 +1232,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const bootReasonInfo = document.getElementById('bootReasonInfo');
             if (bootReasonInfo) bootReasonInfo.textContent = 'Loading...';
             
-            // Get API key from URL (no hardcoded secrets in public repo)
-            const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            // Check if we have any authentication method (Bearer token or API key)
+            const headers = getAuthHeaders();
+            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
-            if (!apiKey) {
-                console.warn('updateSystemHealthWidget: No API key provided in URL - API calls may fail');
+            if (!hasAuth) {
+                console.log('updateSystemHealthWidget: No authentication available - Bearer token or API key required');
                 return;
             }
             
@@ -1249,10 +1248,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             fetch(apiUrl, {
                 method: 'GET',
-                headers: {
-                    'X-API-Secret': apiKey,
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             })
                 .then(response => {
                     console.log('updateSystemHealthWidget: Received response, status:', response.status);
@@ -1616,17 +1612,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show loading state
             timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Loading ' + hours + 'h door activity timeline...</p></div>';
             
-            // Get API key from URL (no hardcoded secrets in public repo)
-            const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
+            // Check if we have any authentication method (Bearer token or API key)
+            const headers = getAuthHeaders();
+            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
-            if (!apiKey) {
-                console.warn('updateDoorTimeline: No API key provided in URL - API calls may fail');
-                timelineViz.innerHTML = '<div class="timeline-error">No API key provided in URL. Add ?apikey=YOUR_API_KEY to the URL.</div>';
+            if (!hasAuth) {
+                console.log('updateDoorTimeline: No authentication available - Bearer token or API key required');
+                timelineViz.innerHTML = '<div class="timeline-error">Authentication required. Please log in to view timeline.</div>';
                 return;
             }
             
-            console.log('TIMELINE: Using API key from URL parameter');
+            console.log('TIMELINE: Using authentication headers');
             
             // Call the ventilation history API for door timeline data
             const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=${hours}`;
@@ -1635,10 +1631,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             fetch(apiUrl, {
                 method: 'GET',
-                headers: {
-                    'X-API-Secret': apiKey,
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             })
                 .then(response => {
                     console.log('TIMELINE: Received response, status:', response.status);
@@ -6778,13 +6771,30 @@ async function loadClimateAnalysis() {
         }
         console.log('DEBUG: Full headers object for Climate API:', headers);
         
+        // DEBUG: Check authentication status
+        const token = localStorage.getItem('ventilation_auth_token');
+        console.log('DEBUG: Bearer token available:', !!token);
+        console.log('DEBUG: API secret available:', !!CONFIG.apiSecret);
+        console.log('DEBUG: Current URL:', window.location.href);
+        
         const response = await fetch(apiUrl, {
             method: 'GET',
             headers: headers
         });
         
+        console.log('DEBUG: Climate API response status:', response.status);
+        console.log('DEBUG: Climate API response headers:', [...response.headers.entries()]);
+        
         if (!response.ok) {
-            throw new Error(`Climate API returned ${response.status}: ${response.statusText}`);
+            // Try to get detailed error information
+            let errorText = '';
+            try {
+                errorText = await response.text();
+                console.log('DEBUG: Climate API error response body:', errorText);
+            } catch (e) {
+                console.log('DEBUG: Could not read error response body:', e);
+            }
+            throw new Error(`Climate API returned ${response.status}: ${response.statusText}. Response: ${errorText}`);
         }
         
         const climateData = await response.json();
