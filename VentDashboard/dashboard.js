@@ -557,20 +557,61 @@ async function refreshData() {
                         document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available</div>';
                     }
                     
-                    // Load system assessments (enhanced ESP32 sends as dailySummary.assessments)
-                    const assessments = yesterdayData.dailySummary?.assessments || yesterdayData.assessments;
-                    if (assessments) {
-                        const assess = assessments;
+                    // System assessments based on real yesterday data
+                    if (yesterdayData.environmental || yesterdayData.performance || yesterdayData.incidents) {
+                        const env = yesterdayData.environmental || {};
+                        const perf = yesterdayData.performance || {};
+                        const incidents = yesterdayData.incidents || {};
+                        const doors = yesterdayData.doors || {};
+                        
+                        // Calculate assessment scores
+                        let systemHealth = "Good";
+                        let healthIcon = "✅";
+                        if (incidents.totalIncidents > 5) {
+                            systemHealth = "Fair";
+                            healthIcon = "⚠️";
+                        }
+                        if (incidents.totalIncidents > 10) {
+                            systemHealth = "Poor";
+                            healthIcon = "❌";
+                        }
+                        
+                        let operationalStatus = "Normal";
+                        let operationalIcon = "✅";
+                        if (perf.efficiency < 20) {
+                            operationalStatus = "Below Average";
+                            operationalIcon = "⚠️";
+                        }
+                        if (perf.efficiency < 10) {
+                            operationalStatus = "Poor";
+                            operationalIcon = "❌";
+                        }
+                        
+                        let environmentalStatus = "Stable";
+                        let envIcon = "✅";
+                        const tempRange = (env.tempMax || 0) - (env.tempMin || 0);
+                        if (tempRange > 15) {
+                            environmentalStatus = "Variable";
+                            envIcon = "⚠️";
+                        }
+                        if (tempRange > 25) {
+                            environmentalStatus = "Extreme";
+                            envIcon = "❌";
+                        }
+                        
+                        const tempRangeText = (env.tempMax && env.tempMin) ? tempRange.toFixed(1) : 'Unknown';
+                        
                         document.getElementById('yesterdayAssessments').innerHTML = `
                             <div class="assessment-summary">
-                                <p><strong>Storm Risk Assessment:</strong> ${assess.stormRisk} (Level ${assess.stormLevel}) <em>(Real-time)</em></p>
-                                <p><strong>Operational Assessment:</strong> ${assess.operational} - ${assess.operationalEfficiency}% efficiency <em>(Analysis)</em></p>
-                                <p><strong>System Health:</strong> ${assess.systemHealth} <em>(Real-time)</em></p>
-                                <p><strong>Data Quality:</strong> ${assess.dataQuality} samples collected <em>(Historical)</em></p>
+                                <p><strong>${healthIcon} System Health:</strong> ${systemHealth} (${incidents.totalIncidents || 0} incidents recorded)</p>
+                                <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
+                                <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
+                                <p><strong>🚪 Door Activity:</strong> ${doors.totalEvents || 0} events across ${doors.activeDoors || 0} doors (${doors.peakActivity || 'Unknown'} activity level)</p>
+                                <p><strong>🌤️ Air Quality:</strong> ${env.airQuality || 'Unknown'} conditions</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayAssessments').innerHTML = '<div class="info-state">Assessment data not available - enhanced ESP32 firmware required</div>';
+                        document.getElementById('yesterdayAssessments').innerHTML = '<div class="error-state">System assessment data not available - no yesterday summary found</div>';
                     }
                     
                     // Load door timeline
