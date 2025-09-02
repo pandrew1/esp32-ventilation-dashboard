@@ -2974,12 +2974,13 @@ async function refreshData() {
                 const watchdogStatusElement = document.getElementById('watchdogStatus');
                 if (watchdogStatusElement) watchdogStatusElement.textContent = system.watchdogEnabled ? '✅ Enabled' : '⚪ Disabled';
                 
-                // System Configuration (use actual system data, not hardcoded values)
+                // System Configuration (use actual config data from startup.config)
                 const systemConfigElement = document.getElementById('systemConfig');
                 if (systemConfigElement) {
-                    // Show real configuration data if available, otherwise be honest
-                    if (startupSystem.loopInterval && startupSystem.displayInterval && startupSystem.telemetryMode) {
-                        systemConfigElement.textContent = `Loop: ${startupSystem.loopInterval}s, Display: ${startupSystem.displayInterval}min, Telemetry: ${startupSystem.telemetryMode}`;
+                    // Access configuration data from the correct path: startup.config (not startup.system)
+                    const config = startup.config || {};
+                    if (config.loopCycle && config.displayUpdates && config.telemetry) {
+                        systemConfigElement.textContent = `Loop: ${config.loopCycle}, Display: ${config.displayUpdates}, Telemetry: ${config.telemetry}`;
                     } else {
                         systemConfigElement.textContent = 'Configuration data not available';
                     }
