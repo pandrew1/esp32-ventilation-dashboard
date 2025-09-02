@@ -696,7 +696,37 @@ async function refreshData() {
                     }
                     
                     // Load monthly aggregation status - use actual API structure (moved from separate widget)
-                    if (data.sections && data.sections.monthly && data.sections.monthly.monthlyAggregation) {
+                    // Data is available at data.system.MonthlyAggregationStatus from GetVentilationStatus API
+                    if (data.system && data.system.MonthlyAggregationStatus) {
+                        const agg = data.system.MonthlyAggregationStatus;
+                        
+                        // Format timestamps
+                        const formatDateTime = (isoString) => {
+                            if (!isoString) return 'Unknown';
+                            try {
+                                const date = new Date(isoString);
+                                return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
+                            } catch (e) {
+                                return 'Invalid date';
+                            }
+                        };
+                        
+                        const statusIcon = agg.Success ? '✅' : '❌';
+                        const statusText = agg.Success ? 'Successful' : 'Failed';
+                        const errorText = agg.ErrorMessage ? ` (${agg.ErrorMessage})` : '';
+                        
+                        document.getElementById('yesterdayAggregation').innerHTML = `
+                            <div class="aggregation-status-detail">
+                                <p><strong>Status:</strong> ${statusIcon} ${statusText}${errorText}</p>
+                                <p><strong>Last Run:</strong> ${formatDateTime(agg.LastRun)}</p>
+                                <p><strong>Next Run:</strong> ${formatDateTime(agg.NextScheduledRun)}</p>
+                                <p><strong>Records Updated:</strong> ${agg.RecordsUpdated || 0}</p>
+                                <p><strong>Months Processed:</strong> ${agg.MonthsProcessed || 0}</p>
+                                <p><strong>Trigger:</strong> ${agg.TriggerType || 'Unknown'}</p>
+                            </div>
+                        `;
+                    } else if (data.sections && data.sections.monthly && data.sections.monthly.monthlyAggregation) {
+                        // Fallback to original structure if available
                         const agg = data.sections.monthly.monthlyAggregation;
                         document.getElementById('yesterdayAggregation').innerHTML = `
                             <div class="aggregation-status-detail">
@@ -708,8 +738,8 @@ async function refreshData() {
                             </div>
                         `;
                     } else {
-                        // Show message from monthly section if available
-                        const monthlyMessage = data.sections?.monthly?.message || 'Aggregation status not available';
+                        // Show error message if no data available
+                        const monthlyMessage = data.sections?.monthly?.message || 'Monthly aggregation status not available';
                         document.getElementById('yesterdayAggregation').innerHTML = `<div class="error-state">${monthlyMessage}</div>`;
                     }
                     
