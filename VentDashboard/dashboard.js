@@ -1358,8 +1358,6 @@ async function refreshData() {
                         // Update Hardware Status elements
                         const displayStatus = document.getElementById('displayStatus');
                         const sensorStatus = document.getElementById('sensorStatus');
-                        const relayStatus = document.getElementById('relayStatus');
-                        const watchdogStatus = document.getElementById('watchdogStatus');
                         
                         if (displayStatus) displayStatus.textContent = startup.hardware?.display ? 'OK' : 'Error';
                         if (sensorStatus) {
@@ -1371,24 +1369,9 @@ async function refreshData() {
                             ].filter(Boolean).length;
                             sensorStatus.textContent = `${workingSensors}/3 OK`;
                         }
-                        // Handle relay status - show "Unknown" if not reported by ESP32
-                        if (relayStatus) {
-                            if (startup.hardware?.relay !== undefined) {
-                                relayStatus.textContent = startup.hardware.relay ? 'OK' : 'Error';
-                            } else {
-                                relayStatus.textContent = 'Unknown';
-                                relayStatus.title = 'Relay status not reported by ESP32';
-                            }
-                        }
-                        // Handle watchdog status - show "Unknown" if not reported by ESP32  
-                        if (watchdogStatus) {
-                            if (startup.hardware?.watchdog !== undefined) {
-                                watchdogStatus.textContent = startup.hardware.watchdog ? 'OK' : 'Error';
-                            } else {
-                                watchdogStatus.textContent = 'Unknown';
-                                watchdogStatus.title = 'Watchdog status not reported by ESP32';
-                            }
-                        }
+                        
+                        // Note: Relay and Watchdog status are updated in updateDashboard() function
+                        // to avoid conflicts with the more detailed status display
                         
                         // Calculate health percentage based on available metrics
                         const gaugeContainer = document.querySelector('.gauge-container');
@@ -2979,16 +2962,6 @@ async function refreshData() {
                 if (systemConfigElement) {
                     // Access configuration data from the correct path: startup.config (not startup.system)
                     const config = startup.config || {};
-                    
-                    // Add debugging to understand data structure
-                    console.log('=== CONFIGURATION DEBUG ===');
-                    console.log('Full startup object:', startup);
-                    console.log('Config object:', config);
-                    console.log('Config keys:', Object.keys(config));
-                    console.log('loopCycle:', config.loopCycle);
-                    console.log('displayUpdates:', config.displayUpdates);
-                    console.log('telemetry:', config.telemetry);
-                    console.log('=== END DEBUG ===');
                     
                     if (config.loopCycle && config.displayUpdates && config.telemetry) {
                         systemConfigElement.textContent = `Loop: ${config.loopCycle}, Display: ${config.displayUpdates}, Telemetry: ${config.telemetry}`;
