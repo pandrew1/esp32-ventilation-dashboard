@@ -2979,6 +2979,17 @@ async function refreshData() {
                 if (systemConfigElement) {
                     // Access configuration data from the correct path: startup.config (not startup.system)
                     const config = startup.config || {};
+                    
+                    // Add debugging to understand data structure
+                    console.log('=== CONFIGURATION DEBUG ===');
+                    console.log('Full startup object:', startup);
+                    console.log('Config object:', config);
+                    console.log('Config keys:', Object.keys(config));
+                    console.log('loopCycle:', config.loopCycle);
+                    console.log('displayUpdates:', config.displayUpdates);
+                    console.log('telemetry:', config.telemetry);
+                    console.log('=== END DEBUG ===');
+                    
                     if (config.loopCycle && config.displayUpdates && config.telemetry) {
                         systemConfigElement.textContent = `Loop: ${config.loopCycle}, Display: ${config.displayUpdates}, Telemetry: ${config.telemetry}`;
                     } else {
