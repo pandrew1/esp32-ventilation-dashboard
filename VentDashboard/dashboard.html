@@ -1171,25 +1171,27 @@
             <div id="dashboardContent" style="display: none;">
                 <!-- Current Status Grid -->
                 <div class="grid">
-                    <!-- Indoor Sensors -->
-                    <div class="card">
-                        <h3>🏠 Indoor Environment</h3>
-                        <div class="sensor-reading">
-                            <span>Temperature</span>
-                            <span class="sensor-value temperature" id="indoorTemp">-°F</span>
+                    <!-- Combined Indoor/Outdoor Environment Column -->
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Indoor Sensors -->
+                        <div class="card">
+                            <h3>🏠 Indoor Environment</h3>
+                            <div class="sensor-reading">
+                                <span>Temperature</span>
+                                <span class="sensor-value temperature" id="indoorTemp">-°F</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Humidity</span>
+                                <span class="sensor-value humidity" id="indoorHumidity">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Pressure</span>
+                                <span class="sensor-value pressure" id="indoorPressure">- inHg</span>
+                            </div>
                         </div>
-                        <div class="sensor-reading">
-                            <span>Humidity</span>
-                            <span class="sensor-value humidity" id="indoorHumidity">-%</span>
-                        </div>
-                        <div class="sensor-reading">
-                            <span>Pressure</span>
-                            <span class="sensor-value pressure" id="indoorPressure">- inHg</span>
-                        </div>
-                    </div>
 
-                    <!-- Outdoor Sensors -->
-                    <div class="card">
+                        <!-- Outdoor Sensors -->
+                        <div class="card">
                         <h3>🌤️ Outdoor Environment & Weather</h3>
                         <div class="sensor-reading">
                             <span>Temperature</span>
