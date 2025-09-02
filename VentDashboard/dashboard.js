@@ -131,27 +131,7 @@ function showApiFailureNotice(message, type = 'warning') {
 }
 
 // Initialize dashboard
-async function initializeDashboard() {
-    console.log('Initializing dashboard...');
-    
-    // Clear any previous data source tracking
-    if (window.dataSourceTracker) {
-        window.dataSourceTracker.clearAll();
-    }
-    
-    // Load dashboard components
-    await refreshData();
-    // Monthly aggregation now handled in Yesterday's Report detailed view
-    // await loadAggregationStatus();
-    await loadChart(6); // Load 6-hour chart by default
-    await loadPressureChart(6); // Load 6-hour pressure chart by default
-    await loadIncidentAlmanac();
-    
-    // Start auto-refresh
-    startAutoRefresh();
-    
-    console.log('Dashboard initialization complete');
-}
+// (Removed duplicate function - using the one with enhanced API calls below)
 
 // Authentication check - redirect to login if not authenticated
 window.addEventListener('load', function() {
@@ -307,10 +287,7 @@ async function refreshData() {
 // Note: These functions are implemented later in this file
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM ready, initializing dashboard...');
-    initializeDashboard();
-});
+// (Removed duplicate initialization - using the one with enhanced API calls in the code below)
 
 //
 // Moved by Paul from dashboard.html 20250829
