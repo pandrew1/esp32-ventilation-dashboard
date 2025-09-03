@@ -4168,23 +4168,24 @@ async function refreshData() {
                     };
                 }).filter(point => point.pressure !== null && point.timestamp); // Only show points with real pressure data
                 
-                // Check if data has actually changed to avoid unnecessary chart refreshes
-                const newDataHash = JSON.stringify(pressureData.map(p => ({ 
-                    t: p.timestamp, 
-                    p: p.pressure, 
-                    c: p.pressureChange 
-                })));
+                // Check if we have new data by comparing latest timestamps (more efficient than full data comparison)
+                // Find the latest timestamp in the current dataset
+                const timestamps = pressureData.map(p => new Date(p.timestamp * 1000)).filter(d => !isNaN(d.getTime()));
+                const newLatestTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
                 
-                if (latestPressureDataTimestamp === newDataHash) {
-                    console.log('Pressure chart data unchanged, skipping refresh animation');
+                if (!newLatestTimestamp) {
+                    console.log('Pressure chart: No valid timestamps found, skipping update');
                     return;
                 }
                 
-                // Update the data hash to track changes
-                latestPressureDataTimestamp = newDataHash;
-                
-                console.log(`Processed ${pressureData.length} pressure data points (data changed, refreshing chart)`);
-                updatePressureChart(pressureData, hours);
+                // Only update if we have new data (latest timestamp is newer than what we've seen before)
+                if (!latestPressureDataTimestamp || newLatestTimestamp > latestPressureDataTimestamp) {
+                    console.log(`Pressure chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
+                    latestPressureDataTimestamp = newLatestTimestamp;
+                    updatePressureChart(pressureData, hours);
+                } else {
+                    console.log('Pressure chart: No new data points, skipping refresh to avoid unnecessary animations');
+                }
                 
             } catch (error) {
                 console.error('Error loading pressure chart data:', error);
@@ -4599,13 +4600,13 @@ async function refreshData() {
 
                 // Check if this is newer than our stored latest timestamp
                 if (!latestChartDataTimestamp || newLatestTimestamp > latestChartDataTimestamp) {
-                    console.log(`Chart refresh: New data available`);
+                    console.log(`Temperature chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
                     
                     // Update our stored timestamp and refresh the chart
                     latestChartDataTimestamp = newLatestTimestamp;
                     updateChart(data.data, hours);
                 } else {
-                    // No new data, skip refresh to avoid unnecessary animations
+                    console.log('Temperature chart: No new data points, skipping refresh to avoid unnecessary animations');
                 }
 
             } catch (error) {
