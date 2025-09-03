@@ -185,7 +185,33 @@ const DashboardUtils = {
     isValidTimestamp(timestamp) {
         if (!timestamp) return false;
         
-        const date = new Date(timestamp);
+        let date;
+        
+        // Handle different timestamp formats
+        if (typeof timestamp === 'string') {
+            if (timestamp.includes('T') || timestamp.includes('-')) {
+                // ISO string format
+                date = new Date(timestamp);
+            } else {
+                // Unix timestamp as string
+                const unixSeconds = parseInt(timestamp);
+                if (!isNaN(unixSeconds) && unixSeconds > 1000000000 && unixSeconds < 2000000000) {
+                    date = new Date(unixSeconds * 1000);
+                } else {
+                    return false;
+                }
+            }
+        } else if (typeof timestamp === 'number') {
+            // Unix timestamp as number - check if it needs conversion
+            if (timestamp < 1000000000 || timestamp > 2000000000) {
+                return false;
+            }
+            // If timestamp is less than 10^10, it's in seconds; otherwise milliseconds
+            date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+        } else {
+            return false;
+        }
+        
         if (isNaN(date.getTime())) return false;
         
         // Must be after 2020 and before 2030 (reasonable bounds for this system)
@@ -330,6 +356,69 @@ const DashboardUtils = {
         const combined = `${month}/${day} ${timeStr}`;
         
         return { dateStr: `${month}/${day}`, timeStr, combined };
+    },
+
+    // API-specific failure notification (different behavior from showNotification)
+    showApiFailureNotice(message, type = 'warning') {
+        // Remove any existing API failure notices
+        const existingNotice = document.querySelector('.api-failure-notice');
+        if (existingNotice) {
+            existingNotice.remove();
+        }
+
+        const header = document.querySelector('.header');
+        if (!header) return;
+
+        const notice = document.createElement('div');
+        notice.className = 'api-failure-notice';
+        notice.style.cssText = `
+            background: ${type === 'error' ? 'rgba(220,53,69,0.9)' : 'rgba(255,193,7,0.9)'};
+            color: ${type === 'error' ? 'white' : '#212529'};
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 0.9em;
+            border-radius: 5px;
+            margin-top: 15px;
+            border: 1px solid ${type === 'error' ? 'rgba(220,53,69,0.5)' : 'rgba(255,193,7,0.5)'};
+            animation: slideDown 0.3s ease-out;
+        `;
+        notice.innerHTML = `
+            <strong>${type === 'error' ? '⚠️ API Error:' : '⚠️ Data Unavailable:'}</strong> ${message}
+            <button onclick="this.parentElement.remove()" style="
+                float: right;
+                background: transparent;
+                border: none;
+                color: inherit;
+                font-size: 16px;
+                cursor: pointer;
+                padding: 0 5px;
+                margin-left: 10px;
+            ">×</button>
+        `;
+        
+        // Add CSS animation if not already present
+        if (!document.querySelector('#api-notice-styles')) {
+            const style = document.createElement('style');
+            style.id = 'api-notice-styles';
+            style.textContent = `
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        header.appendChild(notice);
+        
+        // Auto-remove after 10 seconds for warnings (not errors)
+        if (type === 'warning') {
+            setTimeout(() => {
+                if (notice.parentElement) {
+                    notice.remove();
+                }
+            }, 10000);
+        }
     }
 };
 
@@ -369,7 +458,7 @@ function logout() {
 
 // Function to show API failure notifications
 function showApiFailureNotice(message, type = 'warning') {
-    return DashboardUtils.showNotification(message, type);
+    return DashboardUtils.showApiFailureNotice(message, type);
 }
 
 // Initialize dashboard
