@@ -21,7 +21,7 @@ const CONFIG = {
     historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 30000, // 30 seconds - check for new telemetry data
-    apiSecret: null, // Will be set dynamically
+    apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
     enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
 };
 
@@ -44,90 +44,332 @@ let latestChartDataTimestamp = null; // Track the latest data point timestamp to
 let latestPressureDataTimestamp = null; // Track pressure chart data freshness
 let originalIncidentsData = []; // Global variable to store original incidents data for filtering
 
-// Authentication and API helper functions
+// === UTILITY FUNCTIONS SECTION (STAGE 1 OPTIMIZATION) ===
+const DashboardUtils = {
+    // Consolidated authentication
+    getAuthHeaders() {
+        const token = localStorage.getItem('ventilation_auth_token');
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        // If user is logged in, use Bearer token authentication
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        // Otherwise, use API key if available
+        else if (CONFIG.apiSecret) {
+            headers['X-API-Secret'] = CONFIG.apiSecret;
+        }
+        
+        return headers;
+    },
+
+    // Consolidated logout
+    logout() {
+        localStorage.removeItem('ventilation_auth_token');
+        localStorage.removeItem('ventilation_user_email');
+        window.location.href = 'login.html';
+    },
+
+    // Universal date/time formatter
+    formatDateTime(date, options = {}) {
+        if (!date) return 'Unknown';
+        
+        const dateObj = date instanceof Date ? date : new Date(date);
+        if (isNaN(dateObj.getTime())) return 'Invalid Date';
+        
+        const defaults = {
+            format: 'full', // 'full', 'date', 'time', 'short', 'iso'
+            timezone: 'local',
+            includeSeconds: false
+        };
+        
+        const opts = { ...defaults, ...options };
+        
+        switch (opts.format) {
+            case 'iso':
+                return dateObj.toISOString();
+            case 'date':
+                return dateObj.toLocaleDateString();
+            case 'time':
+                return dateObj.toLocaleTimeString('en-US', { 
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: opts.includeSeconds ? '2-digit' : undefined
+                });
+            case 'short':
+                return dateObj.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+            case 'full':
+            default:
+                return dateObj.toLocaleString();
+        }
+    },
+
+    // Universal duration formatter
+    formatDuration(seconds, options = {}) {
+        if (!seconds || seconds < 0) return '0s';
+        
+        const defaults = {
+            format: 'auto', // 'auto', 'seconds', 'minutes', 'hours', 'days', 'verbose'
+            precision: 1,
+            showUnits: true
+        };
+        
+        const opts = { ...defaults, ...options };
+        
+        if (opts.format === 'verbose') {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            const parts = [];
+            if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+            if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+            if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+            if (secs > 0 && parts.length < 2) parts.push(`${secs} second${secs !== 1 ? 's' : ''}`);
+            
+            return parts.length > 0 ? parts.join(', ') : '0 seconds';
+        }
+        
+        // Auto format based on duration
+        if (opts.format === 'auto') {
+            if (seconds < 60) return opts.showUnits ? `${seconds.toFixed(0)}s` : seconds.toFixed(0);
+            if (seconds < 3600) return opts.showUnits ? `${(seconds/60).toFixed(opts.precision)}m` : (seconds/60).toFixed(opts.precision);
+            if (seconds < 86400) return opts.showUnits ? `${(seconds/3600).toFixed(opts.precision)}h` : (seconds/3600).toFixed(opts.precision);
+            return opts.showUnits ? `${(seconds/86400).toFixed(opts.precision)}d` : (seconds/86400).toFixed(opts.precision);
+        }
+        
+        // Specific format
+        const divisors = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
+        const units = { seconds: 's', minutes: 'm', hours: 'h', days: 'd' };
+        const value = (seconds / divisors[opts.format]).toFixed(opts.precision);
+        
+        return opts.showUnits ? `${value}${units[opts.format]}` : value;
+    },
+
+    // Universal temperature formatter
+    formatTemperature(temp, options = {}) {
+        if (temp === null || temp === undefined) return '--°F';
+        
+        const defaults = {
+            unit: 'F', // 'F', 'C', 'K'
+            precision: 1,
+            showUnit: true
+        };
+        
+        const opts = { ...defaults, ...options };
+        const value = Number(temp);
+        
+        if (isNaN(value)) return '--°F';
+        
+        let convertedTemp = value;
+        if (opts.unit === 'C') {
+            convertedTemp = (value - 32) * 5/9;
+        } else if (opts.unit === 'K') {
+            convertedTemp = ((value - 32) * 5/9) + 273.15;
+        }
+        
+        const formatted = convertedTemp.toFixed(opts.precision);
+        return opts.showUnit ? `${formatted}°${opts.unit}` : formatted;
+    },
+
+    // Universal timestamp validator
+    isValidTimestamp(timestamp) {
+        if (!timestamp) return false;
+        
+        const date = new Date(timestamp);
+        if (isNaN(date.getTime())) return false;
+        
+        // Must be after 2020 and before 2030 (reasonable bounds for this system)
+        const year = date.getFullYear();
+        return year >= 2020 && year <= 2030;
+    },
+
+    // Universal temperature reading validator
+    isValidTemperatureReading(reading) {
+        if (!reading || typeof reading !== 'object') return false;
+        
+        // Must have basic temperature data
+        if (!('IndoorTemp' in reading) || !('OutdoorTemp' in reading)) return false;
+        
+        const indoor = Number(reading.IndoorTemp);
+        const outdoor = Number(reading.OutdoorTemp);
+        
+        // Temperature must be reasonable (Pacific NW range: -10F to 120F)
+        return !isNaN(indoor) && !isNaN(outdoor) && 
+               indoor >= -10 && indoor <= 120 && 
+               outdoor >= -10 && outdoor <= 120;
+    },
+
+    // Universal notification system
+    showNotification(message, type = 'info', timeout = 10000) {
+        // Remove any existing notices
+        const existingNotice = document.querySelector('.dashboard-notification');
+        if (existingNotice) {
+            existingNotice.remove();
+        }
+
+        const header = document.querySelector('.header');
+        if (!header) return;
+
+        const notice = document.createElement('div');
+        notice.className = 'dashboard-notification';
+        
+        const styles = {
+            'info': { bg: 'rgba(23,162,184,0.9)', color: 'white', border: 'rgba(23,162,184,0.5)' },
+            'warning': { bg: 'rgba(255,193,7,0.9)', color: '#212529', border: 'rgba(255,193,7,0.5)' },
+            'error': { bg: 'rgba(220,53,69,0.9)', color: 'white', border: 'rgba(220,53,69,0.5)' },
+            'success': { bg: 'rgba(40,167,69,0.9)', color: 'white', border: 'rgba(40,167,69,0.5)' }
+        };
+        
+        const style = styles[type] || styles.info;
+        
+        notice.style.cssText = `
+            background: ${style.bg};
+            color: ${style.color};
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 0.9em;
+            border-radius: 5px;
+            margin-top: 15px;
+            border: 1px solid ${style.border};
+            animation: slideDown 0.3s ease-out;
+            position: relative;
+        `;
+        
+        const icons = {
+            'info': 'ℹ️',
+            'warning': '⚠️',
+            'error': '🚨',
+            'success': '✅'
+        };
+        
+        notice.innerHTML = `
+            <strong>${icons[type]} ${type.charAt(0).toUpperCase() + type.slice(1)}:</strong> ${message}
+            <button onclick="this.parentElement.remove()" style="
+                float: right;
+                background: transparent;
+                border: none;
+                color: inherit;
+                font-size: 16px;
+                cursor: pointer;
+                padding: 0 5px;
+                margin-left: 10px;
+            ">×</button>
+        `;
+        
+        // Add CSS animation if not already present
+        if (!document.querySelector('#notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'notification-styles';
+            style.textContent = `
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        header.appendChild(notice);
+        
+        // Auto-remove after timeout for non-error messages
+        if (type !== 'error' && timeout > 0) {
+            setTimeout(() => {
+                if (notice.parentElement) {
+                    notice.remove();
+                }
+            }, timeout);
+        }
+    },
+
+    // Connection status management
+    updateConnectionStatus(status) {
+        const statusElement = document.getElementById('connectionStatus');
+        const statusText = document.getElementById('connectionText');
+        
+        if (!statusElement) return;
+        
+        // Remove all status classes
+        statusElement.classList.remove('online', 'connecting', 'disconnected');
+        
+        const statusMap = {
+            'connected': { class: 'online', text: 'Connected' },
+            'connecting': { class: 'connecting', text: 'Connecting...' },
+            'disconnected': { class: 'disconnected', text: 'Disconnected' }
+        };
+        
+        const config = statusMap[status] || statusMap.disconnected;
+        statusElement.classList.add(config.class);
+        
+        if (statusText) {
+            statusText.textContent = config.text;
+        }
+    },
+
+    // Detailed timestamp formatter (maintains compatibility with existing usage)
+    formatDetailedTimestamp(date = new Date()) {
+        // Create simpler format: m/d hh:mm:ss AM/PM (no leading zeros for date)
+        const month = String(date.getMonth() + 1); // No padding
+        const day = String(date.getDate()); // No padding
+        const timeStr = date.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            hour12: true
+        });
+        
+        const combined = `${month}/${day} ${timeStr}`;
+        
+        return { dateStr: `${month}/${day}`, timeStr, combined };
+    }
+};
+
+// === GLOBAL STATE MANAGEMENT (STAGE 1 OPTIMIZATION) ===
+const DashboardState = {
+    // Chart instances
+    charts: {
+        temperature: null,
+        pressure: null,
+        incidentTrends: null
+    },
+    
+    // UI state (consolidating global variables)
+    ui: {
+        refreshTimer: refreshTimer,
+        currentChartHours: currentChartHours,
+        currentPressureChartHours: currentPressureChartHours,
+        originalIncidentsData: originalIncidentsData
+    },
+    
+    // Chart data comparison hashes (for Stage 3)
+    chartDataHashes: {
+        temperature: null,
+        pressure: null,
+        incidents: null
+    }
+};
+
+// Legacy function for backward compatibility - will be removed in later stages
 function getAuthHeaders() {
-    const token = localStorage.getItem('ventilation_auth_token');
-    const headers = {
-        'Content-Type': 'application/json'
-    };
-    
-    // If user is logged in, use Bearer token authentication
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    // Otherwise, use API key if available
-    else if (CONFIG.apiSecret) {
-        headers['X-API-Secret'] = CONFIG.apiSecret;
-    }
-    
-    return headers;
+    return DashboardUtils.getAuthHeaders();
 }
 
 function logout() {
-    localStorage.removeItem('ventilation_auth_token');
-    localStorage.removeItem('ventilation_user_email');
-    window.location.href = 'login.html';
+    return DashboardUtils.logout();
 }
 
 // Function to show API failure notifications
 function showApiFailureNotice(message, type = 'warning') {
-    // Remove any existing notices
-    const existingNotice = document.querySelector('.api-failure-notice');
-    if (existingNotice) {
-        existingNotice.remove();
-    }
-
-    const header = document.querySelector('.header');
-    const notice = document.createElement('div');
-    notice.className = 'api-failure-notice';
-    notice.style.cssText = `
-        background: ${type === 'error' ? 'rgba(220,53,69,0.9)' : 'rgba(255,193,7,0.9)'};
-        color: ${type === 'error' ? 'white' : '#212529'};
-        padding: 12px 15px;
-        text-align: center;
-        font-size: 0.9em;
-        border-radius: 5px;
-        margin-top: 15px;
-        border: 1px solid ${type === 'error' ? 'rgba(220,53,69,0.5)' : 'rgba(255,193,7,0.5)'};
-        animation: slideDown 0.3s ease-out;
-    `;
-    notice.innerHTML = `
-        <strong>${type === 'error' ? '⚠️ API Error:' : '⚠️ Data Unavailable:'}</strong> ${message}
-        <button onclick="this.parentElement.remove()" style="
-            float: right;
-            background: transparent;
-            border: none;
-            color: inherit;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 0 5px;
-            margin-left: 10px;
-        ">×</button>
-    `;
-    
-    // Add CSS animation if not already present
-    if (!document.querySelector('#api-notice-styles')) {
-        const style = document.createElement('style');
-        style.id = 'api-notice-styles';
-        style.textContent = `
-            @keyframes slideDown {
-                from { opacity: 0; transform: translateY(-10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    header.appendChild(notice);
-    
-    // Auto-remove after 10 seconds for warnings (not errors)
-    if (type === 'warning') {
-        setTimeout(() => {
-            if (notice.parentElement) {
-                notice.remove();
-            }
-        }, 10000);
-    }
+    return DashboardUtils.showNotification(message, type);
 }
 
 // Initialize dashboard
@@ -148,40 +390,7 @@ window.addEventListener('load', function() {
 
 // Connection status management
 function updateConnectionStatus(status) {
-    const statusElement = document.getElementById('connectionStatus');
-    const statusText = document.getElementById('connectionStatusText');
-    const statusTimestamp = document.getElementById('connectionStatusTimestamp');
-    
-    if (!statusElement) return;
-    
-    // Remove all status classes
-    statusElement.classList.remove('connected', 'connecting', 'disconnected');
-    
-    switch(status) {
-        case 'connected':
-            statusElement.classList.add('connected');
-            statusText.textContent = 'Connected';
-            break;
-        case 'connecting':
-            statusElement.classList.add('connecting');
-            statusText.textContent = 'Connecting...';
-            break;
-        case 'disconnected':
-            statusElement.classList.add('disconnected');
-            statusText.textContent = 'Disconnected';
-            break;
-    }
-    
-    // Update timestamp
-    if (statusTimestamp) {
-        const now = new Date();
-        statusTimestamp.textContent = now.toLocaleTimeString('en-US', { 
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-    }
+    return DashboardUtils.updateConnectionStatus(status);
 }
 
 // Auto-refresh functionality
@@ -296,92 +505,6 @@ async function refreshData() {
 // Note: getApiKeyFromUrl() function is defined at the top of the page
 // Variables are already declared at the top of this file
 
-// Authentication and API helper functions
-        function getAuthHeaders() {
-            const token = localStorage.getItem('ventilation_auth_token');
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            // If user is logged in, use Bearer token authentication
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            // Otherwise, use API key if available
-            else if (CONFIG.apiSecret) {
-                headers['X-API-Secret'] = CONFIG.apiSecret;
-            }
-            
-            return headers;
-        }
-
-        function logout() {
-            localStorage.removeItem('ventilation_auth_token');
-            localStorage.removeItem('ventilation_user_email');
-            window.location.href = 'login.html';
-        }
-
-        // Function to show API failure notifications
-        function showApiFailureNotice(message, type = 'warning') {
-            // Remove any existing notices
-            const existingNotice = document.querySelector('.api-failure-notice');
-            if (existingNotice) {
-                existingNotice.remove();
-            }
-
-            const header = document.querySelector('.header');
-            const notice = document.createElement('div');
-            notice.className = 'api-failure-notice';
-            notice.style.cssText = `
-                background: ${type === 'error' ? 'rgba(220,53,69,0.9)' : 'rgba(255,193,7,0.9)'};
-                color: ${type === 'error' ? 'white' : '#212529'};
-                padding: 12px 15px;
-                text-align: center;
-                font-size: 0.9em;
-                border-radius: 5px;
-                margin-top: 15px;
-                border: 1px solid ${type === 'error' ? 'rgba(220,53,69,0.5)' : 'rgba(255,193,7,0.5)'};
-                animation: slideDown 0.3s ease-out;
-            `;
-            notice.innerHTML = `
-                <strong>${type === 'error' ? '⚠️ API Error:' : '⚠️ Data Unavailable:'}</strong> ${message}
-                <button onclick="this.parentElement.remove()" style="
-                    float: right;
-                    background: transparent;
-                    border: none;
-                    color: inherit;
-                    font-size: 16px;
-                    cursor: pointer;
-                    padding: 0 5px;
-                    margin-left: 10px;
-                ">×</button>
-            `;
-            
-            // Add CSS animation if not already present
-            if (!document.querySelector('#api-notice-styles')) {
-                const style = document.createElement('style');
-                style.id = 'api-notice-styles';
-                style.textContent = `
-                    @keyframes slideDown {
-                        from { opacity: 0; transform: translateY(-10px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-            
-            header.appendChild(notice);
-            
-            // Auto-remove after 10 seconds for warnings (not errors)
-            if (type === 'warning') {
-                setTimeout(() => {
-                    if (notice.parentElement) {
-                        notice.remove();
-                    }
-                }, 10000);
-            }
-        }
-
         // Add logout button to header
         document.addEventListener('DOMContentLoaded', function() {
             const header = document.querySelector('.header');
@@ -412,21 +535,9 @@ async function refreshData() {
             setupEnhancedDashboard(); // Initialize Phase 2 enhancements
         });
 
-        // Helper function to format detailed timestamps consistently
+        // Wrapper function for consolidated utility
         function formatDetailedTimestamp(date = new Date()) {
-            // Create simpler format: m/d hh:mm:ss AM/PM (no leading zeros for date)
-            const month = String(date.getMonth() + 1); // No padding
-            const day = String(date.getDate()); // No padding
-            const timeStr = date.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit',
-                hour12: true
-            });
-            
-            const combined = `${month}/${day} ${timeStr}`;
-            
-            return { dateStr: `${month}/${day}`, timeStr, combined };
+            return DashboardUtils.formatDetailedTimestamp(date);
         }
 
         // Initialize dashboard
@@ -4507,31 +4618,7 @@ async function refreshData() {
             
             // Filter out corrupted data with invalid timestamps (fix for chart showing years 1954, 1963, 1972, 1981)
             function isValidTimestamp(timestamp) {
-                let date;
-                
-                if (typeof timestamp === 'string') {
-                    if (timestamp.includes('T') || timestamp.includes('-')) {
-                        date = new Date(timestamp);
-                    } else {
-                        const unixSeconds = parseInt(timestamp);
-                        if (!isNaN(unixSeconds) && unixSeconds > 1000000000 && unixSeconds < 2000000000) {
-                            date = new Date(unixSeconds * 1000);
-                        } else {
-                            return false;
-                        }
-                    }
-                } else if (typeof timestamp === 'number') {
-                    if (timestamp < 1000000000 || timestamp > 2000000000) {
-                        return false; // Invalid Unix timestamp range
-                    }
-                    date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
-                } else {
-                    return false;
-                }
-                
-                // Reject timestamps before 2020 or after 2030 (likely corrupted)
-                const year = date.getFullYear();
-                return !isNaN(date.getTime()) && year >= 2020 && year <= 2030;
+                return DashboardUtils.isValidTimestamp(timestamp);
             }
             
             // Filter out items with corrupted timestamps
@@ -6354,23 +6441,7 @@ async function refreshData() {
         }
 
         function updateConnectionStatus(status) {
-            const indicator = document.getElementById('connectionStatus');
-            const text = document.getElementById('connectionText');
-
-            switch(status) {
-                case 'connected':
-                    indicator.className = 'status-indicator online';
-                    text.textContent = 'Connected';
-                    break;
-                case 'connecting':
-                    indicator.className = 'status-indicator';
-                    text.textContent = 'Connecting...';
-                    break;
-                case 'error':
-                    indicator.className = 'status-indicator';
-                    text.textContent = 'Connection Error';
-                    break;
-            }
+            return DashboardUtils.updateConnectionStatus(status);
         }
 
         function showError() {
