@@ -1159,15 +1159,9 @@ async function refreshData() {
         function updateSystemHealthWidget() {
             console.log('=== ENHANCED API: updateSystemHealthWidget() started ===');
             
-            // Show loading states with null checks for simplified health metrics
-            const healthUptime = document.getElementById('healthUptime');
-            const healthWifi = document.getElementById('healthWifi'); 
-            const healthErrors = document.getElementById('healthErrors');
-            const lastBootInfo = document.getElementById('lastBootInfo');
+            // Note: Simplified health metrics UI removed to eliminate duplicate/bad data display
             
-            if (healthUptime) healthUptime.textContent = 'Loading...';
-            if (healthWifi) healthWifi.textContent = 'Loading...';
-            if (healthErrors) healthErrors.textContent = 'Loading...';
+            const lastBootInfo = document.getElementById('lastBootInfo');
             if (lastBootInfo) lastBootInfo.textContent = 'Loading boot information...';
             
             const bootReasonInfo = document.getElementById('bootReasonInfo');
@@ -1210,85 +1204,11 @@ async function refreshData() {
                         console.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
                         console.log('updateSystemHealthWidget: Startup system:', startup.system);
                         
-                        // Update simplified health metrics with null checks using actual API fields
-                        const healthUptime = document.getElementById('healthUptime');
-                        const healthWifi = document.getElementById('healthWifi'); 
-                        const healthErrors = document.getElementById('healthErrors');
+                        // Update boot information only (health metrics UI removed)
                         const lastBootInfo = document.getElementById('lastBootInfo');
                         const bootReasonInfo = document.getElementById('bootReasonInfo');
                         
-                        // Map API response fields to display elements
-                        if (healthUptime) {
-                            // Calculate actual uptime from boot time instead of trusting ESP32's uptime value
-                            if (startup.bootTime) {
-                                const bootTimestamp = parseInt(startup.bootTime);
-                                const currentTimestamp = Math.floor(Date.now() / 1000);
-                                const actualUptimeMinutes = Math.floor((currentTimestamp - bootTimestamp) / 60);
-                                
-                                const hours = Math.floor(actualUptimeMinutes / 60);
-                                const minutes = actualUptimeMinutes % 60;
-                                
-                                console.log('updateSystemHealthWidget: Uptime calculation:', {
-                                    bootTimestamp: bootTimestamp,
-                                    currentTimestamp: currentTimestamp,
-                                    reportedUptime: startup.uptime,
-                                    calculatedUptimeMinutes: actualUptimeMinutes,
-                                    display: `${hours}h ${minutes}m`
-                                });
-                                
-                                healthUptime.textContent = `${hours}h ${minutes}m`;
-                            } else {
-                                // Fallback to ESP32's reported uptime if no boot time available
-                                const uptimeMinutes = startup.uptime || 0;
-                                const hours = Math.floor(uptimeMinutes / 60);
-                                const minutes = uptimeMinutes % 60;
-                                healthUptime.textContent = `${hours}h ${minutes}m`;
-                            }
-                        }
-                        
-                        if (healthWifi) {
-                            // Use signal strength from system data with quality indicator
-                            const signalStrength = startup.system?.signalStrength;
-                            if (signalStrength) {
-                                let signalQuality = 'Excellent';
-                                if (signalStrength < -70) signalQuality = 'Poor';
-                                else if (signalStrength < -60) signalQuality = 'Fair'; 
-                                else if (signalStrength < -50) signalQuality = 'Good';
-                                
-                                healthWifi.textContent = `${signalStrength} dBm`;
-                                healthWifi.title = `WiFi Signal: ${signalQuality} (${signalStrength} dBm)\nRange: Excellent > -50, Good > -60, Fair > -70, Poor < -70`;
-                            } else {
-                                healthWifi.textContent = 'Unknown';
-                                healthWifi.title = 'WiFi signal strength unavailable';
-                            }
-                        }
-                        
-                        if (healthErrors) {
-                            // Calculate memory usage percentage from system data with details
-                            const freeHeap = startup.system?.freeHeap;
-                            const heapSize = startup.system?.heapSize;
-                            if (freeHeap && heapSize) {
-                                const memoryUsed = Math.round(((heapSize - freeHeap) / heapSize) * 100);
-                                const freeKB = Math.round(freeHeap / 1024);
-                                const totalKB = Math.round(heapSize / 1024);
-                                
-                                healthErrors.textContent = `${memoryUsed}%`;
-                                healthErrors.title = `Memory Usage: ${memoryUsed}% used\nFree: ${freeKB} KB of ${totalKB} KB total\nESP32 RAM utilization`;
-                                
-                                // Change color based on memory usage
-                                if (memoryUsed > 80) {
-                                    healthErrors.style.color = '#dc2626'; // Red
-                                } else if (memoryUsed > 60) {
-                                    healthErrors.style.color = '#ea580c'; // Orange  
-                                } else {
-                                    healthErrors.style.color = '#16a34a'; // Green
-                                }
-                            } else {
-                                healthErrors.textContent = 'Unknown';
-                                healthErrors.title = 'Memory usage information unavailable';
-                            }
-                        }
-                        
+                        // Update boot information
                         if (lastBootInfo) {
                             // Format boot time from timestamp
                             if (startup.bootTime) {
@@ -1312,9 +1232,24 @@ async function refreshData() {
                         const wifiIP = document.getElementById('wifiIP');
                         const macAddress = document.getElementById('macAddress');
                         
-                        if (chipModel) chipModel.textContent = startup.system?.chipModel || 'Unknown';
-                        if (cpuFreq) cpuFreq.textContent = startup.system?.cpuFreq ? `${startup.system.cpuFreq} MHz` : 'Unknown';
-                        if (flashSize) flashSize.textContent = startup.system?.flashSize ? `${Math.round(startup.system.flashSize / (1024 * 1024))} MB` : 'Unknown';
+                        if (chipModel) chipModel.textContent = startup.system?.chipModel || startup.systemStatus?.chipModel || 'Unknown';
+                        if (cpuFreq) cpuFreq.textContent = (startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency) ? `${startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency} MHz` : 'Unknown';
+                        if (flashSize) {
+                            // Try multiple data paths for Flash size - some APIs store in bytes, others in MB
+                            const flashFromSystem = startup.system?.flashSize;
+                            const flashFromStatus = startup.systemStatus?.flashSize;
+                            
+                            let flashMB = null;
+                            if (flashFromSystem) {
+                                // If > 100, likely in bytes, convert to MB
+                                flashMB = flashFromSystem > 100 ? Math.round(flashFromSystem / (1024 * 1024)) : flashFromSystem;
+                            } else if (flashFromStatus) {
+                                // systemStatus.flashSize is typically already in MB
+                                flashMB = flashFromStatus;
+                            }
+                            
+                            flashSize.textContent = flashMB ? `${flashMB} MB` : 'Unknown';
+                        }
                         if (freeHeap) freeHeap.textContent = startup.system?.freeHeap ? `${Math.round(startup.system.freeHeap / 1024)} KB` : 'Unknown';
                         if (wifiIP) wifiIP.textContent = startup.system?.wifiIP || 'Unknown';
                         if (macAddress) macAddress.textContent = startup.system?.macAddress || 'Unknown';
@@ -1415,16 +1350,10 @@ async function refreshData() {
                             }
                         }
                     } else {
-                        // Handle case where startup data is not available
-                        const healthUptime = document.getElementById('healthUptime');
-                        const healthWifi = document.getElementById('healthWifi'); 
-                        const healthErrors = document.getElementById('healthErrors');
+                        // Handle case where startup data is not available  
                         const lastBootInfo = document.getElementById('lastBootInfo');
                         const bootReasonInfo = document.getElementById('bootReasonInfo');
                         
-                        if (healthUptime) healthUptime.textContent = 'Waiting...';
-                        if (healthWifi) healthWifi.textContent = 'Waiting...';
-                        if (healthErrors) healthErrors.textContent = 'Waiting...';
                         if (lastBootInfo) lastBootInfo.textContent = 'Boot information pending';
                         if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Pending';
                         
@@ -1458,16 +1387,10 @@ async function refreshData() {
                 .catch(error => {
                     console.error('updateSystemHealthWidget: Error loading system health data:', error);
                     
-                    // Show error states with null checks
-                    const healthUptime = document.getElementById('healthUptime');
-                    const healthWifi = document.getElementById('healthWifi'); 
-                    const healthErrors = document.getElementById('healthErrors');
+                    // Show error states for remaining elements
                     const lastBootInfo = document.getElementById('lastBootInfo');
                     const bootReasonInfo = document.getElementById('bootReasonInfo');
                     
-                    if (healthUptime) healthUptime.textContent = 'Error';
-                    if (healthWifi) healthWifi.textContent = 'Error';
-                    if (healthErrors) healthErrors.textContent = 'Error';
                     if (lastBootInfo) lastBootInfo.textContent = 'Boot information unavailable';
                     if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Data not available';
                     
@@ -3189,7 +3112,19 @@ async function refreshData() {
                 
                 const flashSizeElement = document.getElementById('flashSize');
                 if (flashSizeElement) {
-                    const flashMB = startupSystem.flashSize ? Math.round(startupSystem.flashSize / 1024 / 1024) : null;
+                    // Try multiple data paths for Flash size - some APIs store in bytes, others in MB
+                    const flashFromSystem = startupSystem.flashSize;
+                    const flashFromStatus = startup.systemStatus?.flashSize;
+                    
+                    let flashMB = null;
+                    if (flashFromSystem) {
+                        // If > 100, likely in bytes, convert to MB
+                        flashMB = flashFromSystem > 100 ? Math.round(flashFromSystem / (1024 * 1024)) : flashFromSystem;
+                    } else if (flashFromStatus) {
+                        // systemStatus.flashSize is typically already in MB
+                        flashMB = flashFromStatus;
+                    }
+                    
                     flashSizeElement.textContent = flashMB ? `${flashMB} MB` : 'Unknown';
                 }
                 

@@ -1348,28 +1348,7 @@
                             </div>
                         </div>
 
-                        <!-- System Health Monitoring -->
-                        <div class="system-health-widget" style="margin-top: 20px;">
-                            <div class="health-gauge">
-                                <div class="gauge-container" style="--health-percentage: 85%;">
-                                    <div class="gauge-value" id="systemHealthPercentage" title="Overall System Health Score: Calculated from hardware components + WiFi signal + memory usage. Hover for details.">--%</div>
-                                </div>
-                            </div>
-                            <div class="health-metrics">
-                                <div class="metric">
-                                    <span title="System uptime since last boot">Uptime</span>
-                                    <span id="healthUptime" title="Time since ESP32 last booted">99.2%</span>
-                                </div>
-                                <div class="metric">
-                                    <span title="WiFi signal strength in dBm (decibels relative to milliwatt)">WiFi Signal</span>
-                                    <span id="healthWifi" title="WiFi signal strength: Excellent > -50dBm, Good > -60dBm, Fair > -70dBm">98.5%</span>
-                                </div>
-                                <div class="metric">
-                                    <span title="ESP32 RAM memory usage percentage">Memory Used</span>
-                                    <span id="healthErrors" title="Percentage of ESP32 RAM currently in use">75%</span>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- System Health Monitoring (removed duplicate UX that showed bad data) -->
                         
                         <!-- PHASE 3: Building Performance Analysis Panel -->
                         <div class="building-performance-section" style="margin: 20px 0; padding: 15px; border: 2px solid #2196F3; border-radius: 8px; background: linear-gradient(135deg, #f0f8ff 0%, #e3f2fd 100%);">
