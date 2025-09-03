@@ -439,11 +439,195 @@ const DashboardState = {
         originalIncidentsData: originalIncidentsData
     },
     
-    // Chart data comparison hashes (for Stage 3)
-    chartDataHashes: {
+    // Chart data comparison timestamps (for Stage 3)
+    chartTimestamps: {
         temperature: null,
         pressure: null,
         incidents: null
+    },
+    
+    // API data cache with TTL (Stage 2)
+    cache: {
+        statusData: { data: null, timestamp: null, ttl: 30000 }, // 30 seconds
+        enhancedData: { data: null, timestamp: null, ttl: 60000 }, // 60 seconds  
+        historyData: new Map() // Key: hours, Value: { data, timestamp, ttl }
+    }
+};
+
+// === CENTRALIZED DATA MANAGEMENT (STAGE 2 OPTIMIZATION) ===
+const DataManager = {
+    // Subscription system for data updates
+    subscribers: {
+        status: [],
+        enhanced: [],
+        history: []
+    },
+
+    // Subscribe to data updates
+    subscribe(dataType, callback) {
+        if (!this.subscribers[dataType]) {
+            this.subscribers[dataType] = [];
+        }
+        this.subscribers[dataType].push(callback);
+    },
+
+    // Notify all subscribers of data updates
+    _notifySubscribers(dataType, data) {
+        if (this.subscribers[dataType]) {
+            this.subscribers[dataType].forEach(callback => {
+                try {
+                    callback(data);
+                } catch (error) {
+                    console.error(`Error notifying ${dataType} subscriber:`, error);
+                }
+            });
+        }
+    },
+
+    // Consolidated Enhanced Dashboard Data API call
+    async getEnhancedData(forceRefresh = false) {
+        const cache = DashboardState.cache.enhancedData;
+        const now = Date.now();
+
+        // Return cached data if still valid
+        if (!forceRefresh && cache.data && cache.timestamp && (now - cache.timestamp < cache.ttl)) {
+            console.log('DataManager: Using cached enhanced data');
+            return cache.data;
+        }
+
+        console.log('DataManager: Fetching fresh enhanced data');
+        
+        try {
+            const response = await fetch(CONFIG.enhancedApiUrl, {
+                method: 'GET',
+                headers: DashboardUtils.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Cache the response
+            cache.data = data;
+            cache.timestamp = now;
+
+            // Notify all subscribers
+            this._notifySubscribers('enhanced', data);
+
+            console.log('DataManager: Enhanced data fetched and cached successfully');
+            return data;
+
+        } catch (error) {
+            console.error('DataManager: Error fetching enhanced data:', error);
+            // Return cached data if available, even if expired
+            if (cache.data) {
+                console.log('DataManager: Returning expired cached data due to error');
+                return cache.data;
+            }
+            throw error;
+        }
+    },
+
+    // Consolidated History Data API call with parameter awareness
+    async getHistoryData(hours = 24, forceRefresh = false) {
+        const historyCache = DashboardState.cache.historyData;
+        const cacheKey = `hours_${hours}`;
+        const cache = historyCache.get(cacheKey);
+        const now = Date.now();
+        const ttl = 45000; // 45 seconds TTL
+
+        // Return cached data if still valid
+        if (!forceRefresh && cache && cache.data && cache.timestamp && (now - cache.timestamp < ttl)) {
+            console.log(`DataManager: Using cached history data for ${hours}h`);
+            return cache.data;
+        }
+
+        console.log(`DataManager: Fetching fresh history data for ${hours}h`);
+        
+        try {
+            const url = `${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: DashboardUtils.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Cache the response
+            historyCache.set(cacheKey, {
+                data: data,
+                timestamp: now,
+                ttl: ttl
+            });
+
+            // Notify all subscribers
+            this._notifySubscribers('history', { hours, data });
+
+            console.log(`DataManager: History data (${hours}h) fetched and cached successfully`);
+            return data;
+
+        } catch (error) {
+            console.error(`DataManager: Error fetching history data for ${hours}h:`, error);
+            // Return cached data if available, even if expired
+            if (cache && cache.data) {
+                console.log(`DataManager: Returning expired cached data for ${hours}h due to error`);
+                return cache.data;
+            }
+            throw error;
+        }
+    },
+
+    // Consolidated Status Data API call
+    async getStatusData(forceRefresh = false) {
+        const cache = DashboardState.cache.statusData;
+        const now = Date.now();
+
+        // Return cached data if still valid
+        if (!forceRefresh && cache.data && cache.timestamp && (now - cache.timestamp < cache.ttl)) {
+            console.log('DataManager: Using cached status data');
+            return cache.data;
+        }
+
+        console.log('DataManager: Fetching fresh status data');
+        
+        try {
+            const url = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: DashboardUtils.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Cache the response
+            cache.data = data;
+            cache.timestamp = now;
+
+            // Notify all subscribers
+            this._notifySubscribers('status', data);
+
+            console.log('DataManager: Status data fetched and cached successfully');
+            return data;
+
+        } catch (error) {
+            console.error('DataManager: Error fetching status data:', error);
+            // Return cached data if available, even if expired
+            if (cache.data) {
+                console.log('DataManager: Returning expired cached data due to error');
+                return cache.data;
+            }
+            throw error;
+        }
     }
 };
 
@@ -510,7 +694,7 @@ function startAutoRefresh() {
 
 // Main data refresh function
 async function refreshData() {
-    console.log('Refreshing dashboard data...');
+    console.log('=== STAGE 2: Refreshing dashboard data using DataManager ===');
     
     try {
         updateConnectionStatus('connecting');
@@ -523,50 +707,17 @@ async function refreshData() {
             updateConnectionStatus('disconnected');
             return;
         }
-        
-        const headers = getAuthHeaders();
-        const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
-            method: 'GET',
-            headers: headers
-        });
-        
-        if (response.status === 401) {
-            const token = localStorage.getItem('ventilation_auth_token');
-            if (!token && CONFIG.apiSecret) {
-                logout();
-                return;
-            } else if (token) {
-                showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
-                showNoDataState();
-                updateConnectionStatus('disconnected');
-                return;
-            }
-        }
-        
-        if (!response.ok) {
-            if (response.status === 401 || response.status === 404) {
-                showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
-                showNoDataState();
-                updateConnectionStatus('disconnected');
-                return;
-            }
-            showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
-            showNoDataState();
-            updateConnectionStatus('disconnected');
-            return;
-        }
-        
-        const data = await response.json();
-        console.log('Dashboard data received successfully');
+
+        // Use consolidated DataManager instead of direct API call
+        const data = await DataManager.getStatusData();
+        console.log('DataManager: Status data retrieved successfully');
         
         // Update dashboard with new data
         updateDashboard(data);
-        
-        // Monthly Data Aggregation moved to Yesterday's Report detailed view
-        // console.log('RefreshData: About to call loadAggregationStatus()');
-        // await loadAggregationStatus();
-        
         updateConnectionStatus('connected');
+
+        // Refresh chart data if chart is currently displayed
+        refreshCurrentChart();
         
         // Clear any existing error notices
         const apiFailureNotice = document.getElementById('apiFailureNotice');
@@ -575,8 +726,21 @@ async function refreshData() {
         }
         
     } catch (error) {
-        console.error('Error refreshing dashboard data:', error);
-        showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
+        console.error('DataManager: Error refreshing dashboard data:', error);
+        
+        // Handle authentication errors
+        if (error.message.includes('401')) {
+            const token = localStorage.getItem('ventilation_auth_token');
+            if (!token && CONFIG.apiSecret) {
+                logout();
+                return;
+            } else if (token) {
+                showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
+            }
+        } else {
+            showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
+        }
+        
         showNoDataState();
         updateConnectionStatus('disconnected');
     }
@@ -679,6 +843,8 @@ async function refreshData() {
         }
 
         function loadYesterdayDetailedContent() {
+            console.log('=== STAGE 2: loadYesterdayDetailedContent() using DataManager ===');
+            
             // Show loading states initially for all sections
             document.getElementById('yesterdayEnvironmental').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading environmental data...</em></div>';
             document.getElementById('yesterdayHumidity').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading humidity analysis...</em></div>';
@@ -689,10 +855,6 @@ async function refreshData() {
             document.getElementById('yesterdayAggregation').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading aggregation status...</em></div>';
             document.getElementById('yesterdayIncidentSummary').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading incident analysis...</em></div>';
             
-            // Get API key from URL (no hardcoded secrets in public repo)
-            const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
-            
             // Check if we have any authentication method (Bearer token or API key)
             const headers = getAuthHeaders();
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
@@ -702,20 +864,11 @@ async function refreshData() {
                 return;
             }
             
-            // Call the enhanced dashboard API
-            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
-            
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: headers
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
+            // Use consolidated DataManager instead of direct API call
+            DataManager.getEnhancedData()
                 .then(data => {
+                    console.log('DataManager: Enhanced data received for detailed content');
+                    
                     // Extract yesterday's data from the sections
                     const yesterdayData = data.sections && data.sections.yesterday;
                     if (!yesterdayData) {
@@ -871,7 +1024,7 @@ async function refreshData() {
                     loadYesterdayIncidentSummary();
                 })
                 .catch(error => {
-                    console.error('Error loading yesterday detailed content:', error);
+                    console.error('DataManager: Error loading enhanced data for detailed content:', error);
                     
                     // Show error message in all sections
                     const errorMessage = `<div class="error-state">Failed to load data: ${error.message}</div>`;
@@ -930,7 +1083,7 @@ async function refreshData() {
         }
 
         function loadYesterdaySummaryMetrics() {
-            console.log('=== ENHANCED API: loadYesterdaySummaryMetrics() started ===');
+            console.log('=== STAGE 2: loadYesterdaySummaryMetrics() using DataManager ===');
             
             // Show loading states for all metric elements
             const loadingText = 'Loading...';
@@ -955,238 +1108,152 @@ async function refreshData() {
             document.getElementById('yesterdayIncidents').textContent = loadingText;
             document.getElementById('yesterdayUptime').textContent = loadingText;
             
-            // Get API key from URL (no hardcoded secrets in public repo)
-            const urlParams = new URLSearchParams(window.location.search);
-            const apiKey = urlParams.get('apikey') || urlParams.get('key') || '';
-            
             // Check if we have any authentication method (Bearer token or API key)
             const headers = getAuthHeaders();
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
             if (!hasAuth) {
                 console.log('loadYesterdaySummaryMetrics: No authentication available - Bearer token or API key required');
+                setYesterdayMetricsToWaiting();
                 return;
             }
             
-            // Call the enhanced dashboard API for summary data
-            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
-            
-            console.log('loadYesterdaySummaryMetrics: Making API call to:', apiUrl);
-            
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: headers
-            })
-                .then(response => {
-                    console.log('loadYesterdaySummaryMetrics: Received response, status:', response.status);
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
+            // Use consolidated DataManager instead of direct API call
+            DataManager.getEnhancedData()
                 .then(data => {
-                    console.log('loadYesterdaySummaryMetrics: Received data:', data);
+                    console.log('DataManager: Enhanced data received for yesterday metrics');
                     
-                    // Extract yesterday summary data from sections
-                    const yesterday = data.sections && data.sections.yesterday;
-                    console.log('loadYesterdaySummaryMetrics: Yesterday section:', yesterday);
-                    
-                    if (yesterday && yesterday.status !== 'waiting_for_esp32_data') {
-                        console.log('loadYesterdaySummaryMetrics: Yesterday data available, status:', yesterday.status);
-                        console.log('loadYesterdaySummaryMetrics: Processing yesterday data');
-                        console.log('loadYesterdaySummaryMetrics: Yesterday data structure:', {
-                            environmental: yesterday.environmental ? 'PRESENT' : 'MISSING',
-                            performance: yesterday.performance ? 'PRESENT' : 'MISSING', 
-                            doors: yesterday.doors ? 'PRESENT' : 'MISSING',
-                            incidents: yesterday.incidents ? 'PRESENT' : 'MISSING'
-                        });
-                        // Update temperature metrics
-                        if (yesterday.environmental) {
-                            const env = yesterday.environmental;
-                            document.getElementById('yesterdayAvgTemp').textContent = `${env.tempAvg}°F`;
-                            document.getElementById('yesterdayTempRange').textContent = `${env.tempMin}° - ${env.tempMax}°`;
-                            document.getElementById('yesterdayTempTrend').textContent = 'Data available';
-                            document.getElementById('yesterdayTempTrend').className = 'metric-trend';
-                        } else {
-                            document.getElementById('yesterdayAvgTemp').textContent = 'No temp data';
-                            document.getElementById('yesterdayTempRange').textContent = 'No range data';
-                            document.getElementById('yesterdayTempTrend').textContent = 'Missing environmental data';
-                        }
-                        
-                        // Update efficiency metrics
-                        if (yesterday.performance) {
-                            const perf = yesterday.performance;
-                            document.getElementById('yesterdayEfficiency').textContent = `${perf.efficiency}%`;
-                            document.getElementById('yesterdayRuntime').textContent = `${perf.runtime} hrs runtime`;
-                            document.getElementById('yesterdayEfficiencyTrend').textContent = 'Data available';
-                            document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
-                        } else {
-                            document.getElementById('yesterdayEfficiency').textContent = 'No data';
-                            document.getElementById('yesterdayRuntime').textContent = 'No runtime data';
-                            document.getElementById('yesterdayEfficiencyTrend').textContent = 'Missing performance data';
-                        }
-                        
-                        // Update door activity metrics
-                        if (yesterday.doors) {
-                            const doors = yesterday.doors;
-                            console.log('loadYesterdaySummaryMetrics: Door data:', doors);
-                            document.getElementById('yesterdayDoorsActive').textContent = `${doors.activeDoors || 0}/${doors.totalDoors || 0}`;
-                            document.getElementById('yesterdaySessions').textContent = `${doors.totalEvents || 0} events`;
-                            document.getElementById('yesterdayPeakTime').textContent = `Peak: ${doors.peakActivity || 'N/A'}`;
-                        } else {
-                            console.log('loadYesterdaySummaryMetrics: No door data in yesterday section');
-                            document.getElementById('yesterdayDoorsActive').textContent = 'No door data';
-                            document.getElementById('yesterdaySessions').textContent = '0 events';
-                            document.getElementById('yesterdayPeakTime').textContent = 'Peak: No data';
-                        }
-                        
-                        // Update system health metrics - use incident data with proper null handling
-                        if (yesterday.incidents) {
-                            const incidents = yesterday.incidents;
-                            console.log('loadYesterdaySummaryMetrics: Incident data:', incidents);
-                            
-                            const totalIncidents = incidents.total || 0;
-                            const resolvedIncidents = incidents.resolved || 0;
-                            const criticalIncidents = incidents.critical || 0;
-                            const pendingIncidents = incidents.pending || 0;
-                            
-                            // Enhanced system health calculation
-                            let systemHealthScore = 100;
-                            if (totalIncidents > 0) {
-                                // More sophisticated health scoring based on incident severity
-                                systemHealthScore = Math.max(0, 100 - (criticalIncidents * 20) - (incidents.high * 10) - (incidents.medium * 5) - (incidents.low * 2));
-                            }
-                            
-                            document.getElementById('yesterdaySystemHealth').textContent = `${systemHealthScore}%`;
-                            
-                            // Enhanced incident reporting with severity breakdown
-                            let incidentText = `${totalIncidents} incidents`;
-                            if (totalIncidents > 0) {
-                                const severityBreakdown = [];
-                                if (criticalIncidents > 0) severityBreakdown.push(`${criticalIncidents} critical`);
-                                if (incidents.high > 0) severityBreakdown.push(`${incidents.high} high`);
-                                if (incidents.medium > 0) severityBreakdown.push(`${incidents.medium} medium`);
-                                if (incidents.low > 0) severityBreakdown.push(`${incidents.low} low`);
-                                
-                                if (severityBreakdown.length > 0) {
-                                    incidentText += ` (${severityBreakdown.join(', ')})`;
-                                }
-                            }
-                            // Add note about data source for transparency
-                            if (incidents.realDataNote) {
-                                incidentText += ' ✓';
-                            }
-                            
-                            document.getElementById('yesterdayIncidents').textContent = incidentText;
-                            
-                            // Better uptime calculation with fallbacks
-                            let uptimeText = 'No uptime data';
-                            if (incidents.uptime !== undefined && incidents.uptime !== null) {
-                                uptimeText = `${incidents.uptime}% uptime`;
-                            } else if (totalIncidents === 0) {
-                                uptimeText = '100% uptime';
-                            } else if (resolvedIncidents >= 0 && totalIncidents > 0) {
-                                uptimeText = `${resolvedIncidents}/${totalIncidents} resolved`;
-                            }
-                            document.getElementById('yesterdayUptime').textContent = uptimeText;
-                        } else {
-                            // No incidents data available
-                            console.log('loadYesterdaySummaryMetrics: No incident data in yesterday section');
-                            document.getElementById('yesterdaySystemHealth').textContent = 'No data';
-                            document.getElementById('yesterdayIncidents').textContent = 'No incident data';
-                            document.getElementById('yesterdayUptime').textContent = 'No uptime data';
-                        }
+                    if (data && data.sections && data.sections.yesterday) {
+                        processYesterdayData(data.sections.yesterday);
                     } else {
-                        console.log('loadYesterdaySummaryMetrics: Yesterday data not available or waiting for ESP32 data');
-                        console.log('loadYesterdaySummaryMetrics: Yesterday status:', yesterday ? yesterday.status : 'yesterday object is null/undefined');
-                        
-                        // Show waiting states for all metrics
-                        const waitingText = 'Waiting for data';
-                        
-                        // Temperature metrics - check if elements exist
-                        const tempAvgElement = document.getElementById('yesterdayAvgTemp');
-                        const tempRangeElement = document.getElementById('yesterdayTempRange');
-                        const tempTrendElement = document.getElementById('yesterdayTempTrend');
-                        
-                        console.log('loadYesterdaySummaryMetrics: DOM elements found:');
-                        console.log('  yesterdayAvgTemp:', tempAvgElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayTempRange:', tempRangeElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayTempTrend:', tempTrendElement ? 'EXISTS' : 'NULL');
-                        
-                        if (tempAvgElement) tempAvgElement.textContent = waitingText;
-                        if (tempRangeElement) tempRangeElement.textContent = waitingText;
-                        if (tempTrendElement) tempTrendElement.textContent = 'Pending';
-                        
-                        // Efficiency metrics - check if elements exist
-                        const efficiencyElement = document.getElementById('yesterdayEfficiency');
-                        const runtimeElement = document.getElementById('yesterdayRuntime');
-                        const efficiencyTrendElement = document.getElementById('yesterdayEfficiencyTrend');
-                        
-                        console.log('  yesterdayEfficiency:', efficiencyElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayRuntime:', runtimeElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayEfficiencyTrend:', efficiencyTrendElement ? 'EXISTS' : 'NULL');
-                        
-                        if (efficiencyElement) efficiencyElement.textContent = waitingText;
-                        if (runtimeElement) runtimeElement.textContent = waitingText;
-                        if (efficiencyTrendElement) efficiencyTrendElement.textContent = 'Pending';
-                        
-                        // Door activity metrics - check if elements exist
-                        const doorsActiveElement = document.getElementById('yesterdayDoorsActive');
-                        const sessionsElement = document.getElementById('yesterdaySessions');
-                        const peakTimeElement = document.getElementById('yesterdayPeakTime');
-                        
-                        console.log('  yesterdayDoorsActive:', doorsActiveElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdaySessions:', sessionsElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayPeakTime:', peakTimeElement ? 'EXISTS' : 'NULL');
-                        
-                        if (doorsActiveElement) doorsActiveElement.textContent = waitingText;
-                        if (sessionsElement) sessionsElement.textContent = waitingText;
-                        if (peakTimeElement) peakTimeElement.textContent = 'Pending';
-                        
-                        // System health metrics - check if elements exist
-                        const systemHealthElement = document.getElementById('yesterdaySystemHealth');
-                        const incidentsElement = document.getElementById('yesterdayIncidents');
-                        const uptimeElement = document.getElementById('yesterdayUptime');
-                        
-                        console.log('  yesterdaySystemHealth:', systemHealthElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayIncidents:', incidentsElement ? 'EXISTS' : 'NULL');
-                        console.log('  yesterdayUptime:', uptimeElement ? 'EXISTS' : 'NULL');
-                        
-                        if (systemHealthElement) systemHealthElement.textContent = waitingText;
-                        if (incidentsElement) incidentsElement.textContent = waitingText;
-                        if (uptimeElement) uptimeElement.textContent = 'Pending';
-                        
-                        console.log('loadYesterdaySummaryMetrics: Set all yesterday metrics to waiting state');
+                        console.log('loadYesterdaySummaryMetrics: No yesterday data available');
+                        setYesterdayMetricsToWaiting();
                     }
                 })
                 .catch(error => {
-                    console.error('loadYesterdaySummaryMetrics: Error loading data:', error);
-                    
-                    // Show error state for all metrics
-                    const errorText = 'Error';
-                    
-                    // Temperature metrics
-                    document.getElementById('yesterdayAvgTemp').textContent = errorText;
-                    document.getElementById('yesterdayTempRange').textContent = 'Failed to load';
-                    document.getElementById('yesterdayTempTrend').textContent = 'No data';
-                    document.getElementById('yesterdayTempTrend').className = 'metric-trend';
-                    
-                    // Efficiency metrics
-                    document.getElementById('yesterdayEfficiency').textContent = errorText;
-                    document.getElementById('yesterdayRuntime').textContent = 'Failed to load';
-                    document.getElementById('yesterdayEfficiencyTrend').textContent = 'No data';
-                    document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
-                    
-                    // Door activity metrics
-                    document.getElementById('yesterdayDoorsActive').textContent = errorText;
-                    document.getElementById('yesterdaySessions').textContent = 'Failed to load';
-                    document.getElementById('yesterdayPeakTime').textContent = 'No data';
-                    
-                    // System health metrics
-                    document.getElementById('yesterdaySystemHealth').textContent = errorText;
-                    document.getElementById('yesterdayIncidents').textContent = 'Failed to load';
-                    document.getElementById('yesterdayUptime').textContent = 'No data';
+                    console.error('DataManager: Error loading enhanced data for yesterday metrics:', error);
+                    setYesterdayMetricsToError();
                 });
+
+            // Helper function to process yesterday data
+            function processYesterdayData(yesterday) {
+                console.log('loadYesterdaySummaryMetrics: Processing yesterday data');
+                
+                if (yesterday && yesterday.status !== 'waiting_for_esp32_data') {
+                    console.log('loadYesterdaySummaryMetrics: Yesterday data available, status:', yesterday.status);
+                    
+                    // Update temperature metrics
+                    if (yesterday.environmental) {
+                        const env = yesterday.environmental;
+                        document.getElementById('yesterdayAvgTemp').textContent = `${env.tempAvg}°F`;
+                        document.getElementById('yesterdayTempRange').textContent = `${env.tempMin}° - ${env.tempMax}°`;
+                        document.getElementById('yesterdayTempTrend').textContent = 'Data available';
+                        document.getElementById('yesterdayTempTrend').className = 'metric-trend';
+                    } else {
+                        document.getElementById('yesterdayAvgTemp').textContent = 'No temp data';
+                        document.getElementById('yesterdayTempRange').textContent = 'No range data';
+                        document.getElementById('yesterdayTempTrend').textContent = 'Missing environmental data';
+                    }
+                    
+                    // Update efficiency metrics
+                    if (yesterday.performance) {
+                        const perf = yesterday.performance;
+                        document.getElementById('yesterdayEfficiency').textContent = `${perf.efficiency}%`;
+                        document.getElementById('yesterdayRuntime').textContent = `${perf.runtime} hrs runtime`;
+                        document.getElementById('yesterdayEfficiencyTrend').textContent = 'Data available';
+                        document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                    } else {
+                        document.getElementById('yesterdayEfficiency').textContent = 'No data';
+                        document.getElementById('yesterdayRuntime').textContent = 'No runtime data';
+                        document.getElementById('yesterdayEfficiencyTrend').textContent = 'Missing performance data';
+                    }
+                    
+                    // Update door activity metrics
+                    if (yesterday.doors) {
+                        const doors = yesterday.doors;
+                        document.getElementById('yesterdayDoorsActive').textContent = `${doors.activeDoors || 0}/${doors.totalDoors || 0}`;
+                        document.getElementById('yesterdaySessions').textContent = `${doors.totalEvents || 0} events`;
+                        document.getElementById('yesterdayPeakTime').textContent = `Peak: ${doors.peakActivity || 'N/A'}`;
+                    } else {
+                        document.getElementById('yesterdayDoorsActive').textContent = 'No door data';
+                        document.getElementById('yesterdaySessions').textContent = '0 events';
+                        document.getElementById('yesterdayPeakTime').textContent = 'Peak: No data';
+                    }
+                    
+                    // Update system health metrics
+                    if (yesterday.incidents) {
+                        const incidents = yesterday.incidents;
+                        
+                        const totalIncidents = incidents.total || 0;
+                        const criticalIncidents = incidents.critical || 0;
+                        
+                        // Calculate system health score
+                        let systemHealthScore = 100;
+                        if (totalIncidents > 0) {
+                            systemHealthScore = Math.max(0, 100 - (criticalIncidents * 20) - (incidents.high * 10) - (incidents.medium * 5) - (incidents.low * 2));
+                        }
+                        
+                        document.getElementById('yesterdaySystemHealth').textContent = `${systemHealthScore}%`;
+                        document.getElementById('yesterdayIncidents').textContent = `${totalIncidents} incidents`;
+                        
+                        let uptimeText = 'No uptime data';
+                        if (incidents.uptime !== undefined && incidents.uptime !== null) {
+                            uptimeText = `${incidents.uptime}% uptime`;
+                        } else if (totalIncidents === 0) {
+                            uptimeText = '100% uptime';
+                        }
+                        document.getElementById('yesterdayUptime').textContent = uptimeText;
+                    } else {
+                        document.getElementById('yesterdaySystemHealth').textContent = 'No data';
+                        document.getElementById('yesterdayIncidents').textContent = 'No incident data';
+                        document.getElementById('yesterdayUptime').textContent = 'No uptime data';
+                    }
+                } else {
+                    setYesterdayMetricsToWaiting();
+                }
+            }
+            
+            // Helper function to set waiting state
+            function setYesterdayMetricsToWaiting() {
+                const waitingText = 'Waiting for data';
+                
+                document.getElementById('yesterdayAvgTemp').textContent = waitingText;
+                document.getElementById('yesterdayTempRange').textContent = waitingText;
+                document.getElementById('yesterdayTempTrend').textContent = 'Pending';
+                
+                document.getElementById('yesterdayEfficiency').textContent = waitingText;
+                document.getElementById('yesterdayRuntime').textContent = waitingText;
+                document.getElementById('yesterdayEfficiencyTrend').textContent = 'Pending';
+                
+                document.getElementById('yesterdayDoorsActive').textContent = waitingText;
+                document.getElementById('yesterdaySessions').textContent = waitingText;
+                document.getElementById('yesterdayPeakTime').textContent = 'Pending';
+                
+                document.getElementById('yesterdaySystemHealth').textContent = waitingText;
+                document.getElementById('yesterdayIncidents').textContent = waitingText;
+                document.getElementById('yesterdayUptime').textContent = 'Pending';
+            }
+            
+            // Helper function to set error state
+            function setYesterdayMetricsToError() {
+                const errorText = 'Error';
+                
+                document.getElementById('yesterdayAvgTemp').textContent = errorText;
+                document.getElementById('yesterdayTempRange').textContent = 'Failed to load';
+                document.getElementById('yesterdayTempTrend').textContent = 'No data';
+                
+                document.getElementById('yesterdayEfficiency').textContent = errorText;
+                document.getElementById('yesterdayRuntime').textContent = 'Failed to load';
+                document.getElementById('yesterdayEfficiencyTrend').textContent = 'No data';
+                
+                document.getElementById('yesterdayDoorsActive').textContent = errorText;
+                document.getElementById('yesterdaySessions').textContent = 'Failed to load';
+                document.getElementById('yesterdayPeakTime').textContent = 'No data';
+                
+                document.getElementById('yesterdaySystemHealth').textContent = errorText;
+                document.getElementById('yesterdayIncidents').textContent = 'Failed to load';
+                document.getElementById('yesterdayUptime').textContent = 'No data';
+            }
         }
 
         function updateEnhancedDoorActivity() {
@@ -1357,7 +1424,7 @@ async function refreshData() {
         }
 
         function updateSystemHealthWidget() {
-            console.log('=== ENHANCED API: updateSystemHealthWidget() started ===');
+            console.log('=== STAGE 2: updateSystemHealthWidget() using DataManager ===');
             
             // Note: Simplified health metrics UI removed to eliminate duplicate/bad data display
             
@@ -1376,24 +1443,10 @@ async function refreshData() {
                 return;
             }
             
-            // Call the enhanced dashboard API for system health data
-            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData';
-            
-            console.log('updateSystemHealthWidget: Making API call to:', apiUrl);
-            
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: headers
-            })
-                .then(response => {
-                    console.log('updateSystemHealthWidget: Received response, status:', response.status);
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
+            // Use consolidated DataManager instead of direct API call
+            DataManager.getEnhancedData()
                 .then(data => {
-                    console.log('updateSystemHealthWidget: Received data:', data);
+                    console.log('DataManager: Enhanced data received for system health widget');
                     
                     // Extract startup data from sections - correct API structure
                     const startup = data.sections && data.sections.startup;
@@ -1585,7 +1638,7 @@ async function refreshData() {
                     }
                 })
                 .catch(error => {
-                    console.error('updateSystemHealthWidget: Error loading system health data:', error);
+                    console.error('DataManager: Error loading enhanced data for system health widget:', error);
                     
                     // Show error states for remaining elements
                     const lastBootInfo = document.getElementById('lastBootInfo');
