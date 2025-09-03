@@ -664,9 +664,8 @@ async function refreshData() {
                         document.getElementById('yesterdayVentilation').innerHTML = '<div class="error-state">Ventilation analysis not available</div>';
                     }
                     
-                    // Monthly aggregation moved to updateDashboard function (Status API has the data)
-                    // Enhanced API doesn't have system.MonthlyAggregationStatus
-                    document.getElementById('yesterdayAggregation').innerHTML = '<div class="info-state">Loading monthly aggregation status...</div>';
+                    // Load monthly aggregation status - call existing updateDashboard to get Status API data
+                    loadYesterdayMonthlyAggregationFromStatusAPI();
                     
                     // Load incident summary from Status API (Enhanced API doesn't have real incident data)
                     loadYesterdayIncidentSummary();
@@ -2310,6 +2309,80 @@ async function refreshData() {
             } catch (error) {
                 console.error('Error loading yesterday incident summary:', error);
                 incidentElement.innerHTML = '<div class="error-state">Failed to load incident data</div>';
+            }
+        }
+
+        async function loadYesterdayMonthlyAggregationFromStatusAPI() {
+            console.log('=== YESTERDAY MONTHLY AGGREGATION: loadYesterdayMonthlyAggregationFromStatusAPI() started ===');
+            
+            const aggregationElement = document.getElementById('yesterdayAggregation');
+            if (!aggregationElement) {
+                console.error('yesterdayAggregation element not found');
+                return;
+            }
+            
+            // Show loading state
+            aggregationElement.innerHTML = '<div class="loading-state">Loading monthly aggregation status...</div>';
+            
+            try {
+                // Get authentication headers (same as other API calls)
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    aggregationElement.innerHTML = '<div class="error-state">Authentication required for aggregation data</div>';
+                    return;
+                }
+                
+                // Get data from Status API - same call as updateDashboard uses
+                const apiUrl = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
+                const response = await fetch(apiUrl, { method: 'GET', headers: headers });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Use the exact same logic as updateDashboard function (line 3252)
+                if (data.system && data.system.MonthlyAggregationStatus) {
+                    const agg = data.system.MonthlyAggregationStatus;
+                    
+                    // Format timestamps (same function as updateDashboard)
+                    const formatDateTime = (isoString) => {
+                        if (!isoString) return 'Unknown';
+                        try {
+                            const date = new Date(isoString);
+                            return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
+                        } catch (e) {
+                            return 'Invalid date';
+                        }
+                    };
+                    
+                    const statusIcon = agg.Success ? '✅' : '❌';
+                    const statusText = agg.Success ? 'Successful' : 'Failed';
+                    const errorText = agg.ErrorMessage ? ` (${agg.ErrorMessage})` : '';
+                    
+                    // Use exact same HTML as updateDashboard function
+                    aggregationElement.innerHTML = `
+                        <div class="aggregation-status-detail">
+                            <p><strong>Status:</strong> ${statusIcon} ${statusText}${errorText}</p>
+                            <p><strong>Last Run:</strong> ${formatDateTime(agg.LastRun)}</p>
+                            <p><strong>Next Run:</strong> ${formatDateTime(agg.NextScheduledRun)}</p>
+                            <p><strong>Records Updated:</strong> ${agg.RecordsUpdated || 0}</p>
+                            <p><strong>Months Processed:</strong> ${agg.MonthsProcessed || 0}</p>
+                            <p><strong>Trigger:</strong> ${agg.TriggerType || 'Unknown'}</p>
+                        </div>
+                    `;
+                    
+                    console.log(`YESTERDAY MONTHLY AGGREGATION: Displayed status: ${statusText}, Records: ${agg.RecordsUpdated || 0}`);
+                } else {
+                    aggregationElement.innerHTML = '<div class="error-state">Monthly aggregation status not available</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading yesterday monthly aggregation:', error);
+                aggregationElement.innerHTML = '<div class="error-state">Failed to load aggregation data</div>';
             }
         }
 
