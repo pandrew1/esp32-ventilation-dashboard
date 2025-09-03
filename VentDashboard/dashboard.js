@@ -9,6 +9,135 @@
 - Wait 1-2 minutes after git push for Azure deployment to complete
 */
 
+// ===================================================================
+// STAGE 4: CONSOLIDATED UTILITY FUNCTIONS
+// ===================================================================
+
+// DateTime Utilities - Consolidated from multiple duplicate functions
+const DateTimeUtils = {
+    formatDateTime(date, options = {}) {
+        if (!date) return '--';
+        
+        const dateObj = (typeof date === 'string') ? new Date(date) : date;
+        if (isNaN(dateObj.getTime())) return '--';
+        
+        const defaultOptions = {
+            showDate: true,
+            showTime: true,
+            timeFormat: '12h',
+            ...options
+        };
+        
+        if (defaultOptions.timeFormat === '24h') {
+            return dateObj.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                hour12: false 
+            });
+        } else {
+            return dateObj.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                hour12: true 
+            });
+        }
+    },
+
+    formatDetailedTimestamp(date = new Date()) {
+        return date.toLocaleString('en-US', { 
+            weekday: 'short', 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
+    },
+
+    isValidTimestamp(timestamp) {
+        if (!timestamp) return false;
+        const date = new Date(timestamp * 1000);
+        const now = new Date();
+        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+        
+        return date >= oneYearAgo && date <= oneYearFromNow;
+    },
+
+    formatRelativeDateTime(date) {
+        const now = new Date();
+        const isToday = date.toDateString() === now.toDateString();
+        const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString();
+        
+        if (isToday) {
+            return `Today ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        } else if (isYesterday) {
+            return `Yesterday ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        } else {
+            return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ' ' + 
+                   date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+    }
+};
+
+// Validation Utilities - Consolidated from duplicate validation functions
+const ValidationUtils = {
+    isValidIncidentTimestamp(timestamp) {
+        if (!timestamp || timestamp === 0) return false;
+        return DateTimeUtils.isValidTimestamp(timestamp);
+    },
+
+    isValidTemperatureReading(temp) {
+        return temp && typeof temp === 'number' && temp > -50 && temp < 150;
+    },
+
+    isValidPressureReading(pressure) {
+        return pressure && typeof pressure === 'number' && pressure > 25 && pressure < 35;
+    }
+};
+
+// Chart Utilities - Helper functions for chart management
+const ChartUtils = {
+    destroyChart(chartInstance) {
+        if (chartInstance) {
+            chartInstance.destroy();
+            return null;
+        }
+        return chartInstance;
+    },
+
+    getTimeDisplayFormat(hours) {
+        if (hours <= 6) {
+            return { unit: 'minute', stepSize: 30 };
+        } else if (hours <= 24) {
+            return { unit: 'hour', stepSize: 2 };
+        } else if (hours <= 72) {
+            return { unit: 'hour', stepSize: 6 };
+        } else {
+            return { unit: 'day', stepSize: 1 };
+        }
+    },
+
+    updateActiveButton(containerSelector, hours, functionName) {
+        document.querySelectorAll(`${containerSelector} .time-btn`).forEach(btn => {
+            const onclick = btn.getAttribute('onclick');
+            if (onclick && onclick.includes(functionName)) {
+                btn.classList.remove('active');
+                if (onclick.includes(`${functionName}(${hours})`)) {
+                    btn.classList.add('active');
+                }
+            }
+        });
+    }
+};
+
+// ===================================================================
+
 // Helper function to get API key from URL parameter (must be defined first)
 function getApiKeyFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -72,44 +201,9 @@ const DashboardUtils = {
         window.location.href = 'login.html';
     },
 
-    // Universal date/time formatter
+    // Universal date/time formatter - Use consolidated utility
     formatDateTime(date, options = {}) {
-        if (!date) return 'Unknown';
-        
-        const dateObj = date instanceof Date ? date : new Date(date);
-        if (isNaN(dateObj.getTime())) return 'Invalid Date';
-        
-        const defaults = {
-            format: 'full', // 'full', 'date', 'time', 'short', 'iso'
-            timezone: 'local',
-            includeSeconds: false
-        };
-        
-        const opts = { ...defaults, ...options };
-        
-        switch (opts.format) {
-            case 'iso':
-                return dateObj.toISOString();
-            case 'date':
-                return dateObj.toLocaleDateString();
-            case 'time':
-                return dateObj.toLocaleTimeString('en-US', { 
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: opts.includeSeconds ? '2-digit' : undefined
-                });
-            case 'short':
-                return dateObj.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                });
-            case 'full':
-            default:
-                return dateObj.toLocaleString();
-        }
+        return DateTimeUtils.formatDateTime(date, options);
     },
 
     // Universal duration formatter
@@ -1038,6 +1132,11 @@ async function refreshData() {
                     document.getElementById('yesterdayIncidentSummary').innerHTML = errorMessage;
                 });
         }
+
+// ===================================================================
+// DATA LOADING & PROCESSING FUNCTIONS  
+// Functions responsible for fetching and processing dashboard data
+// ===================================================================
 
         function setupEnhancedDashboard() {
             console.log('=== SETUP: setupEnhancedDashboard() started ===');
@@ -2487,17 +2586,7 @@ async function refreshData() {
                 if (data.system && data.system.MonthlyAggregationStatus) {
                     const agg = data.system.MonthlyAggregationStatus;
                     
-                    // Format timestamps (same function as updateDashboard)
-                    const formatDateTime = (isoString) => {
-                        if (!isoString) return 'Unknown';
-                        try {
-                            const date = new Date(isoString);
-                            return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
-                        } catch (e) {
-                            return 'Invalid date';
-                        }
-                    };
-                    
+                    // Format timestamps using consolidated utility
                     const statusIcon = agg.Success ? '✅' : '❌';
                     const statusText = agg.Success ? 'Successful' : 'Failed';
                     const errorText = agg.ErrorMessage ? ` (${agg.ErrorMessage})` : '';
@@ -2506,8 +2595,8 @@ async function refreshData() {
                     aggregationElement.innerHTML = `
                         <div class="aggregation-status-detail">
                             <p><strong>Status:</strong> ${statusIcon} ${statusText}${errorText}</p>
-                            <p><strong>Last Run:</strong> ${formatDateTime(agg.LastRun)}</p>
-                            <p><strong>Next Run:</strong> ${formatDateTime(agg.NextScheduledRun)}</p>
+                            <p><strong>Last Run:</strong> ${DateTimeUtils.formatDateTime(agg.LastRun)}</p>
+                            <p><strong>Next Run:</strong> ${DateTimeUtils.formatDateTime(agg.NextScheduledRun)}</p>
                             <p><strong>Records Updated:</strong> ${agg.RecordsUpdated || 0}</p>
                             <p><strong>Months Processed:</strong> ${agg.MonthsProcessed || 0}</p>
                             <p><strong>Trigger:</strong> ${agg.TriggerType || 'Unknown'}</p>
@@ -2631,21 +2720,12 @@ async function refreshData() {
                 if (resultElement) resultElement.textContent = status.ErrorMessage || 'Unknown error';
             }
             
-            // Format timestamps with helper function
-            const formatDateTime = (isoString) => {
-                if (!isoString) return 'Unknown';
-                try {
-                    const date = new Date(isoString);
-                    return date.toLocaleString();
-                } catch (e) {
-                    return 'Invalid date';
-                }
-            };
+            // Format timestamps using consolidated utility
             
             // Update all elements with null checks
-            if (lastRunElement) lastRunElement.textContent = formatDateTime(status.LastRun);
+            if (lastRunElement) lastRunElement.textContent = DateTimeUtils.formatDateTime(status.LastRun);
             if (recordsUpdatedElement) recordsUpdatedElement.textContent = status.RecordsUpdated || 'Unknown';
-            if (nextRunElement) nextRunElement.textContent = formatDateTime(status.NextScheduledRun);
+            if (nextRunElement) nextRunElement.textContent = DateTimeUtils.formatDateTime(status.NextScheduledRun);
         }
 
         async function refreshData() {
@@ -3398,17 +3478,6 @@ async function refreshData() {
                 if (monthlyAggElement && data.system && data.system.MonthlyAggregationStatus) {
                     const agg = data.system.MonthlyAggregationStatus;
                     
-                    // Format timestamps
-                    const formatDateTime = (isoString) => {
-                        if (!isoString) return 'Unknown';
-                        try {
-                            const date = new Date(isoString);
-                            return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
-                        } catch (e) {
-                            return 'Invalid date';
-                        }
-                    };
-                    
                     const statusIcon = agg.Success ? '✅' : '❌';
                     const statusText = agg.Success ? 'Successful' : 'Failed';
                     const errorText = agg.ErrorMessage ? ` (${agg.ErrorMessage})` : '';
@@ -3416,8 +3485,8 @@ async function refreshData() {
                     monthlyAggElement.innerHTML = `
                         <div class="aggregation-status-detail">
                             <p><strong>Status:</strong> ${statusIcon} ${statusText}${errorText}</p>
-                            <p><strong>Last Run:</strong> ${formatDateTime(agg.LastRun)}</p>
-                            <p><strong>Next Run:</strong> ${formatDateTime(agg.NextScheduledRun)}</p>
+                            <p><strong>Last Run:</strong> ${DateTimeUtils.formatDateTime(agg.LastRun)}</p>
+                            <p><strong>Next Run:</strong> ${DateTimeUtils.formatDateTime(agg.NextScheduledRun)}</p>
                             <p><strong>Records Updated:</strong> ${agg.RecordsUpdated || 0}</p>
                             <p><strong>Months Processed:</strong> ${agg.MonthsProcessed || 0}</p>
                             <p><strong>Trigger:</strong> ${agg.TriggerType || 'Unknown'}</p>
@@ -3624,20 +3693,6 @@ async function refreshData() {
                 return;
             }
 
-            // Filter out incidents with corrupted timestamps (more lenient validation)
-            function isValidIncidentTimestamp(timestamp) {
-                if (!timestamp || timestamp === 0) return false;
-                
-                // Convert to Date object
-                const date = new Date(timestamp * 1000); // Incidents use Unix timestamps in seconds
-                
-                // Validate date and check year range (more lenient range)
-                if (isNaN(date.getTime())) return false;
-                const year = date.getFullYear();
-                // More lenient timestamp validation - allow wider range and ongoing incidents
-                return year >= 2015 && year <= 2035;
-            }
-            
             // Filter incidents with valid timestamps, but be more lenient for ongoing incidents
             const validIncidents = incidents.filter(incident => {
                 const validStart = isValidIncidentTimestamp(incident.startTime);
@@ -3778,21 +3833,9 @@ async function refreshData() {
                 return;
             }
 
-            // Filter out incidents with corrupted timestamps (more lenient validation for filtering)
-            function isValidIncidentTimestamp(timestamp) {
-                if (!timestamp || timestamp <= 0) return false;
-                
-                const date = new Date(timestamp * 1000);
-                if (isNaN(date.getTime())) return false;
-                
-                const year = date.getFullYear();
-                // More lenient timestamp validation for filtering
-                return year >= 2015 && year <= 2035;
-            }
-            
             const validIncidents = incidents.filter(incident => {
-                const validStart = isValidIncidentTimestamp(incident.startTime);
-                const validEnd = incident.endTime === 0 || isValidIncidentTimestamp(incident.endTime);
+                const validStart = ValidationUtils.isValidIncidentTimestamp(incident.startTime);
+                const validEnd = incident.endTime === 0 || ValidationUtils.isValidIncidentTimestamp(incident.endTime);
                 
                 // Log invalid incidents for debugging during filtering
                 if (!validStart || !validEnd) {
@@ -3835,21 +3878,6 @@ async function refreshData() {
                 const startTime = new Date(incident.startTime * 1000);
                 const endTime = incident.endTime > 0 ? new Date(incident.endTime * 1000) : null;
                 
-                const formatDateTime = (date) => {
-                    const now = new Date();
-                    const isToday = date.toDateString() === now.toDateString();
-                    const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString();
-                    
-                    if (isToday) {
-                        return `Today ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-                    } else if (isYesterday) {
-                        return `Yesterday ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-                    } else {
-                        return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ' ' + 
-                               date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    }
-                };
-                
                 const formatDuration = (seconds) => {
                     if (seconds < 60) return `${seconds}s`;
                     if (seconds < 3600) return `${Math.floor(seconds/60)}m ${seconds%60}s`;
@@ -3862,8 +3890,8 @@ async function refreshData() {
                     formatDuration(incident.endTime - incident.startTime) : 'Ongoing';
                 
                 const timeRange = endTime ? 
-                    `${formatDateTime(startTime)} - ${formatDateTime(endTime)} (${duration})` :
-                    `${formatDateTime(startTime)} - Ongoing`;
+                    `${DateTimeUtils.formatRelativeDateTime(startTime)} - ${DateTimeUtils.formatRelativeDateTime(endTime)} (${duration})` :
+                    `${DateTimeUtils.formatRelativeDateTime(startTime)} - Ongoing`;
                 
                 incidentsHtml += `
                     <div class="incident-item ${severityClass}">
@@ -4034,6 +4062,11 @@ async function refreshData() {
             return table;
         }
 
+// ===================================================================
+// CHART & VISUALIZATION FUNCTIONS
+// Functions for managing Chart.js charts and data visualization
+// ===================================================================
+
         async function loadChart(hours) {
             console.log(`=== STAGE 3 FIX: loadChart(${hours}) using DataManager ===`);
             
@@ -4044,15 +4077,10 @@ async function refreshData() {
             }
             
             // Track the current chart time period
-            currentChartHours = hours;            // Update active button - find the button with matching hours
-            document.querySelectorAll('.time-btn').forEach(btn => {
-                btn.classList.remove('active');
-                // Check if this button's onclick matches the requested hours
-                const onclick = btn.getAttribute('onclick');
-                if (onclick && onclick.includes(`loadChart(${hours})`)) {
-                    btn.classList.add('active');
-                }
-            });
+            currentChartHours = hours;
+            
+            // Update active button using consolidated utility
+            ChartUtils.updateActiveButton('', hours, 'loadChart');
 
             try {
                 const token = localStorage.getItem('ventilation_auth_token');
@@ -4114,16 +4142,8 @@ async function refreshData() {
             // Track the current pressure chart time period
             currentPressureChartHours = hours;
             
-            // Update active button for pressure chart - look for buttons with onclick containing loadPressureChart
-            document.querySelectorAll('.time-btn').forEach(btn => {
-                const onclick = btn.getAttribute('onclick');
-                if (onclick && onclick.includes('loadPressureChart')) {
-                    btn.classList.remove('active');
-                    if (onclick.includes(`loadPressureChart(${hours})`)) {
-                        btn.classList.add('active');
-                    }
-                }
-            });
+            // Update active button using consolidated utility
+            ChartUtils.updateActiveButton('', hours, 'loadPressureChart');
 
             try {
                 // Fetch real pressure and forecast data from Azure Functions API
@@ -6523,12 +6543,6 @@ async function refreshData() {
             return DashboardUtils.updateConnectionStatus(status);
         }
 
-        function showError() {
-            document.getElementById('loadingSection').style.display = 'none';
-            document.getElementById('dashboardContent').style.display = 'none';
-            document.getElementById('errorSection').style.display = 'block';
-        }
-
         function startAutoRefresh() {
             if (refreshTimer) {
                 clearInterval(refreshTimer);
@@ -6543,6 +6557,11 @@ async function refreshData() {
         window.refreshData = refreshData;
 
         // Ventilation effectiveness calculation functions
+// ===================================================================
+// EFFECTIVENESS CALCULATION & ANALYSIS FUNCTIONS
+// Functions for calculating and analyzing ventilation effectiveness
+// ===================================================================
+
         function calculateVentilationEffectiveness(timeBasedData) {
             if (!timeBasedData || timeBasedData.length === 0) {
                 return [];
