@@ -4104,6 +4104,12 @@ async function refreshData() {
         // The fetchPressureData sample function has been removed
 
         async function loadPressureChart(hours) {
+            console.log(`=== STAGE 3 FIX: loadPressureChart(${hours}) using DataManager ===`);
+            
+            // Check if time range changed before updating currentPressureChartHours
+            const previousHours = currentPressureChartHours;
+            const timeRangeChanged = previousHours !== hours;
+            
             // Track the current pressure chart time period
             currentPressureChartHours = hours;
             
@@ -4156,9 +4162,14 @@ async function refreshData() {
                     return;
                 }
                 
-                // Only update if we have new data (latest timestamp is newer than what we've seen before)
-                if (!latestPressureDataTimestamp || newLatestTimestamp > latestPressureDataTimestamp) {
-                    console.log(`Pressure chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
+                // Only update if we have new data OR if the time range has changed
+                const timeRangeChanged = currentPressureChartHours !== hours;
+                if (!latestPressureDataTimestamp || newLatestTimestamp > latestPressureDataTimestamp || timeRangeChanged) {
+                    if (timeRangeChanged) {
+                        console.log(`Pressure chart: Time range changed to ${hours}h, updating chart`);
+                    } else {
+                        console.log(`Pressure chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
+                    }
                     latestPressureDataTimestamp = newLatestTimestamp;
                     updatePressureChart(pressureData, hours);
                 } else {
