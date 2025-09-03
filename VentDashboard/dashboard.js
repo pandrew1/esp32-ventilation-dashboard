@@ -4035,6 +4035,14 @@ async function refreshData() {
         }
 
         async function loadChart(hours) {
+            console.log(`=== STAGE 3 FIX: loadChart(${hours}) using DataManager ===`);
+            
+            // Clear previous data source tracking to prevent accumulation
+            if (window.dataSourceTracker) {
+                window.dataSourceTracker.temperatureDataSources = {};
+                window.dataSourceTracker.updateTemperatureDataSourceDisplay();
+            }
+            
             // Track the current chart time period
             currentChartHours = hours;            // Update active button - find the button with matching hours
             document.querySelectorAll('.time-btn').forEach(btn => {
@@ -4057,39 +4065,10 @@ async function refreshData() {
                     return;
                 }
 
-                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                });
+                // Use consolidated DataManager for history data
+                const data = await DataManager.getHistoryData(hours);
+                console.log(`DataManager: History data received for temperature chart (${hours}h)`);
                 
-                if (response.status === 401) {
-                    // Only logout if using API key authentication
-                    // For Bearer token, fall back to mock data until functions are updated
-                    const token = localStorage.getItem('ventilation_auth_token');
-                    if (!token && CONFIG.apiSecret) {
-                        // Using API key and got 401 - logout
-                        logout();
-                        return;
-                    } else if (token) {
-                        // Using Bearer token but got 401 - functions may not support it yet
-                        // Bearer token chart authentication failed, show empty chart
-                        showApiFailureNotice('History API returned 401 Unauthorized. Chart data is currently unavailable.', 'warning');
-                        window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Auth Failed', '401 Unauthorized');
-                        updateChart([], hours);
-                        return;
-                    }
-                }
-                
-                if (!response.ok) {
-                    // Show empty chart if API fails
-                    // Chart API call failed, show empty chart
-                    showApiFailureNotice(`History API returned ${response.status} ${response.statusText}. Chart data is currently unavailable.`, 'warning');
-                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'API Error', `${response.status} ${response.statusText}`);
-                    updateChart([], hours);
-                    return;
-                }
-                
-                const data = await response.json();
                 if (data.data && data.data.length > 0) {
                     // Track successful hourly data fetch
                     window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Raw Sensor Data', `${data.data.length} data points`);
@@ -4112,7 +4091,7 @@ async function refreshData() {
                 updateChart(data.data || [], hours);
                 
             } catch (error) {
-                console.error('Error loading chart data:', error);
+                console.error('DataManager: Error loading history data for temperature chart:', error);
                 // Show empty chart instead of mock data
                 showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
                 window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Network Error', error.message);
@@ -4149,26 +4128,9 @@ async function refreshData() {
                     return;
                 }
 
-                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                });
-                
-                if (response.status === 401) {
-                    console.log('Pressure API returned 401 Unauthorized');
-                    showApiFailureNotice('API returned 401 Unauthorized. Pressure chart data is currently unavailable.', 'warning');
-                    updatePressureChart([], hours);
-                    return;
-                }
-                
-                if (!response.ok) {
-                    console.error(`Pressure API error: ${response.status} ${response.statusText}`);
-                    showApiFailureNotice(`API returned ${response.status} ${response.statusText}. Pressure chart data is currently unavailable.`, 'warning');
-                    updatePressureChart([], hours);
-                    return;
-                }
-                
-                const apiData = await response.json();
+                // Use consolidated DataManager for history data
+                const apiData = await DataManager.getHistoryData(hours);
+                console.log(`DataManager: History data received for pressure chart (${hours}h)`);
                 console.log('Received pressure/forecast data from API:', apiData);
                 
                 // Transform API data into pressure chart format
@@ -4204,7 +4166,7 @@ async function refreshData() {
                 }
                 
             } catch (error) {
-                console.error('Error loading pressure chart data:', error);
+                console.error('DataManager: Error loading history data for pressure chart:', error);
                 showApiFailureNotice(`Network error loading pressure chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
                 updatePressureChart([], hours);
             }
