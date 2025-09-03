@@ -4109,6 +4109,7 @@ async function refreshData() {
             // Check if time range changed before updating currentPressureChartHours
             const previousHours = currentPressureChartHours;
             const timeRangeChanged = previousHours !== hours;
+            console.log(`Pressure chart: previousHours=${previousHours}, newHours=${hours}, timeRangeChanged=${timeRangeChanged}`);
             
             // Track the current pressure chart time period
             currentPressureChartHours = hours;
@@ -4163,7 +4164,6 @@ async function refreshData() {
                 }
                 
                 // Only update if we have new data OR if the time range has changed
-                const timeRangeChanged = currentPressureChartHours !== hours;
                 if (!latestPressureDataTimestamp || newLatestTimestamp > latestPressureDataTimestamp || timeRangeChanged) {
                     if (timeRangeChanged) {
                         console.log(`Pressure chart: Time range changed to ${hours}h, updating chart`);
