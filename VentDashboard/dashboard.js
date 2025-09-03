@@ -2225,7 +2225,7 @@ async function refreshData() {
             incidentElement.innerHTML = '<div class="loading-state">Loading yesterday incident summary...</div>';
             
             try {
-                // Get authentication headers
+                // Get authentication headers (same as other API calls)
                 const headers = getAuthHeaders();
                 const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
                 
@@ -2235,10 +2235,11 @@ async function refreshData() {
                 }
                 
                 // Get incident data from Status API (has real incident data)
-                const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus?deviceId=ESP32-Ventilation-01&apikey=ESP32VentilationWebhook2025';
+                const apiUrl = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
                 
                 const response = await fetch(apiUrl, { 
-                    method: 'GET'
+                    method: 'GET',
+                    headers: headers
                 });
                 
                 if (!response.ok) {
