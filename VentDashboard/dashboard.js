@@ -1257,7 +1257,7 @@ async function refreshData() {
         }
 
         function updateEnhancedDoorActivity() {
-            console.log('=== DOOR ACTIVITY CENTER: updateEnhancedDoorActivity() started - using real data ===');
+            console.log('=== STAGE 3: updateEnhancedDoorActivity() using DataManager ===');
             
             // Show loading states
             document.getElementById('activeDoorsCount').textContent = '...';
@@ -1277,24 +1277,10 @@ async function refreshData() {
                 return;
             }
             
-            // Use GetVentilationHistory API (same as Activity Timeline) for real door data
-            const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=24';
-            
-            console.log('updateEnhancedDoorActivity: Making API call to:', apiUrl);
-            
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: headers
-            })
-                .then(response => {
-                    console.log('updateEnhancedDoorActivity: Received response, status:', response.status);
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
+            // Use consolidated DataManager for 24h history data
+            DataManager.getHistoryData(24)
                 .then(data => {
-                    console.log('updateEnhancedDoorActivity: Received history data:', data);
+                    console.log('DataManager: History data received for door activity (24h)');
                     
                     // Process door data same way as Activity Timeline
                     const doorEvents = [];
@@ -1410,7 +1396,7 @@ async function refreshData() {
                     }
                 })
                 .catch(error => {
-                    console.error('updateEnhancedDoorActivity: Error:', error);
+                    console.error('DataManager: Error loading history data for door activity:', error);
                     
                     // Show error state
                     document.getElementById('activeDoorsCount').textContent = 'Error';
@@ -1724,23 +1710,10 @@ async function refreshData() {
             
             console.log('TIMELINE: Using authentication headers');
             
-            // Call the ventilation history API for door timeline data
-            const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=${hours}`;
-            
-            console.log('TIMELINE: Making API call to:', apiUrl);
-            
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: headers
-            })
-                .then(response => {
-                    console.log('TIMELINE: Received response, status:', response.status);
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
+            // Use consolidated DataManager for history data
+            DataManager.getHistoryData(hours)
                 .then(data => {
+                    console.log(`DataManager: History data received for timeline (${hours}h)`);
                     console.log('TIMELINE: Received history data for', hours, 'hours:', {
                         dataPoints: data.data ? data.data.length : 0,
                         deviceId: data.deviceId,
@@ -1898,7 +1871,7 @@ async function refreshData() {
                     renderActivityTimeline(doorsData, hours);
                 })
                 .catch(error => {
-                    console.error('TIMELINE ERROR: Failed to load timeline data:', error);
+                    console.error('DataManager: Error loading history data for timeline:', error);
                     console.error('TIMELINE ERROR: Error details:', {
                         message: error.message,
                         stack: error.stack,
@@ -2255,7 +2228,7 @@ async function refreshData() {
         }
 
         async function loadYesterdayDoorActivity() {
-            console.log('=== YESTERDAY DOOR ACTIVITY: loadYesterdayDoorActivity() started ===');
+            console.log('=== STAGE 3: loadYesterdayDoorActivity() using DataManager ===');
             
             const yesterdayElement = document.getElementById('yesterdayDoorTimeline');
             if (!yesterdayElement) {
@@ -2276,19 +2249,9 @@ async function refreshData() {
                     return;
                 }
                 
-                // Get door activity data from History API (24 hours = yesterday)
-                const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=24';
-                
-                const response = await fetch(apiUrl, { 
-                    method: 'GET', 
-                    headers: headers 
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
+                // Use consolidated DataManager for 24h history data
+                const data = await DataManager.getHistoryData(24);
+                console.log('DataManager: History data received for yesterday door activity (24h)');
                 
                 // History API returns {deviceId: ..., data: [...]}
                 const historyData = data.data || [];
@@ -2382,7 +2345,7 @@ async function refreshData() {
                 console.log(`YESTERDAY DOOR ACTIVITY: Found ${doorActivityStats.totalEvents} events, ${doorActivityStats.activeDoors.size} active doors`);
                 
             } catch (error) {
-                console.error('Error loading yesterday door activity:', error);
+                console.error('DataManager: Error loading history data for yesterday door activity:', error);
                 yesterdayElement.innerHTML = '<div class="error-state">Failed to load door activity data</div>';
             }
         }
