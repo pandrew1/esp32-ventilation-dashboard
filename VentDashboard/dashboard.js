@@ -668,39 +668,8 @@ async function refreshData() {
                     // Enhanced API doesn't have system.MonthlyAggregationStatus
                     document.getElementById('yesterdayAggregation').innerHTML = '<div class="info-state">Loading monthly aggregation status...</div>';
                     
-                    // Load incident summary
-                    if (yesterdayData.incidents) {
-                        const incidents = yesterdayData.incidents;
-                        
-                        // Calculate system health based on incident data
-                        const totalIncidents = incidents.total || 0;
-                        const criticalIncidents = incidents.critical || 0;
-                        const resolvedIncidents = incidents.resolved || 0;
-                        
-                        // Calculate uptime percentage if not provided
-                        let uptimeDisplay = 'No uptime data';
-                        if (incidents.uptime !== undefined && incidents.uptime !== null) {
-                            uptimeDisplay = `${incidents.uptime}% uptime`;
-                        } else if (totalIncidents === 0) {
-                            uptimeDisplay = '100% uptime';
-                        } else if (resolvedIncidents > 0) {
-                            uptimeDisplay = `${resolvedIncidents}/${totalIncidents} resolved`;
-                        }
-                        
-                        // Status handling
-                        const systemStatus = incidents.status || (totalIncidents === 0 ? 'Normal' : criticalIncidents > 0 ? 'Attention Required' : 'Monitoring');
-                        
-                        document.getElementById('yesterdayIncidentSummary').innerHTML = `
-                            <div class="incident-summary">
-                                <p><strong>Total Incidents:</strong> ${totalIncidents}</p>
-                                <p><strong>Critical:</strong> ${criticalIncidents}</p>
-                                <p><strong>System Health:</strong> ${uptimeDisplay}</p>
-                                <p><strong>Status:</strong> ${systemStatus}</p>
-                            </div>
-                        `;
-                    } else {
-                        document.getElementById('yesterdayIncidentSummary').innerHTML = '<div class="error-state">Incident data not available</div>';
-                    }
+                    // Load incident summary from Status API (Enhanced API doesn't have real incident data)
+                    loadYesterdayIncidentSummary();
                 })
                 .catch(error => {
                     console.error('Error loading yesterday detailed content:', error);
@@ -2240,6 +2209,106 @@ async function refreshData() {
             } catch (error) {
                 console.error('Error loading yesterday door activity:', error);
                 yesterdayElement.innerHTML = '<div class="error-state">Failed to load door activity data</div>';
+            }
+        }
+
+        async function loadYesterdayIncidentSummary() {
+            console.log('=== YESTERDAY INCIDENT SUMMARY: loadYesterdayIncidentSummary() started ===');
+            
+            const incidentElement = document.getElementById('yesterdayIncidentSummary');
+            if (!incidentElement) {
+                console.error('yesterdayIncidentSummary element not found');
+                return;
+            }
+            
+            // Show loading state
+            incidentElement.innerHTML = '<div class="loading-state">Loading yesterday incident summary...</div>';
+            
+            try {
+                // Get authentication headers
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    incidentElement.innerHTML = '<div class="error-state">Authentication required for incident data</div>';
+                    return;
+                }
+                
+                // Get incident data from Status API (has real incident data)
+                const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus?deviceId=ESP32-Ventilation-01&apikey=ESP32VentilationWebhook2025';
+                
+                const response = await fetch(apiUrl, { 
+                    method: 'GET'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.incidents || !Array.isArray(data.incidents)) {
+                    incidentElement.innerHTML = '<div class="info-state">No incident data available</div>';
+                    return;
+                }
+                
+                // Calculate yesterday's date range in Unix timestamps
+                const now = new Date();
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+                const yesterdayEnd = new Date(yesterdayStart);
+                yesterdayEnd.setDate(yesterdayStart.getDate() + 1);
+                yesterdayEnd.setSeconds(yesterdayEnd.getSeconds() - 1);
+                
+                const yesterdayStartUnix = Math.floor(yesterdayStart.getTime() / 1000);
+                const yesterdayEndUnix = Math.floor(yesterdayEnd.getTime() / 1000);
+                
+                console.log(`YESTERDAY INCIDENT SUMMARY: Filtering incidents between ${yesterdayStartUnix} and ${yesterdayEndUnix}`);
+                
+                // Filter incidents for yesterday
+                const yesterdayIncidents = data.incidents.filter(incident => 
+                    incident.startTime >= yesterdayStartUnix && incident.startTime <= yesterdayEndUnix
+                );
+                
+                console.log(`YESTERDAY INCIDENT SUMMARY: Found ${yesterdayIncidents.length} incidents for yesterday`);
+                
+                // Calculate incident statistics
+                const totalIncidents = yesterdayIncidents.length;
+                const criticalIncidents = yesterdayIncidents.filter(inc => inc.severity === 0).length; // Critical severity = 0
+                const highIncidents = yesterdayIncidents.filter(inc => inc.severity === 1).length; // High severity = 1
+                const resolvedIncidents = yesterdayIncidents.filter(inc => inc.endTime && inc.endTime > 0).length;
+                
+                // Calculate uptime percentage
+                let uptimeDisplay = '100% uptime';
+                if (totalIncidents > 0) {
+                    if (resolvedIncidents > 0) {
+                        uptimeDisplay = `${resolvedIncidents}/${totalIncidents} resolved`;
+                    } else {
+                        uptimeDisplay = `${totalIncidents} active incidents`;
+                    }
+                }
+                
+                // Determine system status
+                const systemStatus = totalIncidents === 0 ? 'Normal' : 
+                                   criticalIncidents > 0 ? 'Attention Required' : 
+                                   highIncidents > 0 ? 'Monitoring' : 'Normal';
+                
+                // Display incident summary
+                incidentElement.innerHTML = `
+                    <div class="incident-summary">
+                        <p><strong>Total Incidents:</strong> ${totalIncidents}</p>
+                        <p><strong>Critical:</strong> ${criticalIncidents}</p>
+                        <p><strong>System Health:</strong> ${uptimeDisplay}</p>
+                        <p><strong>Status:</strong> ${systemStatus}</p>
+                    </div>
+                `;
+                
+                console.log(`YESTERDAY INCIDENT SUMMARY: Displayed ${totalIncidents} total, ${criticalIncidents} critical, status: ${systemStatus}`);
+                
+            } catch (error) {
+                console.error('Error loading yesterday incident summary:', error);
+                incidentElement.innerHTML = '<div class="error-state">Failed to load incident data</div>';
             }
         }
 
