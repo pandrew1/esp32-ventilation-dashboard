@@ -3695,9 +3695,9 @@ async function refreshData() {
 
             // Filter incidents with valid timestamps, but be more lenient for ongoing incidents
             const validIncidents = incidents.filter(incident => {
-                const validStart = isValidIncidentTimestamp(incident.startTime);
+                const validStart = ValidationUtils.isValidIncidentTimestamp(incident.startTime);
                 // For ongoing incidents (endTime === 0), only validate startTime
-                const validEnd = incident.endTime === 0 || isValidIncidentTimestamp(incident.endTime);
+                const validEnd = incident.endTime === 0 || ValidationUtils.isValidIncidentTimestamp(incident.endTime);
                 
                 // Log invalid incidents for debugging
                 if (!validStart || !validEnd) {
