@@ -614,39 +614,8 @@ async function refreshData() {
                         document.getElementById('yesterdayAssessments').innerHTML = '<div class="error-state">System assessment data not available - no yesterday summary found</div>';
                     }
                     
-                    // Load door timeline
-                    if (yesterdayData.doors) {
-                        const doors = yesterdayData.doors;
-                        
-                        // Calculate most active door from actual activity data if available
-                        let mostActiveDoor = doors.mostActive || 'N/A';
-                        // Note: doorEvents is from timeline processing, may not be available in this context
-                        // Use doors data from API instead
-                        if (doors.doorTransitions && doors.doorTransitions.length > 0) {
-                            const doorActivityCounts = {};
-                            doors.doorTransitions.forEach(transition => {
-                                const doorName = transition.door || transition.doorName;
-                                if (doorName) {
-                                    doorActivityCounts[doorName] = (doorActivityCounts[doorName] || 0) + 1;
-                                }
-                            });
-                            const sortedDoors = Object.entries(doorActivityCounts).sort(([,a], [,b]) => b - a);
-                            if (sortedDoors.length > 0) {
-                                mostActiveDoor = `${sortedDoors[0][0]} (${sortedDoors[0][1]} events)`;
-                            }
-                        }
-                        
-                        document.getElementById('yesterdayDoorTimeline').innerHTML = `
-                            <div class="door-summary">
-                                <p><strong>Active Doors:</strong> ${doors.activeDoors} of ${doors.totalDoors}</p>
-                                <p><strong>Total Events:</strong> ${doors.totalEvents}</p>
-                                <p><strong>Peak Activity:</strong> ${doors.peakActivity}</p>
-                                <p><strong>Most Active:</strong> ${mostActiveDoor}</p>
-                            </div>
-                        `;
-                    } else {
-                        document.getElementById('yesterdayDoorTimeline').innerHTML = '<div class="error-state">Door timeline data not available</div>';
-                    }
+                    // Load door timeline - get real door activity data from History API like the main timeline
+                    loadYesterdayDoorActivity();
                     
                     // Load humidity analysis - use actual API structure
                     if (yesterdayData.environmental) {
@@ -2139,6 +2108,139 @@ async function refreshData() {
             timelineViz.innerHTML = timelineStyles + timelineHtml;
             
             console.log('renderActivityTimeline: Timeline rendered successfully');
+        }
+
+        async function loadYesterdayDoorActivity() {
+            console.log('=== YESTERDAY DOOR ACTIVITY: loadYesterdayDoorActivity() started ===');
+            
+            const yesterdayElement = document.getElementById('yesterdayDoorTimeline');
+            if (!yesterdayElement) {
+                console.error('yesterdayDoorTimeline element not found');
+                return;
+            }
+            
+            // Show loading state
+            yesterdayElement.innerHTML = '<div class="loading-state">Loading yesterday door activity...</div>';
+            
+            try {
+                // Get authentication headers
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    yesterdayElement.innerHTML = '<div class="error-state">Authentication required for door activity data</div>';
+                    return;
+                }
+                
+                // Get door activity data from History API (24 hours = yesterday)
+                const apiUrl = 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory?deviceId=ESP32-Ventilation-01&hours=24';
+                
+                const response = await fetch(apiUrl, { 
+                    method: 'GET', 
+                    headers: headers 
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // History API returns {deviceId: ..., data: [...]}
+                const historyData = data.data || [];
+                
+                if (!historyData || historyData.length === 0) {
+                    yesterdayElement.innerHTML = '<div class="info-state">No history data available for yesterday</div>';
+                    return;
+                }
+                
+                // Process door activity from history data 
+                let doorEvents = [];
+                const doorActivityStats = {
+                    activeDoors: new Set(),
+                    totalEvents: 0,
+                    mostActiveCount: 0,
+                    mostActiveDoor: 'None'
+                };
+                
+                historyData.forEach(entry => {
+                    // Check for doors array (door status data) - doors are objects, not strings
+                    if (entry.doors && Array.isArray(entry.doors)) {
+                        entry.doors.forEach(door => {
+                            // Door data comes as objects with properties like {id: 2, name: "D2 (House Hinge)", wasOpenedToday: true, ...}
+                            if (door.name && door.wasOpenedToday === true) {
+                                const doorName = door.name.trim();
+                                doorActivityStats.activeDoors.add(doorName);
+                                doorEvents.push({
+                                    door: doorName,
+                                    status: 'active',
+                                    timestamp: entry.timestamp,
+                                    type: 'daily_activity'
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Check for doorTransitions array (actual door events)  
+                    if (entry.doorTransitions && Array.isArray(entry.doorTransitions)) {
+                        entry.doorTransitions.forEach(transition => {
+                            // Transition data comes as objects with properties like {doorId: 2, doorName: "D2 (House Hinge)", opened: true, ...}
+                            if (transition.doorName) {
+                                const doorName = transition.doorName.trim();
+                                const opened = transition.opened === true;
+                                
+                                doorActivityStats.activeDoors.add(doorName);
+                                doorEvents.push({
+                                    door: doorName,
+                                    status: opened ? 'opened' : 'closed',
+                                    timestamp: entry.timestamp,
+                                    type: 'transition'
+                                });
+                            }
+                        });
+                    }
+                });
+                
+                doorActivityStats.totalEvents = doorEvents.length;
+                
+                // Find most active door
+                const doorCounts = {};
+                doorEvents.forEach(event => {
+                    doorCounts[event.door] = (doorCounts[event.door] || 0) + 1;
+                });
+                
+                if (Object.keys(doorCounts).length > 0) {
+                    const sortedDoors = Object.entries(doorCounts).sort(([,a], [,b]) => b - a);
+                    doorActivityStats.mostActiveDoor = `${sortedDoors[0][0]} (${sortedDoors[0][1]} events)`;
+                    doorActivityStats.mostActiveCount = sortedDoors[0][1];
+                }
+                
+                // Determine peak activity level
+                let peakActivity = 'None';
+                if (doorActivityStats.totalEvents > 50) {
+                    peakActivity = 'High';
+                } else if (doorActivityStats.totalEvents > 15) {
+                    peakActivity = 'Medium';
+                } else if (doorActivityStats.totalEvents > 0) {
+                    peakActivity = 'Low';
+                }
+                
+                // Display the results
+                yesterdayElement.innerHTML = `
+                    <div class="door-summary">
+                        <p><strong>Active Doors:</strong> ${doorActivityStats.activeDoors.size} detected</p>
+                        <p><strong>Total Events:</strong> ${doorActivityStats.totalEvents}</p>
+                        <p><strong>Peak Activity:</strong> ${peakActivity}</p>
+                        <p><strong>Most Active:</strong> ${doorActivityStats.mostActiveDoor}</p>
+                    </div>
+                `;
+                
+                console.log(`YESTERDAY DOOR ACTIVITY: Found ${doorActivityStats.totalEvents} events, ${doorActivityStats.activeDoors.size} active doors`);
+                
+            } catch (error) {
+                console.error('Error loading yesterday door activity:', error);
+                yesterdayElement.innerHTML = '<div class="error-state">Failed to load door activity data</div>';
+            }
         }
 
         async function loadAggregationStatus() {
