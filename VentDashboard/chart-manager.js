@@ -2,7 +2,7 @@
 // Smart chart update detection and lifecycle management
 
 export class ChartManager {
-    constructor() {
+    constructor(dataManager) {
         this.charts = {
             temperature: null,
             pressure: null,
@@ -19,6 +19,8 @@ export class ChartManager {
             temperature: 6,
             pressure: 6
         };
+        
+        this.dataManager = dataManager;
     }
 
     // Smart temperature chart update with timestamp detection
@@ -28,41 +30,49 @@ export class ChartManager {
         const timeRangeChanged = this.currentTimeRanges.temperature !== hours;
         this.currentTimeRanges.temperature = hours;
         
-        // Get data using global functions from dashboard
-        const data = await loadHistoryData(hours);
-        if (!data || data.length === 0) {
-            console.log('ChartManager: No temperature data available');
-            return existingChart;
-        }
-        
-        // Extract timestamps for comparison
-        const timestamps = data.map(d => {
-            let timestamp;
-            if (typeof d.timestamp === 'string') {
-                timestamp = d.timestamp.includes('T') ? new Date(d.timestamp) : new Date(parseInt(d.timestamp) * 1000);
-            } else {
-                timestamp = new Date(d.timestamp > 1000000000000 ? d.timestamp : d.timestamp * 1000);
-            }
-            return timestamp;
-        }).filter(d => !isNaN(d.getTime()));
-        
-        const newLatestTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
-        
-        // Update if we have new data OR time range changed
-        if (!this.latestTimestamps.temperature || 
-            newLatestTimestamp > this.latestTimestamps.temperature || 
-            timeRangeChanged) {
+        try {
+            // Get data using DataManager instead of global function
+            const apiData = await this.dataManager.getHistoryData(hours);
+            const data = apiData?.data || [];
             
-            if (timeRangeChanged) {
-                console.log(`ChartManager: Time range changed to ${hours}h, updating chart`);
-            } else {
-                console.log(`ChartManager: New data detected, updating chart (${newLatestTimestamp?.toLocaleTimeString()})`);
+            if (!data || data.length === 0) {
+                console.log('ChartManager: No temperature data available');
+                return existingChart;
             }
             
-            this.latestTimestamps.temperature = newLatestTimestamp;
-            return await this._performTemperatureChartUpdate(data, hours, existingChart);
-        } else {
-            console.log('ChartManager: No new temperature data, skipping refresh');
+            // Extract timestamps for comparison
+            const timestamps = data.map(d => {
+                let timestamp;
+                if (typeof d.timestamp === 'string') {
+                    timestamp = d.timestamp.includes('T') ? new Date(d.timestamp) : new Date(parseInt(d.timestamp) * 1000);
+                } else {
+                    timestamp = new Date(d.timestamp > 1000000000000 ? d.timestamp : d.timestamp * 1000);
+                }
+                return timestamp;
+            }).filter(d => !isNaN(d.getTime()));
+            
+            const newLatestTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
+            
+            // Update if we have new data OR time range changed
+            if (!this.latestTimestamps.temperature || 
+                newLatestTimestamp > this.latestTimestamps.temperature || 
+                timeRangeChanged) {
+                
+                if (timeRangeChanged) {
+                    console.log(`ChartManager: Time range changed to ${hours}h, updating chart`);
+                } else {
+                    console.log(`ChartManager: New data detected, updating chart (${newLatestTimestamp?.toLocaleTimeString()})`);
+                }
+                
+                this.latestTimestamps.temperature = newLatestTimestamp;
+                return await this._performTemperatureChartUpdate(data, hours, existingChart);
+            } else {
+                console.log('ChartManager: No new temperature data, skipping refresh');
+                return existingChart;
+            }
+            
+        } catch (error) {
+            console.error('ChartManager: Error updating temperature chart:', error);
             return existingChart;
         }
     }
@@ -74,32 +84,40 @@ export class ChartManager {
         const timeRangeChanged = this.currentTimeRanges.pressure !== hours;
         this.currentTimeRanges.pressure = hours;
         
-        // Get data using global functions from dashboard
-        const data = await loadHistoryData(hours);
-        if (!data || data.length === 0) {
-            console.log('ChartManager: No pressure data available');
-            return existingChart;
-        }
-        
-        const timestamps = data.map(d => new Date(d.timestamp * 1000))
-            .filter(d => !isNaN(d.getTime()));
-        
-        const newLatestTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
-        
-        if (!this.latestTimestamps.pressure || 
-            newLatestTimestamp > this.latestTimestamps.pressure || 
-            timeRangeChanged) {
+        try {
+            // Get data using DataManager instead of global function
+            const apiData = await this.dataManager.getHistoryData(hours);
+            const data = apiData?.data || [];
             
-            if (timeRangeChanged) {
-                console.log(`ChartManager: Pressure time range changed to ${hours}h, updating chart`);
-            } else {
-                console.log(`ChartManager: New pressure data detected, updating chart (${newLatestTimestamp?.toLocaleTimeString()})`);
+            if (!data || data.length === 0) {
+                console.log('ChartManager: No pressure data available');
+                return existingChart;
             }
             
-            this.latestTimestamps.pressure = newLatestTimestamp;
-            return await this._performPressureChartUpdate(data, hours, existingChart);
-        } else {
-            console.log('ChartManager: No new pressure data, skipping refresh');
+            const timestamps = data.map(d => new Date(d.timestamp * 1000))
+                .filter(d => !isNaN(d.getTime()));
+            
+            const newLatestTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
+            
+            if (!this.latestTimestamps.pressure || 
+                newLatestTimestamp > this.latestTimestamps.pressure || 
+                timeRangeChanged) {
+                
+                if (timeRangeChanged) {
+                    console.log(`ChartManager: Pressure time range changed to ${hours}h, updating chart`);
+                } else {
+                    console.log(`ChartManager: New pressure data detected, updating chart (${newLatestTimestamp?.toLocaleTimeString()})`);
+                }
+                
+                this.latestTimestamps.pressure = newLatestTimestamp;
+                return await this._performPressureChartUpdate(data, hours, existingChart);
+            } else {
+                console.log('ChartManager: No new pressure data, skipping refresh');
+                return existingChart;
+            }
+            
+        } catch (error) {
+            console.error('ChartManager: Error updating pressure chart:', error);
             return existingChart;
         }
     }
@@ -123,6 +141,14 @@ export class ChartManager {
             return existingChart;
         }
     }
+}
+
+// Export ChartManager class and a function to create an instance
+export { ChartManager };
+
+// Function to create a chart manager instance with DataManager dependency
+export function createChartManager(dataManager) {
+    return new ChartManager(dataManager);
 }
 
 // Create singleton instance

@@ -96,8 +96,11 @@ async function initializeModularSystems() {
         
         // Load simplified modules
         const { dataManager } = await ModuleLoader.loadModule('data-api-manager.js');
-        const { chartManager } = await ModuleLoader.loadModule('chart-manager.js');
+        const { createChartManager } = await ModuleLoader.loadModule('chart-manager.js');
         const { DashboardEvents } = await ModuleLoader.loadModule('core-event-system.js');
+        
+        // Create chart manager with DataManager dependency
+        const chartManager = createChartManager(dataManager);
         
         // Set global references
         GlobalDataManager = dataManager;
@@ -1556,6 +1559,100 @@ async function refreshData() {
         }
 
         /**
+         * ENHANCED: Calculates summary metrics from raw VentilationData records
+         * Uses the same approach as loadYesterdayIndividualSensorData but provides summary stats
+         * This ensures the top 4 boxes show accurate data instead of N/A values
+         * @returns {Promise<void>}
+         */
+        async function calculateYesterdaySummaryFromRawData() {
+            console.log('=== ENHANCED: calculateYesterdaySummaryFromRawData() for accurate summary metrics ===');
+            
+            try {
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    console.log('calculateYesterdaySummaryFromRawData: No authentication available');
+                    setYesterdayMetricsToWaiting();
+                    return;
+                }
+
+                // Use DataManager to get yesterday's raw data (same as individual sensor function)
+                const data = await DataManager.getHistoryData(24);
+                console.log('DataManager: History data received for summary calculation (24h)');
+                
+                const historyData = data.data || [];
+                
+                if (!historyData || historyData.length === 0) {
+                    console.log('No history data available for summary calculation');
+                    setYesterdayMetricsToWaiting();
+                    return;
+                }
+                
+                // Process raw sensor data to calculate summary statistics
+                const allTemps = [];
+                const fanOnMinutes = [];
+                const efficiencyValues = [];
+                let totalFanMinutes = 0;
+                
+                historyData.forEach(entry => {
+                    // Collect all temperature readings
+                    if (entry.IndoorTemp != null) allTemps.push(entry.IndoorTemp);
+                    if (entry.OutdoorTemp != null) allTemps.push(entry.OutdoorTemp);
+                    if (entry.GarageTemp != null) allTemps.push(entry.GarageTemp);
+                    
+                    // Collect fan runtime data
+                    if (entry.FanMinutesToday != null) {
+                        fanOnMinutes.push(entry.FanMinutesToday);
+                        totalFanMinutes = Math.max(totalFanMinutes, entry.FanMinutesToday);
+                    }
+                    
+                    // Calculate efficiency from fan operation
+                    if (entry.FanOn === true) {
+                        efficiencyValues.push(1); // Fan was on
+                    } else if (entry.FanOn === false) {
+                        efficiencyValues.push(0); // Fan was off
+                    }
+                });
+                
+                // Calculate summary statistics
+                const tempMin = allTemps.length > 0 ? Math.min(...allTemps).toFixed(1) : 'N/A';
+                const tempMax = allTemps.length > 0 ? Math.max(...allTemps).toFixed(1) : 'N/A';
+                const tempAvg = allTemps.length > 0 ? (allTemps.reduce((a, b) => a + b, 0) / allTemps.length).toFixed(1) : 'N/A';
+                
+                const efficiency = efficiencyValues.length > 0 ? 
+                    ((efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length) * 100).toFixed(1) : 'N/A';
+                const runtime = totalFanMinutes > 0 ? (totalFanMinutes / 60).toFixed(2) : 'N/A';
+                
+                // Update the top 4 summary boxes with calculated data
+                document.getElementById('yesterdayAvgTemp').textContent = tempAvg !== 'N/A' ? `${tempAvg}°F` : 'N/A';
+                document.getElementById('yesterdayTempRange').textContent = tempMin !== 'N/A' && tempMax !== 'N/A' ? `${tempMin}° - ${tempMax}°` : 'N/A';
+                document.getElementById('yesterdayTempTrend').textContent = allTemps.length > 0 ? 'Data available' : 'No data';
+                document.getElementById('yesterdayTempTrend').className = 'metric-trend';
+                
+                document.getElementById('yesterdayEfficiency').textContent = efficiency !== 'N/A' ? `${efficiency}%` : 'N/A';
+                document.getElementById('yesterdayRuntime').textContent = runtime !== 'N/A' ? `${runtime} hrs runtime` : 'N/A';
+                document.getElementById('yesterdayEfficiencyTrend').textContent = efficiencyValues.length > 0 ? 'Data available' : 'No data';
+                document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                
+                // For door activity and air quality, use placeholder values since we don't have PM2.5 sensors
+                document.getElementById('yesterdayDoorEvents').textContent = 'See timeline below';  
+                document.getElementById('yesterdayDoorTrend').textContent = 'Activity tracked';
+                document.getElementById('yesterdayDoorTrend').className = 'metric-trend';
+                
+                document.getElementById('yesterdaySystemHealth').textContent = 'See assessments below';
+                document.getElementById('yesterdayIncidents').textContent = 'See incident summary';
+                document.getElementById('yesterdayUptime').textContent = historyData.length > 0 ? 'Data available' : 'No data';
+                
+                console.log(`ENHANCED SUMMARY: Calculated from ${historyData.length} records - Temp: ${tempMin}°-${tempMax}° (avg ${tempAvg}°), Efficiency: ${efficiency}%, Runtime: ${runtime}h`);
+                
+            } catch (error) {
+                console.error('Enhanced summary calculation failed:', error);
+                setYesterdayMetricsToError();
+            }
+        }
+
+        /**
          * Loads and displays yesterday's summary metrics in the dashboard
          * Fetches temperature, efficiency, door activity, and air quality metrics
          * Updates metric displays and handles authentication requirements
@@ -1563,7 +1660,7 @@ async function refreshData() {
          * @returns {void}
          */
         function loadYesterdaySummaryMetrics() {
-            console.log('=== STAGE 2: loadYesterdaySummaryMetrics() using DataManager ===');
+            console.log('=== ENHANCED: loadYesterdaySummaryMetrics() using raw data calculation ===');
             
             // Show loading states for all metric elements
             const loadingText = 'Loading...';
@@ -1588,117 +1685,8 @@ async function refreshData() {
             document.getElementById('yesterdayIncidents').textContent = loadingText;
             document.getElementById('yesterdayUptime').textContent = loadingText;
             
-            // Check if we have any authentication method (Bearer token or API key)
-            const headers = getAuthHeaders();
-            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
-            
-            if (!hasAuth) {
-                console.log('loadYesterdaySummaryMetrics: No authentication available - Bearer token or API key required');
-                setYesterdayMetricsToWaiting();
-                return;
-            }
-            
-            // Use consolidated DataManager instead of direct API call
-            DataManager.getEnhancedData()
-                .then(data => {
-                    console.log('DataManager: Enhanced data received for yesterday metrics');
-                    
-                    if (data && data.sections && data.sections.yesterday) {
-                        processYesterdayData(data.sections.yesterday);
-                    } else {
-                        console.log('loadYesterdaySummaryMetrics: No yesterday data available');
-                        setYesterdayMetricsToWaiting();
-                    }
-                })
-                .catch(error => {
-                    console.error('DataManager: Error loading enhanced data for yesterday metrics:', error);
-                    setYesterdayMetricsToError();
-                });
-
-            // Helper function to process yesterday data
-            /**
-             * Processes yesterday's data and updates all metric displays
-             * Handles temperature, efficiency, door activity, and air quality metrics
-             * Updates DOM elements with formatted data or shows appropriate fallbacks
-             * @param {Object} yesterday - Yesterday's data object from the API
-             * @returns {void}
-             */
-            function processYesterdayData(yesterday) {
-                console.log('loadYesterdaySummaryMetrics: Processing yesterday data');
-                
-                if (yesterday && yesterday.status !== 'waiting_for_esp32_data') {
-                    console.log('loadYesterdaySummaryMetrics: Yesterday data available, status:', yesterday.status);
-                    
-                    // Update temperature metrics
-                    if (yesterday.environmental) {
-                        const env = yesterday.environmental;
-                        document.getElementById('yesterdayAvgTemp').textContent = `${env.tempAvg}°F`;
-                        document.getElementById('yesterdayTempRange').textContent = `${env.tempMin}° - ${env.tempMax}°`;
-                        document.getElementById('yesterdayTempTrend').textContent = 'Data available';
-                        document.getElementById('yesterdayTempTrend').className = 'metric-trend';
-                    } else {
-                        document.getElementById('yesterdayAvgTemp').textContent = 'No temp data';
-                        document.getElementById('yesterdayTempRange').textContent = 'No range data';
-                        document.getElementById('yesterdayTempTrend').textContent = 'Missing environmental data';
-                    }
-                    
-                    // Update efficiency metrics
-                    if (yesterday.performance) {
-                        const perf = yesterday.performance;
-                        document.getElementById('yesterdayEfficiency').textContent = `${perf.efficiency}%`;
-                        document.getElementById('yesterdayRuntime').textContent = `${perf.runtime} hrs runtime`;
-                        document.getElementById('yesterdayEfficiencyTrend').textContent = 'Data available';
-                        document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
-                    } else {
-                        document.getElementById('yesterdayEfficiency').textContent = 'No data';
-                        document.getElementById('yesterdayRuntime').textContent = 'No runtime data';
-                        document.getElementById('yesterdayEfficiencyTrend').textContent = 'Missing performance data';
-                    }
-                    
-                    // Update door activity metrics
-                    if (yesterday.doors) {
-                        const doors = yesterday.doors;
-                        document.getElementById('yesterdayDoorsActive').textContent = `${doors.activeDoors || 0}/${doors.totalDoors || 0}`;
-                        document.getElementById('yesterdaySessions').textContent = `${doors.totalEvents || 0} events`;
-                        document.getElementById('yesterdayPeakTime').textContent = `Peak: ${doors.peakActivity || 'N/A'}`;
-                    } else {
-                        document.getElementById('yesterdayDoorsActive').textContent = 'No door data';
-                        document.getElementById('yesterdaySessions').textContent = '0 events';
-                        document.getElementById('yesterdayPeakTime').textContent = 'Peak: No data';
-                    }
-                    
-                    // Update system health metrics
-                    if (yesterday.incidents) {
-                        const incidents = yesterday.incidents;
-                        
-                        const totalIncidents = incidents.total || 0;
-                        const criticalIncidents = incidents.critical || 0;
-                        
-                        // Calculate system health score
-                        let systemHealthScore = 100;
-                        if (totalIncidents > 0) {
-                            systemHealthScore = Math.max(0, 100 - (criticalIncidents * 20) - (incidents.high * 10) - (incidents.medium * 5) - (incidents.low * 2));
-                        }
-                        
-                        document.getElementById('yesterdaySystemHealth').textContent = `${systemHealthScore}%`;
-                        document.getElementById('yesterdayIncidents').textContent = `${totalIncidents} incidents`;
-                        
-                        let uptimeText = 'No uptime data';
-                        if (incidents.uptime !== undefined && incidents.uptime !== null) {
-                            uptimeText = `${incidents.uptime}% uptime`;
-                        } else if (totalIncidents === 0) {
-                            uptimeText = '100% uptime';
-                        }
-                        document.getElementById('yesterdayUptime').textContent = uptimeText;
-                    } else {
-                        document.getElementById('yesterdaySystemHealth').textContent = 'No data';
-                        document.getElementById('yesterdayIncidents').textContent = 'No incident data';
-                        document.getElementById('yesterdayUptime').textContent = 'No uptime data';
-                    }
-                } else {
-                    setYesterdayMetricsToWaiting();
-                }
-            }
+            // Use the enhanced summary calculation that works with raw VentilationData
+            calculateYesterdaySummaryFromRawData();
             
             // Helper function to set waiting state
             /**

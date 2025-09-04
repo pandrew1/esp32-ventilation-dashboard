@@ -1,6 +1,20 @@
 // Data Manager Module
 // Centralized API calls with intelligent caching and subscription system
 
+// Import CONFIG from dashboard.js
+// Note: This assumes CONFIG is available globally or passed to DataManager
+const getApiConfig = () => {
+    if (typeof CONFIG !== 'undefined') {
+        return CONFIG;
+    }
+    // Fallback configuration
+    return {
+        statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
+        historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
+        enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
+    };
+};
+
 export class DataManager {
     constructor() {
         this.cache = {
@@ -16,6 +30,7 @@ export class DataManager {
         };
         
         this.activeRequests = new Map();
+        this.config = getApiConfig();
     }
 
     // Single source API calls with intelligent caching
@@ -28,7 +43,7 @@ export class DataManager {
         }
         
         console.log('DataManager: Fetching fresh status data');
-        const data = await this._deduplicatedFetch('/api/GetVentilationStatus', 'status');
+        const data = await this._deduplicatedFetch(this.config.statusApiUrl, 'status');
         
         cache.data = data;
         cache.timestamp = Date.now();
@@ -47,7 +62,7 @@ export class DataManager {
         }
         
         console.log(`DataManager: Fetching fresh history data for ${hours}h`);
-        const data = await this._deduplicatedFetch(`/api/GetVentilationHistory?hours=${hours}`, `history-${hours}`);
+        const data = await this._deduplicatedFetch(`${this.config.historyApiUrl}?hours=${hours}`, `history-${hours}`);
         
         this.cache.historyData.set(cacheKey, {
             data,
@@ -67,7 +82,7 @@ export class DataManager {
         }
         
         console.log('DataManager: Fetching fresh enhanced data');
-        const data = await this._deduplicatedFetch('/api/GetEnhancedDashboardData', 'enhanced');
+        const data = await this._deduplicatedFetch(this.config.enhancedApiUrl, 'enhanced');
         
         cache.data = data;
         cache.timestamp = Date.now();
