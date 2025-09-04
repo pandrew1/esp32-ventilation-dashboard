@@ -1624,32 +1624,57 @@ async function refreshData() {
                     ((efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length) * 100).toFixed(1) : 'N/A';
                 const runtime = totalFanMinutes > 0 ? (totalFanMinutes / 60).toFixed(2) : 'N/A';
                 
-                // Update the top 4 summary boxes with calculated data
-                document.getElementById('yesterdayAvgTemp').textContent = tempAvg !== 'N/A' ? `${tempAvg}°F` : 'N/A';
-                document.getElementById('yesterdayTempRange').textContent = tempMin !== 'N/A' && tempMax !== 'N/A' ? `${tempMin}° - ${tempMax}°` : 'N/A';
-                document.getElementById('yesterdayTempTrend').textContent = allTemps.length > 0 ? 'Data available' : 'No data';
-                document.getElementById('yesterdayTempTrend').className = 'metric-trend';
+                // Helper function to safely update DOM elements
+                const safeUpdate = (id, text, className = null) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = text;
+                        if (className) element.className = className;
+                    } else {
+                        console.warn(`Element with id '${id}' not found for Yesterday's Report update`);
+                    }
+                };
                 
-                document.getElementById('yesterdayEfficiency').textContent = efficiency !== 'N/A' ? `${efficiency}%` : 'N/A';
-                document.getElementById('yesterdayRuntime').textContent = runtime !== 'N/A' ? `${runtime} hrs runtime` : 'N/A';
-                document.getElementById('yesterdayEfficiencyTrend').textContent = efficiencyValues.length > 0 ? 'Data available' : 'No data';
-                document.getElementById('yesterdayEfficiencyTrend').className = 'metric-trend';
+                // Update the top 4 summary boxes with calculated data
+                safeUpdate('yesterdayAvgTemp', tempAvg !== 'N/A' ? `${tempAvg}°F` : 'N/A');
+                safeUpdate('yesterdayTempRange', tempMin !== 'N/A' && tempMax !== 'N/A' ? `${tempMin}° - ${tempMax}°` : 'N/A');
+                safeUpdate('yesterdayTempTrend', allTemps.length > 0 ? 'Data available' : 'No data', 'metric-trend');
+                
+                safeUpdate('yesterdayEfficiency', efficiency !== 'N/A' ? `${efficiency}%` : 'N/A');
+                safeUpdate('yesterdayRuntime', runtime !== 'N/A' ? `${runtime} hrs runtime` : 'N/A');
+                safeUpdate('yesterdayEfficiencyTrend', efficiencyValues.length > 0 ? 'Data available' : 'No data', 'metric-trend');
                 
                 // For door activity and air quality, use placeholder values since we don't have PM2.5 sensors
-                document.getElementById('yesterdayDoorEvents').textContent = 'See timeline below';  
-                document.getElementById('yesterdayDoorTrend').textContent = 'Activity tracked';
-                document.getElementById('yesterdayDoorTrend').className = 'metric-trend';
+                safeUpdate('yesterdayDoorEvents', 'See timeline below');  
+                safeUpdate('yesterdayDoorTrend', 'Activity tracked', 'metric-trend');
                 
-                document.getElementById('yesterdaySystemHealth').textContent = 'See assessments below';
-                document.getElementById('yesterdayIncidents').textContent = 'See incident summary';
-                document.getElementById('yesterdayUptime').textContent = historyData.length > 0 ? 'Data available' : 'No data';
+                safeUpdate('yesterdaySystemHealth', 'See assessments below');
+                safeUpdate('yesterdayIncidents', 'See incident summary');
+                safeUpdate('yesterdayUptime', historyData.length > 0 ? 'Data available' : 'No data');
                 
                 console.log(`ENHANCED SUMMARY: Calculated from ${historyData.length} records - Temp: ${tempMin}°-${tempMax}° (avg ${tempAvg}°), Efficiency: ${efficiency}%, Runtime: ${runtime}h`);
                 
-            } catch (error) {
-                console.error('Enhanced summary calculation failed:', error);
-                setYesterdayMetricsToError();
-            }
+        } catch (error) {
+            console.error('Enhanced summary calculation failed:', error);
+            // Inline error handling with safe DOM updates
+            const safeUpdate = (id, text) => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = text;
+            };
+            
+            const errorText = 'Error';
+            safeUpdate('yesterdayAvgTemp', errorText);
+            safeUpdate('yesterdayTempRange', 'Failed to load');  
+            safeUpdate('yesterdayTempTrend', 'No data');
+            safeUpdate('yesterdayEfficiency', errorText);
+            safeUpdate('yesterdayRuntime', 'Failed to load');
+            safeUpdate('yesterdayEfficiencyTrend', 'No data');
+            safeUpdate('yesterdayDoorEvents', errorText);
+            safeUpdate('yesterdayDoorTrend', 'No data');
+            safeUpdate('yesterdaySystemHealth', errorText);
+            safeUpdate('yesterdayIncidents', 'Failed to load');
+            safeUpdate('yesterdayUptime', 'No data');
+        }
         }
 
         /**

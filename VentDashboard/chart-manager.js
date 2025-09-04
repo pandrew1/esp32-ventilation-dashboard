@@ -143,13 +143,7 @@ export class ChartManager {
     }
 }
 
-// Export ChartManager class and a function to create an instance
-export { ChartManager };
-
 // Function to create a chart manager instance with DataManager dependency
 export function createChartManager(dataManager) {
     return new ChartManager(dataManager);
 }
-
-// Create singleton instance
-export const chartManager = new ChartManager();
