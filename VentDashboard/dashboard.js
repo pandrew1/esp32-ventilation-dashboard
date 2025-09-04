@@ -13,7 +13,7 @@
 // STAGE 5: MODULAR ARCHITECTURE SYSTEM
 // ===================================================================
 
-// Authentication Utilities (consolidated from modules/utils/auth.js)
+// Authentication Utilities 
 const AuthUtils = {
     getAuthHeaders() {
         const headers = { 'Content-Type': 'application/json' };
@@ -23,7 +23,7 @@ const AuthUtils = {
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
-        // Otherwise, use API key if available
+        // Otherwise, use API key if available. DOT NOT STORE API SECRETS IN JS
         else if (window.CONFIG && window.CONFIG.apiSecret) {
             headers['X-API-Secret'] = window.CONFIG.apiSecret;
         }
@@ -84,6 +84,12 @@ let GlobalDataManager = null;
 let GlobalChartManager = null;
 let GlobalEventSystem = null;
 
+/**
+ * Initializes the modular architecture system by loading required modules
+ * Loads data-api-manager.js, chart-manager.js, and core-event-system.js
+ * Sets global references for DataManager, ChartManager, and EventSystem
+ * @returns {Object|null} Object containing dataManager, chartManager, and DashboardEvents, or null on failure
+ */
 async function initializeModularSystems() {
     try {
         console.log('=== STAGE 5: Initializing Modular Architecture ===');
@@ -238,6 +244,11 @@ const ChartUtils = {
 // ===================================================================
 
 // Helper function to get API key from URL parameter (must be defined first)
+/**
+ * Extracts API key from URL parameters
+ * Looks for 'apikey' or 'key' parameters in the URL query string
+ * @returns {string|null} The API key if found, null otherwise
+ */
 function getApiKeyFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('apikey') || urlParams.get('key');
@@ -254,6 +265,11 @@ const CONFIG = {
 };
 
 // Initialize API secret from URL parameter
+/**
+ * Initializes the API secret from URL parameters if not already set
+ * Calls getApiKeyFromUrl() to extract the API key and stores it in CONFIG.apiSecret
+ * @returns {string|null} The API secret if found, null otherwise
+ */
 function initializeApiSecret() {
     if (!CONFIG.apiSecret) {
         CONFIG.apiSecret = getApiKeyFromUrl();
@@ -825,15 +841,32 @@ const DataManager = {
 };
 
 // Legacy function for backward compatibility - will be removed in later stages
+/**
+ * Gets authentication headers for API requests
+ * Legacy wrapper function that delegates to DashboardUtils.getAuthHeaders()
+ * @returns {Object} Headers object containing authentication information
+ */
 function getAuthHeaders() {
     return DashboardUtils.getAuthHeaders();
 }
 
+/**
+ * Logs out the current user by clearing authentication data
+ * Legacy wrapper function that delegates to DashboardUtils.logout()
+ * @returns {void}
+ */
 function logout() {
     return DashboardUtils.logout();
 }
 
 // Function to show API failure notifications
+/**
+ * Displays API failure notifications to the user
+ * Legacy wrapper function that delegates to DashboardUtils.showApiFailureNotice()
+ * @param {string} message - The error message to display
+ * @param {string} type - The notification type (default: 'warning')
+ * @returns {void}
+ */
 function showApiFailureNotice(message, type = 'warning') {
     return DashboardUtils.showApiFailureNotice(message, type);
 }
@@ -855,11 +888,23 @@ window.addEventListener('load', function() {
 });
 
 // Connection status management
+/**
+ * Updates the connection status indicator in the dashboard
+ * Legacy wrapper function that delegates to DashboardUtils.updateConnectionStatus()
+ * @param {string} status - The connection status ('connected', 'disconnected', 'reconnecting', etc.)
+ * @returns {void}
+ */
 function updateConnectionStatus(status) {
     return DashboardUtils.updateConnectionStatus(status);
 }
 
 // Auto-refresh functionality
+/**
+ * Starts the auto-refresh timer for dashboard data
+ * Clears any existing refresh timer and starts a new interval timer
+ * Refreshes dashboard data every CONFIG.refreshInterval milliseconds (default: 30 seconds)
+ * @returns {void}
+ */
 function startAutoRefresh() {
     // Clear any existing timer
     if (refreshTimer) {
@@ -886,6 +931,12 @@ function startAutoRefresh() {
 // For now, let's add placeholders for the main functions we know exist
 
 // Main data refresh function
+/**
+ * Refreshes all dashboard data by fetching current status and updating displays
+ * Uses DataManager to fetch status data and updates all dashboard widgets
+ * Updates last refresh time and handles authentication requirements
+ * @returns {Promise<void>}
+ */
 async function refreshData() {
     console.log('=== STAGE 2: Refreshing dashboard data using DataManager ===');
     
@@ -982,11 +1033,23 @@ async function refreshData() {
         });
 
         // Wrapper function for consolidated utility
+        /**
+         * Formats a date object into a detailed timestamp string
+         * Legacy wrapper function that delegates to DashboardUtils.formatDetailedTimestamp()
+         * @param {Date} date - The date to format (default: current date/time)
+         * @returns {string} Formatted timestamp string
+         */
         function formatDetailedTimestamp(date = new Date()) {
             return DashboardUtils.formatDetailedTimestamp(date);
         }
 
         // Initialize dashboard
+        /**
+         * Initializes the entire dashboard system
+         * Sets up modular architecture, loads initial data, sets up charts, and starts auto-refresh
+         * Handles both modern modular systems and legacy fallbacks
+         * @returns {Promise<void>}
+         */
         async function initializeDashboard() {
             console.log('Initializing dashboard...');
             
@@ -1051,6 +1114,12 @@ async function refreshData() {
         // STAGE 5: MODULAR SYSTEM INTEGRATION FUNCTIONS
         // ===================================================================
 
+        /**
+         * Refreshes dashboard data using the modular system architecture
+         * Uses GlobalDataManager for data fetching with intelligent caching
+         * Updates main display, door status, incidents, and emits events
+         * @returns {Promise<void>}
+         */
         async function refreshDataWithModularSystem() {
             console.log('=== STAGE 5: Using enhanced DataManager for data refresh ===');
             
@@ -1078,6 +1147,12 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Loads and updates charts using the modular system architecture
+         * Uses GlobalChartManager for intelligent chart updates with change detection
+         * Handles both temperature and pressure charts, emits update events
+         * @returns {Promise<void>}
+         */
         async function loadChartsWithModularSystem() {
             console.log('=== STAGE 5: Using enhanced ChartManager for chart loading ===');
             
@@ -1104,6 +1179,13 @@ async function refreshData() {
         }
 
         // Enhanced chart button handlers with modular integration
+        /**
+         * Loads temperature chart for specified time period using modular system
+         * Uses GlobalChartManager for intelligent updates and emits chart update events
+         * Falls back to legacy loadChart() if modular system is unavailable
+         * @param {number} hours - Number of hours of data to display
+         * @returns {void}
+         */
         function enhancedLoadChart(hours) {
             if (GlobalChartManager && temperatureChart) {
                 GlobalChartManager.updateTemperatureChart(hours, temperatureChart)
@@ -1122,6 +1204,13 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Loads pressure chart for specified time period using modular system
+         * Uses GlobalChartManager for intelligent updates and emits chart update events
+         * Falls back to legacy loadPressureChart() if modular system is unavailable
+         * @param {number} hours - Number of hours of data to display
+         * @returns {void}
+         */
         function enhancedLoadPressureChart(hours) {
             if (GlobalChartManager && pressureChart) {
                 GlobalChartManager.updatePressureChart(hours, pressureChart)
@@ -1142,6 +1231,12 @@ async function refreshData() {
 
         // Enhanced Dashboard Functions for Phase 2
 
+        /**
+         * Toggles the visibility of the Yesterday Report detailed content section
+         * Expands/collapses the detailed content and loads data when expanding
+         * Updates button text and handles loading states
+         * @returns {void}
+         */
         function toggleYesterdayReport() {
             const detailedContent = document.getElementById('yesterdayDetailedContent');
             const expandToggle = document.getElementById('expandToggle');
@@ -1157,6 +1252,14 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Loads detailed content for the Yesterday Report section
+         * Shows loading states initially, then loads all subsections:
+         * - Environmental data, humidity analysis, pressure analysis
+         * - Performance metrics, ventilation analysis, door activity
+         * - Incident summary and aggregation status
+         * @returns {void}
+         */
         function loadYesterdayDetailedContent() {
             console.log('=== STAGE 2: loadYesterdayDetailedContent() using DataManager ===');
             
@@ -1359,6 +1462,12 @@ async function refreshData() {
 // Functions responsible for fetching and processing dashboard data
 // ===================================================================
 
+        /**
+         * Sets up the enhanced dashboard with Phase 2 features
+         * Initializes yesterday's report, system health widget, door activity, and incident tracking
+         * Sets up all enhanced dashboard widgets and their loading states
+         * @returns {void}
+         */
         function setupEnhancedDashboard() {
             console.log('=== SETUP: setupEnhancedDashboard() started ===');
             
@@ -1402,6 +1511,13 @@ async function refreshData() {
             updateDoorTimeline(24);
         }
 
+        /**
+         * Loads and displays yesterday's summary metrics in the dashboard
+         * Fetches temperature, efficiency, door activity, and air quality metrics
+         * Updates metric displays and handles authentication requirements
+         * Uses DataManager for enhanced data fetching with error handling
+         * @returns {void}
+         */
         function loadYesterdaySummaryMetrics() {
             console.log('=== STAGE 2: loadYesterdaySummaryMetrics() using DataManager ===');
             
@@ -1456,6 +1572,13 @@ async function refreshData() {
                 });
 
             // Helper function to process yesterday data
+            /**
+             * Processes yesterday's data and updates all metric displays
+             * Handles temperature, efficiency, door activity, and air quality metrics
+             * Updates DOM elements with formatted data or shows appropriate fallbacks
+             * @param {Object} yesterday - Yesterday's data object from the API
+             * @returns {void}
+             */
             function processYesterdayData(yesterday) {
                 console.log('loadYesterdaySummaryMetrics: Processing yesterday data');
                 
@@ -1534,6 +1657,12 @@ async function refreshData() {
             }
             
             // Helper function to set waiting state
+            /**
+             * Sets all yesterday metric elements to waiting/pending state
+             * Updates temperature, efficiency, door activity, and air quality displays
+             * Shows "Waiting for data" or "Pending" messages across all metrics
+             * @returns {void}
+             */
             function setYesterdayMetricsToWaiting() {
                 const waitingText = 'Waiting for data';
                 
@@ -1555,6 +1684,12 @@ async function refreshData() {
             }
             
             // Helper function to set error state
+            /**
+             * Sets all yesterday metric elements to error state
+             * Updates all metric displays to show error messages when data loading fails
+             * Shows "Error", "Failed to load", or "No data" messages across all metrics
+             * @returns {void}
+             */
             function setYesterdayMetricsToError() {
                 const errorText = 'Error';
                 
@@ -1576,6 +1711,13 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Updates the enhanced door activity widget with current door status and activity
+         * Uses DataManager to fetch status data and processes door information
+         * Updates active doors count, sessions, and activity statistics
+         * Displays door status indicators and activity timeline
+         * @returns {void}
+         */
         function updateEnhancedDoorActivity() {
             console.log('=== STAGE 3: updateEnhancedDoorActivity() using DataManager ===');
             
@@ -1729,6 +1871,13 @@ async function refreshData() {
                 });
         }
 
+        /**
+         * Updates the system health widget with boot information and system status
+         * Uses DataManager to fetch status data and extracts system health metrics
+         * Updates boot time, boot reason, and other health indicators
+         * Handles authentication requirements and error states
+         * @returns {void}
+         */
         function updateSystemHealthWidget() {
             console.log('=== STAGE 2: updateSystemHealthWidget() using DataManager ===');
             
@@ -2547,6 +2696,13 @@ async function refreshData() {
             console.log('renderActivityTimeline: Timeline rendered successfully');
         }
 
+        /**
+         * Loads and displays yesterday's door activity timeline and statistics
+         * Fetches 24-hour history data and processes door activity events
+         * Calculates active doors, total events, peak activity, and most active door
+         * Displays comma-separated active door names and activity statistics
+         * @returns {Promise<void>}
+         */
         async function loadYesterdayDoorActivity() {
             console.log('=== STAGE 3: loadYesterdayDoorActivity() using DataManager ===');
             
@@ -2670,6 +2826,13 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Loads and displays yesterday's incident summary and analysis
+         * Fetches incident data and categorizes by severity and type
+         * Displays incident counts, severity distribution, and recent incidents
+         * Provides insights into system reliability and operational issues
+         * @returns {Promise<void>}
+         */
         async function loadYesterdayIncidentSummary() {
             console.log('=== YESTERDAY INCIDENT SUMMARY: loadYesterdayIncidentSummary() started ===');
             
@@ -2949,6 +3112,13 @@ async function refreshData() {
             if (nextRunElement) nextRunElement.textContent = DateTimeUtils.formatDateTime(status.NextScheduledRun);
         }
 
+        /**
+         * Main data refresh function for the dashboard (legacy version)
+         * Fetches current ventilation system status and updates all dashboard widgets
+         * Handles authentication, connection status, and error states
+         * Updates temperatures, door status, incidents, and other real-time data
+         * @returns {Promise<void>}
+         */
         async function refreshData() {
             console.log('Refreshing dashboard data...');
             
@@ -3047,6 +3217,13 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Displays the dashboard in a "no data" state when authentication is unavailable
+         * Shows dashboard structure but sets all sensor readings to "No data"
+         * Updates temperature, humidity, pressure, and other sensors to show no data
+         * Used when user is not authenticated or API access is unavailable
+         * @returns {void}
+         */
         function showNoDataState() {
             // Hide loading, show content with no data message
             document.getElementById('loadingSection').style.display = 'none';
@@ -3123,6 +3300,14 @@ async function refreshData() {
             document.getElementById('lastUpdate').title = 'No ESP32 data available - showing browser time of last connection attempt';
         }
 
+        /**
+         * Updates the main dashboard display with fresh sensor data
+         * Processes and displays temperature, humidity, pressure data from all sensors
+         * Updates system status, fan speeds, alerts, door status, and incidents
+         * Handles null/undefined values gracefully and formats data for display
+         * @param {Object} data - The complete sensor and system data from the ESP32
+         * @returns {void}
+         */
         function updateDashboard(data) {
             // Hide loading, show content
             document.getElementById('loadingSection').style.display = 'none';
@@ -3807,6 +3992,14 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Updates the door status display section with current door states
+         * Creates visual indicators for each door showing open/closed status
+         * Displays door names, status, and activity information
+         * Hides the section if no doors are available
+         * @param {Array} doors - Array of door objects with name, status, and activity data
+         * @returns {void}
+         */
         function updateDoorStatus(doors) {
             const doorSection = document.getElementById('doorSection');
             const doorList = document.getElementById('doorList');
@@ -3900,6 +4093,14 @@ async function refreshData() {
             });
         }
 
+        /**
+         * Updates the incidents section with recent system incidents
+         * Processes and categorizes incidents by severity and type
+         * Applies time period and severity filters, generates summary statistics
+         * Creates detailed incident cards with timestamps and descriptions
+         * @param {Array} incidents - Array of incident objects from the system
+         * @returns {void}
+         */
         function updateIncidents(incidents) {
             const incidentsList = document.getElementById('incidentsList');
             const incidentsSummary = document.getElementById('incidentsSummary');
@@ -4288,6 +4489,14 @@ async function refreshData() {
 // Functions for managing Chart.js charts and data visualization
 // ===================================================================
 
+        /**
+         * Loads and displays the temperature chart for the specified time period
+         * Uses DataManager to fetch historical temperature data from multiple sensors
+         * Updates chart buttons, clears previous data tracking, and renders the chart
+         * Handles authentication requirements and error states gracefully
+         * @param {number} hours - Number of hours of historical data to display
+         * @returns {Promise<void>}
+         */
         async function loadChart(hours) {
             console.log(`=== STAGE 3 FIX: loadChart(${hours}) using DataManager ===`);
             
@@ -4845,6 +5054,15 @@ async function refreshData() {
             }
         }
 
+        /**
+         * Updates and renders the temperature chart with new data
+         * Processes historical temperature data and creates Chart.js visualization
+         * Handles multiple temperature sensors (indoor, outdoor, garage)
+         * Manages chart updates, timestamps, and responsive design
+         * @param {Array} data - Array of temperature data points from the API
+         * @param {number} requestedHours - Number of hours of data requested (default: 6)
+         * @returns {void}
+         */
         function updateChart(data, requestedHours = 6) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
             
