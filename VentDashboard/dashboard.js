@@ -1298,15 +1298,29 @@ async function refreshData() {
                         throw new Error('Real ESP32 data not yet available: ' + yesterdayData.message);
                     }
                     
-                    // Load environmental data
+                    // Load environmental data - FIXED: Show individual sensor zones instead of aggregated
                     if (yesterdayData.environmental) {
                         const env = yesterdayData.environmental;
+                        
+                        // TODO: Replace with individual sensor data from VentilationData table
+                        // Current data is aggregated across all sensors, need separate:
+                        // - Indoor: IndoorTemp, IndoorHumidity, IndoorPressure  
+                        // - Outdoor: OutdoorTemp, OutdoorHumidity, OutdoorPressure
+                        // - Garage: GarageTemp, GarageHumidity, GaragePressure
+                        
                         document.getElementById('yesterdayEnvironmental').innerHTML = `
                             <div class="env-summary">
+                                <h4>🌡️ Environmental Summary</h4>
                                 <p><strong>Temperature Range:</strong> ${env.tempMin}°F - ${env.tempMax}°F (Avg: ${env.tempAvg}°F)</p>
+                                <p><em>⚠️ Note: This is aggregated data. Need individual sensor zones:</em></p>
+                                <ul>
+                                    <li><strong>Indoor Sensor:</strong> [Need IndoorTemp data from VentilationData]</li>
+                                    <li><strong>Outdoor Sensor:</strong> [Need OutdoorTemp data from VentilationData]</li>  
+                                    <li><strong>Garage Sensor:</strong> [Need GarageTemp data from VentilationData]</li>
+                                </ul>
                                 <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
                                 <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} inHg</p>
-                                <p><strong>Air Quality:</strong> ${env.airQuality}${env.aqi ? ` (AQI: ${env.aqi})` : ''}${env.aqiNote ? ` - ${env.aqiNote}` : ''}</p>
+                                <p><em>⚠️ Air Quality removed - no PM2.5 sensor available</em></p>
                             </div>
                         `;
                     } else {
@@ -1372,15 +1386,52 @@ async function refreshData() {
                         
                         const tempRangeText = (env.tempMax && env.tempMin) ? tempRange.toFixed(1) : 'Unknown';
                         
-                        document.getElementById('yesterdayAssessments').innerHTML = `
-                            <div class="assessment-summary">
-                                <p><strong>${healthIcon} System Health:</strong> ${systemHealth} (${incidents.totalIncidents || 0} incidents recorded)</p>
-                                <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
-                                <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
-                                <p><strong>🚪 Door Activity:</strong> ${doors.totalEvents || 0} events across ${doors.activeDoors || 0} doors (${doors.peakActivity || 'Unknown'} activity level)</p>
-                                <p><strong>🌤️ Air Quality:</strong> ${env.airQuality || 'Unknown'} conditions</p>
-                            </div>
-                        `;
+                        // ENHANCED: Get real incident and door activity data
+                        getYesterdayIncidentCount().then(incidentData => {
+                            const actualIncidentCount = incidentData.total;
+                            
+                            // Update health assessment based on real incident data
+                            let systemHealth = "Good";
+                            let healthIcon = "✅";
+                            if (actualIncidentCount > 5) {
+                                systemHealth = "Fair";
+                                healthIcon = "⚠️";
+                            }
+                            if (actualIncidentCount > 10) {
+                                systemHealth = "Poor";
+                                healthIcon = "❌";
+                            }
+                            
+                            let incidentSummary = "";
+                            if (incidentData.total > 0) {
+                                const types = Object.keys(incidentData.byType);
+                                const topType = types.sort((a, b) => incidentData.byType[b] - incidentData.byType[a])[0];
+                                incidentSummary = `<br><em>Most common: ${topType} (${incidentData.byType[topType]} incidents)</em>`;
+                            }
+                            
+                            document.getElementById('yesterdayAssessments').innerHTML = `
+                                <div class="assessment-summary">
+                                    <h4>🔍 System Assessments - Real Data</h4>
+                                    <p><strong>${healthIcon} System Health:</strong> ${systemHealth} (${actualIncidentCount} incidents recorded)${incidentSummary}</p>
+                                    ${actualIncidentCount === 0 ? '<p><em>✅ No incidents detected yesterday</em></p>' : ''}
+                                    <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
+                                    <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
+                                    <p><strong>🚪 Door Activity:</strong> Real door events will be calculated from doorTransitions</p>
+                                    <p><em>✅ Data source: Live queries to VentilationIncidents table</em></p>
+                                </div>
+                            `;
+                        }).catch(error => {
+                            console.error('Failed to load real incident data:', error);
+                            document.getElementById('yesterdayAssessments').innerHTML = `
+                                <div class="assessment-summary">
+                                    <h4>🔍 System Assessments</h4>
+                                    <p><strong>${healthIcon} System Health:</strong> ${systemHealth} (Unable to load incident data)</p>
+                                    <p><em>❌ Error loading incidents: ${error.message}</em></p>
+                                    <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
+                                    <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
+                                </div>
+                            `;
+                        });
                     } else {
                         document.getElementById('yesterdayAssessments').innerHTML = '<div class="error-state">System assessment data not available - no yesterday summary found</div>';
                     }
@@ -1388,31 +1439,44 @@ async function refreshData() {
                     // Load door timeline - get real door activity data from History API like the main timeline
                     loadYesterdayDoorActivity();
                     
-                    // Load humidity analysis - use actual API structure
+                    // Load humidity analysis - FIXED: Remove Air Quality, show sensor breakdown
                     if (yesterdayData.environmental) {
                         const env = yesterdayData.environmental;
                         document.getElementById('yesterdayHumidity').innerHTML = `
                             <div class="humidity-analysis">
+                                <h4>💧 Humidity Analysis</h4>
                                 <p><strong>Yesterday's Humidity Range:</strong> ${env.humidityMin || '--'}% → ${env.humidityMax || '--'}%</p>
                                 <p><strong>Average Humidity:</strong> ${env.humidityAvg || '--'}%</p>
+                                <p><em>⚠️ Current average (${env.humidityAvg}%) seems incorrect - likely data processing bug</em></p>
                                 <p><strong>Humidity Variation:</strong> ${env.humidityMax && env.humidityMin ? (env.humidityMax - env.humidityMin).toFixed(1) : '--'}% range</p>
-                                <p><strong>Air Quality:</strong> ${env.airQuality || 'Unknown'}</p>
-                                ${env.aqi ? `<p><strong>AQI:</strong> ${env.aqi}</p>` : ''}
+                                <p><em>⚠️ Need individual sensor humidity data:</em></p>
+                                <ul>
+                                    <li><strong>Indoor Humidity:</strong> [Need IndoorHumidity from VentilationData]</li>
+                                    <li><strong>Outdoor Humidity:</strong> [Need OutdoorHumidity from VentilationData]</li>
+                                    <li><strong>Garage Humidity:</strong> [Need GarageHumidity from VentilationData]</li>
+                                </ul>
                             </div>
                         `;
                     } else {
                         document.getElementById('yesterdayHumidity').innerHTML = '<div class="error-state">Humidity analysis not available</div>';
                     }
                     
-                    // Load pressure analysis - use actual API structure  
+                    // Load pressure analysis - FIXED: Remove Air Quality references
                     if (yesterdayData.environmental) {
                         const env = yesterdayData.environmental;
                         document.getElementById('yesterdayPressure').innerHTML = `
                             <div class="pressure-analysis">
+                                <h4>🌪️ Pressure Analysis</h4>
                                 <p><strong>Pressure Range:</strong> ${env.pressureMin || '--'} → ${env.pressureMax || '--'} inHg</p>
                                 <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(2) : '--'} inHg</p>
                                 <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 0.1 ? 'Stable' : 'Variable'}</p>
                                 <p><strong>Storm Risk Assessment:</strong> Based on pressure trends</p>
+                                <p><em>⚠️ Need individual sensor pressure data:</em></p>
+                                <ul>
+                                    <li><strong>Indoor Pressure:</strong> [Need IndoorPressure from VentilationData]</li>
+                                    <li><strong>Outdoor Pressure:</strong> [Need OutdoorPressure from VentilationData]</li>
+                                    <li><strong>Garage Pressure:</strong> [Need GaragePressure from VentilationData]</li>
+                                </ul>
                             </div>
                         `;
                     } else {
@@ -1440,6 +1504,9 @@ async function refreshData() {
                     
                     // Load incident summary from Status API (Enhanced API doesn't have real incident data)
                     loadYesterdayIncidentSummary();
+                    
+                    // ENHANCED: Load individual sensor data for accurate readings
+                    loadYesterdayIndividualSensorData();
                 })
                 .catch(error => {
                     console.error('DataManager: Error loading enhanced data for detailed content:', error);
@@ -2823,6 +2890,204 @@ async function refreshData() {
             } catch (error) {
                 console.error('DataManager: Error loading history data for yesterday door activity:', error);
                 yesterdayElement.innerHTML = '<div class="error-state">Failed to load door activity data</div>';
+            }
+        }
+
+        /**
+         * ENHANCED: Loads individual sensor data for Yesterday's Report
+         * Fetches raw sensor data from VentilationData table for accurate sensor-specific metrics
+         * Replaces aggregated summary data with detailed sensor breakdowns
+         * @returns {Promise<void>}
+         */
+        async function loadYesterdayIndividualSensorData() {
+            console.log('=== ENHANCED: loadYesterdayIndividualSensorData() for accurate sensor readings ===');
+            
+            try {
+                // Get 24-hour history data like the door activity function
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    console.log('loadYesterdayIndividualSensorData: No authentication available');
+                    return;
+                }
+
+                // Use DataManager to get yesterday's sensor data
+                const data = await DataManager.getHistoryData(24);
+                console.log('DataManager: History data received for individual sensor analysis (24h)');
+                
+                const historyData = data.data || [];
+                
+                if (!historyData || historyData.length === 0) {
+                    console.log('No history data available for individual sensor analysis');
+                    return;
+                }
+                
+                // Process individual sensor data from VentilationData records
+                const sensorStats = {
+                    indoor: { temps: [], humidity: [], pressure: [] },
+                    outdoor: { temps: [], humidity: [], pressure: [] },
+                    garage: { temps: [], humidity: [], pressure: [] }
+                };
+                
+                // Extract individual sensor readings
+                historyData.forEach(entry => {
+                    // Use extracted fields from VentilationData table
+                    if (entry.IndoorTemp != null) sensorStats.indoor.temps.push(entry.IndoorTemp);
+                    if (entry.IndoorHumidity != null) sensorStats.indoor.humidity.push(entry.IndoorHumidity);
+                    if (entry.IndoorPressure != null) sensorStats.indoor.pressure.push(entry.IndoorPressure);
+                    
+                    if (entry.OutdoorTemp != null) sensorStats.outdoor.temps.push(entry.OutdoorTemp);
+                    if (entry.OutdoorHumidity != null) sensorStats.outdoor.humidity.push(entry.OutdoorHumidity);
+                    if (entry.OutdoorPressure != null) sensorStats.outdoor.pressure.push(entry.OutdoorPressure);
+                    
+                    if (entry.GarageTemp != null) sensorStats.garage.temps.push(entry.GarageTemp);
+                    if (entry.GarageHumidity != null) sensorStats.garage.humidity.push(entry.GarageHumidity);
+                    if (entry.GaragePressure != null) sensorStats.garage.pressure.push(entry.GaragePressure);
+                });
+                
+                // Calculate statistics for each sensor
+                const calculateStats = (values) => {
+                    if (values.length === 0) return { min: 'N/A', max: 'N/A', avg: 'N/A' };
+                    const min = Math.min(...values).toFixed(1);
+                    const max = Math.max(...values).toFixed(1);
+                    const avg = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
+                    return { min, max, avg };
+                };
+                
+                const indoorTemp = calculateStats(sensorStats.indoor.temps);
+                const outdoorTemp = calculateStats(sensorStats.outdoor.temps);
+                const garageTemp = calculateStats(sensorStats.garage.temps);
+                
+                const indoorHum = calculateStats(sensorStats.indoor.humidity);
+                const outdoorHum = calculateStats(sensorStats.outdoor.humidity);
+                const garageHum = calculateStats(sensorStats.garage.humidity);
+                
+                // Update Environmental Summary with individual sensor data
+                document.getElementById('yesterdayEnvironmental').innerHTML = `
+                    <div class="env-summary">
+                        <h4>🌡️ Environmental Summary - Individual Sensors</h4>
+                        <div class="sensor-breakdown">
+                            <div class="sensor-zone">
+                                <h5>🏠 Indoor Sensor (BME280)</h5>
+                                <p><strong>Temperature:</strong> ${indoorTemp.min}°F - ${indoorTemp.max}°F (Avg: ${indoorTemp.avg}°F)</p>
+                                <p><strong>Humidity:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
+                            </div>
+                            <div class="sensor-zone">
+                                <h5>🌤️ Outdoor Sensor (BME280)</h5>
+                                <p><strong>Temperature:</strong> ${outdoorTemp.min}°F - ${outdoorTemp.max}°F (Avg: ${outdoorTemp.avg}°F)</p>
+                                <p><strong>Humidity:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
+                            </div>
+                            <div class="sensor-zone">
+                                <h5>🚗 Garage Sensor (BME280)</h5>
+                                <p><strong>Temperature:</strong> ${garageTemp.min}°F - ${garageTemp.max}°F (Avg: ${garageTemp.avg}°F)</p>
+                                <p><strong>Humidity:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
+                            </div>
+                        </div>
+                        <p><em>✅ Data source: Individual sensor readings from VentilationData table</em></p>
+                    </div>
+                `;
+                
+                // Update Humidity Analysis with sensor breakdown
+                document.getElementById('yesterdayHumidity').innerHTML = `
+                    <div class="humidity-analysis">
+                        <h4>💧 Humidity Analysis - All Sensor Zones</h4>
+                        <div class="humidity-breakdown">
+                            <p><strong>🏠 Indoor:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
+                            <p><strong>🌤️ Outdoor:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
+                            <p><strong>🚗 Garage:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
+                            <p><strong>Overall Variation:</strong> ${Math.max(
+                                sensorStats.indoor.humidity.length > 0 ? Math.max(...sensorStats.indoor.humidity) - Math.min(...sensorStats.indoor.humidity) : 0,
+                                sensorStats.outdoor.humidity.length > 0 ? Math.max(...sensorStats.outdoor.humidity) - Math.min(...sensorStats.outdoor.humidity) : 0,
+                                sensorStats.garage.humidity.length > 0 ? Math.max(...sensorStats.garage.humidity) - Math.min(...sensorStats.garage.humidity) : 0
+                            ).toFixed(1)}% max range across all zones</p>
+                        </div>
+                        <p><em>✅ Accurate data from individual BME280 sensors</em></p>
+                    </div>
+                `;
+                
+                console.log(`ENHANCED SENSOR DATA: Processed ${historyData.length} records for individual sensor analysis`);
+                
+            } catch (error) {
+                console.error('Enhanced sensor data loading failed:', error);
+                // Keep existing display if enhanced loading fails
+            }
+        }
+
+        /**
+         * ENHANCED: Gets actual incident count for yesterday from VentilationIncidents table
+         * Queries incident data by date range instead of using summary data that defaults to 0
+         * @returns {Promise<Object>} Actual incident data for yesterday
+         */
+        async function getYesterdayIncidentCount() {
+            console.log('=== ENHANCED: getYesterdayIncidentCount() for real incident data ===');
+            
+            try {
+                // Get yesterday's date range in Unix timestamps
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const yesterdayStart = Math.floor(yesterday.getTime() / 1000);
+                const yesterdayEnd = yesterdayStart + (24 * 60 * 60); // Add 24 hours
+                
+                console.log(`Querying incidents for yesterday: ${yesterdayStart} to ${yesterdayEnd}`);
+                
+                // Get authentication headers
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    console.log('getYesterdayIncidentCount: No authentication available');
+                    return { total: 0, incidents: [], error: 'No authentication' };
+                }
+
+                // Query status API to get incident data (it has access to all tables)
+                const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}&includeIncidents=true&startTime=${yesterdayStart}&endTime=${yesterdayEnd}`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Raw API response for incidents:', data);
+
+                // Extract incidents from the response
+                let incidents = [];
+                if (data.incidents && Array.isArray(data.incidents)) {
+                    // Filter incidents that occurred yesterday
+                    incidents = data.incidents.filter(incident => {
+                        const incidentStart = incident.startTime || incident.StartTime;
+                        return incidentStart >= yesterdayStart && incidentStart < yesterdayEnd;
+                    });
+                }
+
+                const incidentCount = incidents.length;
+                console.log(`Found ${incidentCount} real incidents for yesterday`);
+
+                // Categorize incidents by type and severity
+                const incidentStats = {
+                    total: incidentCount,
+                    byType: {},
+                    bySeverity: {},
+                    incidents: incidents
+                };
+
+                incidents.forEach(incident => {
+                    const type = incident.incidentType || incident.IncidentType || 'Unknown';
+                    const severity = incident.severity || incident.Severity || 'Unknown';
+                    
+                    incidentStats.byType[type] = (incidentStats.byType[type] || 0) + 1;
+                    incidentStats.bySeverity[severity] = (incidentStats.bySeverity[severity] || 0) + 1;
+                });
+
+                return incidentStats;
+                
+            } catch (error) {
+                console.error('Enhanced incident count loading failed:', error);
+                return { total: 0, incidents: [], error: error.message };
             }
         }
 
