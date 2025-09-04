@@ -10,6 +10,105 @@
 */
 
 // ===================================================================
+// STAGE 5: MODULAR ARCHITECTURE SYSTEM
+// ===================================================================
+
+// Authentication Utilities (consolidated from modules/utils/auth.js)
+const AuthUtils = {
+    getAuthHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('ventilation_auth_token');
+        
+        // If user is logged in, use Bearer token authentication
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        // Otherwise, use API key if available
+        else if (window.CONFIG && window.CONFIG.apiSecret) {
+            headers['X-API-Secret'] = window.CONFIG.apiSecret;
+        }
+        
+        return headers;
+    },
+
+    logout() {
+        localStorage.removeItem('ventilation_auth_token');
+        localStorage.removeItem('ventilation_user_email');
+        window.location.href = 'login.html';
+    },
+
+    isAuthenticated() {
+        const token = localStorage.getItem('ventilation_auth_token');
+        const apiSecret = window.CONFIG && window.CONFIG.apiSecret;
+        return !!(token || apiSecret);
+    },
+
+    getUserEmail() {
+        return localStorage.getItem('ventilation_user_email') || 'Anonymous';
+    }
+};
+
+// Simplified Module Loading System
+const ModuleLoader = {
+    loadedModules: new Map(),
+    
+    async loadModule(fileName) {
+        if (this.loadedModules.has(fileName)) {
+            return this.loadedModules.get(fileName);
+        }
+        
+        try {
+            console.log(`ModuleLoader: Loading ${fileName}`);
+            const module = await import(`./${fileName}`);
+            this.loadedModules.set(fileName, module);
+            console.log(`ModuleLoader: ${fileName} loaded successfully`);
+            return module;
+        } catch (error) {
+            console.error(`ModuleLoader: Failed to load ${fileName}:`, error);
+            throw error;
+        }
+    },
+
+    getLoadedModule(fileName) {
+        return this.loadedModules.get(fileName);
+    },
+
+    clearCache() {
+        this.loadedModules.clear();
+        console.log('ModuleLoader: Cache cleared');
+    }
+};
+
+// Enhanced DataManager integration
+let GlobalDataManager = null;
+let GlobalChartManager = null;
+let GlobalEventSystem = null;
+
+async function initializeModularSystems() {
+    try {
+        console.log('=== STAGE 5: Initializing Modular Architecture ===');
+        
+        // Load simplified modules
+        const { dataManager } = await ModuleLoader.loadModule('data-api-manager.js');
+        const { chartManager } = await ModuleLoader.loadModule('chart-manager.js');
+        const { DashboardEvents } = await ModuleLoader.loadModule('core-event-system.js');
+        
+        // Set global references
+        GlobalDataManager = dataManager;
+        GlobalChartManager = chartManager;
+        GlobalEventSystem = DashboardEvents;
+        
+        console.log('=== STAGE 5: Modular systems initialized successfully ===');
+        
+        return { dataManager, chartManager, DashboardEvents };
+    } catch (error) {
+        console.error('STAGE 5: Failed to initialize modular systems:', error);
+        // Fallback to legacy systems if modules fail
+        return null;
+    }
+}
+
+// ===================================================================
 // STAGE 4: CONSOLIDATED UTILITY FUNCTIONS
 // ===================================================================
 
@@ -891,6 +990,22 @@ async function refreshData() {
         async function initializeDashboard() {
             console.log('Initializing dashboard...');
             
+            // STAGE 5: Initialize modular systems first
+            const modularSystems = await initializeModularSystems();
+            if (modularSystems) {
+                console.log('=== STAGE 5: Using enhanced modular architecture ===');
+                // Set up event subscriptions for modular architecture
+                GlobalEventSystem.on('data:updated', (data) => {
+                    console.log('STAGE 5: Data update event received:', data.type);
+                });
+                
+                GlobalEventSystem.on('chart:updated', (data) => {
+                    console.log('STAGE 5: Chart update event received:', data.chartType);
+                });
+            } else {
+                console.log('=== STAGE 5: Fallback to legacy systems ===');
+            }
+            
             // Initialize API secret from URL parameters
             initializeApiSecret();
             
@@ -899,12 +1014,25 @@ async function refreshData() {
                 window.dataSourceTracker.clearAll();
             }
             
-            // Load dashboard components
-            await refreshData();
-            // Monthly aggregation moved to Yesterday's Report
-            // await loadAggregationStatus();
-            await loadChart(6); // Load 6-hour chart by default
-            await loadPressureChart(6); // Load 6-hour pressure chart by default
+            // Load dashboard components with modular enhancement
+            if (GlobalDataManager) {
+                // Use enhanced data manager
+                await refreshDataWithModularSystem();
+            } else {
+                // Fallback to legacy data refresh
+                await refreshData();
+            }
+            
+            // Load charts with modular enhancement
+            if (GlobalChartManager) {
+                // Use enhanced chart manager
+                await loadChartsWithModularSystem();
+            } else {
+                // Fallback to legacy chart loading
+                await loadChart(6); // Load 6-hour chart by default
+                await loadPressureChart(6); // Load 6-hour pressure chart by default
+            }
+            
             await loadIncidentAlmanac();
             
             // Load Enhanced API data sections (only the ones that work)
@@ -917,6 +1045,99 @@ async function refreshData() {
             startAutoRefresh();
             
             console.log('Dashboard initialization complete');
+        }
+
+        // ===================================================================
+        // STAGE 5: MODULAR SYSTEM INTEGRATION FUNCTIONS
+        // ===================================================================
+
+        async function refreshDataWithModularSystem() {
+            console.log('=== STAGE 5: Using enhanced DataManager for data refresh ===');
+            
+            try {
+                // Use the modular DataManager with caching
+                const statusData = await GlobalDataManager.getStatusData();
+                if (statusData && statusData.length > 0) {
+                    const latestRecord = statusData[statusData.length - 1];
+                    updateMainDisplay(latestRecord);
+                    GlobalEventSystem.emit('data:updated', { type: 'status', count: statusData.length });
+                }
+                
+                // Subscribe to future updates
+                GlobalDataManager.subscribe('status', (data) => {
+                    console.log('STAGE 5: Status data subscription update received');
+                    if (data && data.length > 0) {
+                        const latestRecord = data[data.length - 1];
+                        updateMainDisplay(latestRecord);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('STAGE 5: Enhanced data refresh failed, falling back to legacy:', error);
+                await refreshData(); // Fallback to legacy function
+            }
+        }
+
+        async function loadChartsWithModularSystem() {
+            console.log('=== STAGE 5: Using enhanced ChartManager for chart loading ===');
+            
+            try {
+                // Load temperature chart with smart updates
+                const tempChart = await GlobalChartManager.updateTemperatureChart(6, temperatureChart);
+                if (tempChart) {
+                    temperatureChart = tempChart;
+                    GlobalEventSystem.emit('chart:updated', { chartType: 'temperature', hours: 6 });
+                }
+                
+                // Load pressure chart with smart updates
+                const pressChart = await GlobalChartManager.updatePressureChart(6, pressureChart);
+                if (pressChart) {
+                    pressureChart = pressChart;
+                    GlobalEventSystem.emit('chart:updated', { chartType: 'pressure', hours: 6 });
+                }
+                
+            } catch (error) {
+                console.error('STAGE 5: Enhanced chart loading failed, falling back to legacy:', error);
+                await loadChart(6);
+                await loadPressureChart(6);
+            }
+        }
+
+        // Enhanced chart button handlers with modular integration
+        function enhancedLoadChart(hours) {
+            if (GlobalChartManager && temperatureChart) {
+                GlobalChartManager.updateTemperatureChart(hours, temperatureChart)
+                    .then(updatedChart => {
+                        if (updatedChart) {
+                            temperatureChart = updatedChart;
+                            GlobalEventSystem.emit('chart:updated', { chartType: 'temperature', hours });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('STAGE 5: Enhanced temperature chart update failed:', error);
+                        loadChart(hours); // Fallback
+                    });
+            } else {
+                loadChart(hours); // Fallback
+            }
+        }
+
+        function enhancedLoadPressureChart(hours) {
+            if (GlobalChartManager && pressureChart) {
+                GlobalChartManager.updatePressureChart(hours, pressureChart)
+                    .then(updatedChart => {
+                        if (updatedChart) {
+                            pressureChart = updatedChart;
+                            GlobalEventSystem.emit('chart:updated', { chartType: 'pressure', hours });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('STAGE 5: Enhanced pressure chart update failed:', error);
+                        loadPressureChart(hours); // Fallback
+                    });
+            } else {
+                loadPressureChart(hours); // Fallback
+            }
         }
 
         // Enhanced Dashboard Functions for Phase 2
@@ -2369,25 +2590,21 @@ async function refreshData() {
                     mostActiveDoor: 'None'
                 };
                 
+                // First pass: collect active doors from the latest data (not every entry)
+                const latestEntry = historyData[historyData.length - 1];
+                if (latestEntry && latestEntry.doors && Array.isArray(latestEntry.doors)) {
+                    latestEntry.doors.forEach(door => {
+                        // Door data comes as objects with properties like {id: 2, name: "D2 (House Hinge)", wasOpenedToday: true, ...}
+                        if (door.name && door.wasOpenedToday === true) {
+                            const doorName = door.name.trim();
+                            doorActivityStats.activeDoors.add(doorName);
+                        }
+                    });
+                }
+                
+                // Second pass: collect only actual door transition events (not status checks)
                 historyData.forEach(entry => {
-                    // Check for doors array (door status data) - doors are objects, not strings
-                    if (entry.doors && Array.isArray(entry.doors)) {
-                        entry.doors.forEach(door => {
-                            // Door data comes as objects with properties like {id: 2, name: "D2 (House Hinge)", wasOpenedToday: true, ...}
-                            if (door.name && door.wasOpenedToday === true) {
-                                const doorName = door.name.trim();
-                                doorActivityStats.activeDoors.add(doorName);
-                                doorEvents.push({
-                                    door: doorName,
-                                    status: 'active',
-                                    timestamp: entry.timestamp,
-                                    type: 'daily_activity'
-                                });
-                            }
-                        });
-                    }
-                    
-                    // Check for doorTransitions array (actual door events)  
+                    // Only count doorTransitions array (actual door events)  
                     if (entry.doorTransitions && Array.isArray(entry.doorTransitions)) {
                         entry.doorTransitions.forEach(transition => {
                             // Transition data comes as objects with properties like {doorId: 2, doorName: "D2 (House Hinge)", opened: true, ...}
@@ -2395,6 +2612,7 @@ async function refreshData() {
                                 const doorName = transition.doorName.trim();
                                 const opened = transition.opened === true;
                                 
+                                // Make sure this door is in our active doors set
                                 doorActivityStats.activeDoors.add(doorName);
                                 doorEvents.push({
                                     door: doorName,
@@ -2432,9 +2650,12 @@ async function refreshData() {
                 }
                 
                 // Display the results
+                const activeDoorsList = Array.from(doorActivityStats.activeDoors).join(', ');
+                const activeDoorDisplay = doorActivityStats.activeDoors.size > 0 ? activeDoorsList : 'None';
+                
                 yesterdayElement.innerHTML = `
                     <div class="door-summary">
-                        <p><strong>Active Doors:</strong> ${doorActivityStats.activeDoors.size} detected</p>
+                        <p><strong>Active Doors:</strong> ${activeDoorDisplay}</p>
                         <p><strong>Total Events:</strong> ${doorActivityStats.totalEvents}</p>
                         <p><strong>Peak Activity:</strong> ${peakActivity}</p>
                         <p><strong>Most Active:</strong> ${doorActivityStats.mostActiveDoor}</p>
