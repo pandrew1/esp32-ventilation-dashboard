@@ -1302,25 +1302,14 @@ async function refreshData() {
                     if (yesterdayData.environmental) {
                         const env = yesterdayData.environmental;
                         
-                        // TODO: Replace with individual sensor data from VentilationData table
-                        // Current data is aggregated across all sensors, need separate:
-                        // - Indoor: IndoorTemp, IndoorHumidity, IndoorPressure  
-                        // - Outdoor: OutdoorTemp, OutdoorHumidity, OutdoorPressure
-                        // - Garage: GarageTemp, GarageHumidity, GaragePressure
-                        
                         document.getElementById('yesterdayEnvironmental').innerHTML = `
                             <div class="env-summary">
                                 <h4>🌡️ Environmental Summary</h4>
-                                <p><strong>Temperature Range:</strong> ${env.tempMin}°F - ${env.tempMax}°F (Avg: ${env.tempAvg}°F)</p>
-                                <p><em>⚠️ Note: This is aggregated data. Need individual sensor zones:</em></p>
-                                <ul>
-                                    <li><strong>Indoor Sensor:</strong> [Need IndoorTemp data from VentilationData]</li>
-                                    <li><strong>Outdoor Sensor:</strong> [Need OutdoorTemp data from VentilationData]</li>  
-                                    <li><strong>Garage Sensor:</strong> [Need GarageTemp data from VentilationData]</li>
-                                </ul>
-                                <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
-                                <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} inHg</p>
+                                <p><strong>Temperature Range:</strong> ${env.tempMin || 'N/A'}°F - ${env.tempMax || 'N/A'}°F (Avg: ${env.tempAvg || 'N/A'}°F)</p>
+                                <p><strong>Humidity Range:</strong> ${env.humidityMin || 'N/A'}% - ${env.humidityMax || 'N/A'}% (Avg: ${env.humidityAvg || 'N/A'}%)</p>
+                                <p><strong>Pressure:</strong> ${env.pressureMin || 'N/A'} - ${env.pressureMax || 'N/A'} inHg</p>
                                 <p><em>⚠️ Air Quality removed - no PM2.5 sensor available</em></p>
+                                <p><em>🔄 Loading individual sensor breakdown...</em></p>
                             </div>
                         `;
                     } else {
@@ -1332,14 +1321,14 @@ async function refreshData() {
                         const perf = yesterdayData.performance;
                         document.getElementById('yesterdayPerformance').innerHTML = `
                             <div class="perf-summary">
-                                <p><strong>Efficiency:</strong> ${perf.efficiency}%</p>
-                                <p><strong>Runtime:</strong> ${perf.runtime} hours</p>
-                                <p><strong>Energy Usage:</strong> ${perf.energyUsage}</p>
-                                <p><strong>Peak Load:</strong> ${perf.peakLoad}</p>
+                                <p><strong>Efficiency:</strong> ${perf.efficiency || 'N/A'}%</p>
+                                <p><strong>Runtime:</strong> ${perf.runtime || 'N/A'} hours</p>
+                                <p><strong>Energy Usage:</strong> ${perf.energyUsage || 'N/A'}</p>
+                                <p><strong>Peak Load:</strong> ${perf.peakLoad || 'N/A'}</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available</div>';
+                        document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available - check VentilationEnhancements table</div>';
                     }
                     
                     // System assessments based on real yesterday data
@@ -1445,16 +1434,10 @@ async function refreshData() {
                         document.getElementById('yesterdayHumidity').innerHTML = `
                             <div class="humidity-analysis">
                                 <h4>💧 Humidity Analysis</h4>
-                                <p><strong>Yesterday's Humidity Range:</strong> ${env.humidityMin || '--'}% → ${env.humidityMax || '--'}%</p>
-                                <p><strong>Average Humidity:</strong> ${env.humidityAvg || '--'}%</p>
-                                <p><em>⚠️ Current average (${env.humidityAvg}%) seems incorrect - likely data processing bug</em></p>
-                                <p><strong>Humidity Variation:</strong> ${env.humidityMax && env.humidityMin ? (env.humidityMax - env.humidityMin).toFixed(1) : '--'}% range</p>
-                                <p><em>⚠️ Need individual sensor humidity data:</em></p>
-                                <ul>
-                                    <li><strong>Indoor Humidity:</strong> [Need IndoorHumidity from VentilationData]</li>
-                                    <li><strong>Outdoor Humidity:</strong> [Need OutdoorHumidity from VentilationData]</li>
-                                    <li><strong>Garage Humidity:</strong> [Need GarageHumidity from VentilationData]</li>
-                                </ul>
+                                <p><strong>Yesterday's Humidity Range:</strong> ${env.humidityMin || 'N/A'}% → ${env.humidityMax || 'N/A'}%</p>
+                                <p><strong>Average Humidity:</strong> ${env.humidityAvg || 'N/A'}%</p>
+                                <p><strong>Humidity Variation:</strong> ${env.humidityMax && env.humidityMin ? (env.humidityMax - env.humidityMin).toFixed(1) : 'N/A'}% range</p>
+                                <p><em>🔄 Loading individual sensor breakdown...</em></p>
                             </div>
                         `;
                     } else {
@@ -1467,16 +1450,11 @@ async function refreshData() {
                         document.getElementById('yesterdayPressure').innerHTML = `
                             <div class="pressure-analysis">
                                 <h4>🌪️ Pressure Analysis</h4>
-                                <p><strong>Pressure Range:</strong> ${env.pressureMin || '--'} → ${env.pressureMax || '--'} inHg</p>
-                                <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(2) : '--'} inHg</p>
+                                <p><strong>Pressure Range:</strong> ${env.pressureMin || 'N/A'} → ${env.pressureMax || 'N/A'} inHg</p>
+                                <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(2) : 'N/A'} inHg</p>
                                 <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 0.1 ? 'Stable' : 'Variable'}</p>
                                 <p><strong>Storm Risk Assessment:</strong> Based on pressure trends</p>
-                                <p><em>⚠️ Need individual sensor pressure data:</em></p>
-                                <ul>
-                                    <li><strong>Indoor Pressure:</strong> [Need IndoorPressure from VentilationData]</li>
-                                    <li><strong>Outdoor Pressure:</strong> [Need OutdoorPressure from VentilationData]</li>
-                                    <li><strong>Garage Pressure:</strong> [Need GaragePressure from VentilationData]</li>
-                                </ul>
+                                <p><em>🔄 Loading individual sensor breakdown...</em></p>
                             </div>
                         `;
                     } else {
@@ -1488,15 +1466,15 @@ async function refreshData() {
                         const perf = yesterdayData.performance;
                         document.getElementById('yesterdayVentilation').innerHTML = `
                             <div class="ventilation-analysis">
-                                <p><strong>Efficiency:</strong> ${perf.efficiency || '--'}%</p>
-                                <p><strong>Runtime:</strong> ${perf.runtime || '--'} hours</p>
-                                <p><strong>Energy Usage:</strong> ${perf.energyUsage || 'Unknown'}</p>
-                                <p><strong>Peak Load:</strong> ${perf.peakLoad || 'Unknown'}</p>
+                                <p><strong>Efficiency:</strong> ${perf.efficiency || 'N/A'}%</p>
+                                <p><strong>Runtime:</strong> ${perf.runtime || 'N/A'} hours</p>
+                                <p><strong>Energy Usage:</strong> ${perf.energyUsage || 'N/A'}</p>
+                                <p><strong>Peak Load:</strong> ${perf.peakLoad || 'N/A'}</p>
                                 <p><strong>Operational Assessment:</strong> Based on runtime and efficiency metrics</p>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayVentilation').innerHTML = '<div class="error-state">Ventilation analysis not available</div>';
+                        document.getElementById('yesterdayVentilation').innerHTML = '<div class="error-state">Ventilation analysis not available - check VentilationEnhancements table for performance data</div>';
                     }
                     
                     // Load monthly aggregation status - call existing updateDashboard to get Status API data
@@ -2948,11 +2926,11 @@ async function refreshData() {
                 
                 // Calculate statistics for each sensor
                 const calculateStats = (values) => {
-                    if (values.length === 0) return { min: 'N/A', max: 'N/A', avg: 'N/A' };
+                    if (values.length === 0) return { min: 'N/A', max: 'N/A', avg: 'N/A', count: 0 };
                     const min = Math.min(...values).toFixed(1);
                     const max = Math.max(...values).toFixed(1);
                     const avg = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
-                    return { min, max, avg };
+                    return { min, max, avg, count: values.length };
                 };
                 
                 const indoorTemp = calculateStats(sensorStats.indoor.temps);
@@ -2963,48 +2941,89 @@ async function refreshData() {
                 const outdoorHum = calculateStats(sensorStats.outdoor.humidity);
                 const garageHum = calculateStats(sensorStats.garage.humidity);
                 
-                // Update Environmental Summary with individual sensor data
-                document.getElementById('yesterdayEnvironmental').innerHTML = `
-                    <div class="env-summary">
-                        <h4>🌡️ Environmental Summary - Individual Sensors</h4>
-                        <div class="sensor-breakdown">
-                            <div class="sensor-zone">
-                                <h5>🏠 Indoor Sensor (BME280)</h5>
-                                <p><strong>Temperature:</strong> ${indoorTemp.min}°F - ${indoorTemp.max}°F (Avg: ${indoorTemp.avg}°F)</p>
-                                <p><strong>Humidity:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
-                            </div>
-                            <div class="sensor-zone">
-                                <h5>🌤️ Outdoor Sensor (BME280)</h5>
-                                <p><strong>Temperature:</strong> ${outdoorTemp.min}°F - ${outdoorTemp.max}°F (Avg: ${outdoorTemp.avg}°F)</p>
-                                <p><strong>Humidity:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
-                            </div>
-                            <div class="sensor-zone">
-                                <h5>🚗 Garage Sensor (BME280)</h5>
-                                <p><strong>Temperature:</strong> ${garageTemp.min}°F - ${garageTemp.max}°F (Avg: ${garageTemp.avg}°F)</p>
-                                <p><strong>Humidity:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
-                            </div>
-                        </div>
-                        <p><em>✅ Data source: Individual sensor readings from VentilationData table</em></p>
-                    </div>
-                `;
+                // Update Environmental Summary with individual sensor data (append to existing, don't overwrite)
+                const envElement = document.getElementById('yesterdayEnvironmental');
+                const existingEnv = envElement.innerHTML;
                 
-                // Update Humidity Analysis with sensor breakdown
-                document.getElementById('yesterdayHumidity').innerHTML = `
-                    <div class="humidity-analysis">
-                        <h4>💧 Humidity Analysis - All Sensor Zones</h4>
-                        <div class="humidity-breakdown">
-                            <p><strong>🏠 Indoor:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
-                            <p><strong>🌤️ Outdoor:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
-                            <p><strong>🚗 Garage:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
-                            <p><strong>Overall Variation:</strong> ${Math.max(
-                                sensorStats.indoor.humidity.length > 0 ? Math.max(...sensorStats.indoor.humidity) - Math.min(...sensorStats.indoor.humidity) : 0,
-                                sensorStats.outdoor.humidity.length > 0 ? Math.max(...sensorStats.outdoor.humidity) - Math.min(...sensorStats.outdoor.humidity) : 0,
-                                sensorStats.garage.humidity.length > 0 ? Math.max(...sensorStats.garage.humidity) - Math.min(...sensorStats.garage.humidity) : 0
-                            ).toFixed(1)}% max range across all zones</p>
+                // Only update if we don't already have individual sensor data
+                if (!existingEnv.includes('Individual Sensors') && !existingEnv.includes('BME280')) {
+                    envElement.innerHTML = `
+                        <div class="env-summary">
+                            <h4>🌡️ Environmental Summary</h4>
+                            <div class="sensor-breakdown">
+                                <div class="sensor-zone">
+                                    <h5>🏠 Indoor Sensor (BME280)</h5>
+                                    <p><strong>Temperature:</strong> ${indoorTemp.min}°F - ${indoorTemp.max}°F (Avg: ${indoorTemp.avg}°F)</p>
+                                    <p><strong>Humidity:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
+                                </div>
+                                <div class="sensor-zone">
+                                    <h5>🌤️ Outdoor Sensor (BME280)</h5>
+                                    <p><strong>Temperature:</strong> ${outdoorTemp.min}°F - ${outdoorTemp.max}°F (Avg: ${outdoorTemp.avg}°F)</p>
+                                    <p><strong>Humidity:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
+                                </div>
+                                <div class="sensor-zone">
+                                    <h5>🚗 Garage Sensor (BME280)</h5>
+                                    <p><strong>Temperature:</strong> ${garageTemp.min}°F - ${garageTemp.max}°F (Avg: ${garageTemp.avg}°F)</p>
+                                    <p><strong>Humidity:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
+                                </div>
+                            </div>
+                            <p><em>✅ Data source: Individual sensor readings from VentilationData table</em></p>
                         </div>
-                        <p><em>✅ Accurate data from individual BME280 sensors</em></p>
-                    </div>
-                `;
+                    `;
+                }
+                
+                // Update Humidity Analysis with sensor breakdown (append to existing, don't overwrite)
+                const humElement = document.getElementById('yesterdayHumidity');
+                const existingHum = humElement.innerHTML;
+                
+                // Only update if we don't already have sensor breakdown data
+                if (!existingHum.includes('All Sensor Zones') && !existingHum.includes('Indoor:')) {
+                    humElement.innerHTML = `
+                        <div class="humidity-analysis">
+                            <h4>💧 Humidity Analysis</h4>
+                            <div class="humidity-breakdown">
+                                <p><strong>🏠 Indoor:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
+                                <p><strong>🌤️ Outdoor:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
+                                <p><strong>🚗 Garage:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
+                                <p><strong>Overall Variation:</strong> ${Math.max(
+                                    sensorStats.indoor.humidity.length > 0 ? Math.max(...sensorStats.indoor.humidity) - Math.min(...sensorStats.indoor.humidity) : 0,
+                                    sensorStats.outdoor.humidity.length > 0 ? Math.max(...sensorStats.outdoor.humidity) - Math.min(...sensorStats.outdoor.humidity) : 0,
+                                    sensorStats.garage.humidity.length > 0 ? Math.max(...sensorStats.garage.humidity) - Math.min(...sensorStats.garage.humidity) : 0
+                                ).toFixed(1)}% max range across all zones</p>
+                            </div>
+                            <p><em>✅ Accurate data from individual BME280 sensors</em></p>
+                        </div>
+                    `;
+                }
+                
+                // Update Pressure Analysis with individual sensor data
+                const indoorPress = calculateStats(sensorStats.indoor.pressure);
+                const outdoorPress = calculateStats(sensorStats.outdoor.pressure);
+                const garagePress = calculateStats(sensorStats.garage.pressure);
+                
+                const pressElement = document.getElementById('yesterdayPressure');
+                const existingPress = pressElement.innerHTML;
+                
+                // Only update if we don't already have individual pressure data
+                if (!existingPress.includes('Indoor Pressure:') && (indoorPress.count > 0 || outdoorPress.count > 0 || garagePress.count > 0)) {
+                    pressElement.innerHTML = `
+                        <div class="pressure-analysis">
+                            <h4>🌪️ Pressure Analysis</h4>
+                            <div class="pressure-breakdown">
+                                ${indoorPress.count > 0 ? `<p><strong>🏠 Indoor:</strong> ${indoorPress.min} - ${indoorPress.max} inHg (Avg: ${indoorPress.avg})</p>` : '<p><strong>🏠 Indoor:</strong> No pressure data</p>'}
+                                ${outdoorPress.count > 0 ? `<p><strong>🌤️ Outdoor:</strong> ${outdoorPress.min} - ${outdoorPress.max} inHg (Avg: ${outdoorPress.avg})</p>` : '<p><strong>🌤️ Outdoor:</strong> No pressure data</p>'}
+                                ${garagePress.count > 0 ? `<p><strong>🚗 Garage:</strong> ${garagePress.min} - ${garagePress.max} inHg (Avg: ${garagePress.avg})</p>` : '<p><strong>🚗 Garage:</strong> No pressure data</p>'}
+                                <p><strong>Weather Stability:</strong> ${
+                                    Math.max(indoorPress.count, outdoorPress.count, garagePress.count) > 0 ? 
+                                    (Math.max(indoorPress.max || 0, outdoorPress.max || 0, garagePress.max || 0) - 
+                                     Math.min(indoorPress.min || 999, outdoorPress.min || 999, garagePress.min || 999) < 0.1 ? 'Stable' : 'Variable') : 
+                                    'Unknown'
+                                }</p>
+                            </div>
+                            <p><em>✅ Data from individual BME280 pressure sensors</em></p>
+                        </div>
+                    `;
+                }
                 
                 console.log(`ENHANCED SENSOR DATA: Processed ${historyData.length} records for individual sensor analysis`);
                 
