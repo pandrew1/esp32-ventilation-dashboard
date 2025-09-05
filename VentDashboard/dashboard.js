@@ -3016,6 +3016,10 @@ async function refreshData() {
                 if (historyData.length > 0) {
                     console.log('DEBUG: First record fields:', Object.keys(historyData[0]));
                     console.log('DEBUG: First record sample:', historyData[0]);
+                    console.log('DEBUG: First record sensors object:', historyData[0].sensors);
+                    if (historyData[0].sensors) {
+                        console.log('DEBUG: Sensors object keys:', Object.keys(historyData[0].sensors));
+                    }
                 }
                 
                 // Process individual sensor data from VentilationData records
@@ -3027,18 +3031,36 @@ async function refreshData() {
                 
                 // Extract individual sensor readings
                 historyData.forEach(entry => {
-                    // Use extracted fields from VentilationData table
-                    if (entry.IndoorTemp != null) sensorStats.indoor.temps.push(entry.IndoorTemp);
-                    if (entry.IndoorHumidity != null) sensorStats.indoor.humidity.push(entry.IndoorHumidity);
-                    if (entry.IndoorPressure != null) sensorStats.indoor.pressure.push(entry.IndoorPressure);
+                    // FIXED: Access sensor data through the sensors object structure
+                    const sensors = entry.sensors || {};
                     
-                    if (entry.OutdoorTemp != null) sensorStats.outdoor.temps.push(entry.OutdoorTemp);
-                    if (entry.OutdoorHumidity != null) sensorStats.outdoor.humidity.push(entry.OutdoorHumidity);
-                    if (entry.OutdoorPressure != null) sensorStats.outdoor.pressure.push(entry.OutdoorPressure);
+                    // Try multiple possible field names for indoor sensors
+                    const indoorTemp = sensors.IndoorTemp || sensors.indoorTemp || sensors.indoor?.temp;
+                    const indoorHumidity = sensors.IndoorHumidity || sensors.indoorHumidity || sensors.indoor?.humidity;
+                    const indoorPressure = sensors.IndoorPressure || sensors.indoorPressure || sensors.indoor?.pressure;
                     
-                    if (entry.GarageTemp != null) sensorStats.garage.temps.push(entry.GarageTemp);
-                    if (entry.GarageHumidity != null) sensorStats.garage.humidity.push(entry.GarageHumidity);
-                    if (entry.GaragePressure != null) sensorStats.garage.pressure.push(entry.GaragePressure);
+                    // Try multiple possible field names for outdoor sensors
+                    const outdoorTemp = sensors.OutdoorTemp || sensors.outdoorTemp || sensors.outdoor?.temp;
+                    const outdoorHumidity = sensors.OutdoorHumidity || sensors.outdoorHumidity || sensors.outdoor?.humidity;
+                    const outdoorPressure = sensors.OutdoorPressure || sensors.outdoorPressure || sensors.outdoor?.pressure;
+                    
+                    // Try multiple possible field names for garage sensors
+                    const garageTemp = sensors.GarageTemp || sensors.garageTemp || sensors.garage?.temp;
+                    const garageHumidity = sensors.GarageHumidity || sensors.garageHumidity || sensors.garage?.humidity;
+                    const garagePressure = sensors.GaragePressure || sensors.garagePressure || sensors.garage?.pressure;
+                    
+                    // Add values if they exist and are valid numbers
+                    if (indoorTemp != null && !isNaN(indoorTemp)) sensorStats.indoor.temps.push(Number(indoorTemp));
+                    if (indoorHumidity != null && !isNaN(indoorHumidity)) sensorStats.indoor.humidity.push(Number(indoorHumidity));
+                    if (indoorPressure != null && !isNaN(indoorPressure)) sensorStats.indoor.pressure.push(Number(indoorPressure));
+                    
+                    if (outdoorTemp != null && !isNaN(outdoorTemp)) sensorStats.outdoor.temps.push(Number(outdoorTemp));
+                    if (outdoorHumidity != null && !isNaN(outdoorHumidity)) sensorStats.outdoor.humidity.push(Number(outdoorHumidity));
+                    if (outdoorPressure != null && !isNaN(outdoorPressure)) sensorStats.outdoor.pressure.push(Number(outdoorPressure));
+                    
+                    if (garageTemp != null && !isNaN(garageTemp)) sensorStats.garage.temps.push(Number(garageTemp));
+                    if (garageHumidity != null && !isNaN(garageHumidity)) sensorStats.garage.humidity.push(Number(garageHumidity));
+                    if (garagePressure != null && !isNaN(garagePressure)) sensorStats.garage.pressure.push(Number(garagePressure));
                 });
                 
                 // Calculate statistics for each sensor
