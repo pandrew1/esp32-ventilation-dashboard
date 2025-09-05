@@ -5872,6 +5872,13 @@ async function refreshData() {
             const severityFilter = document.getElementById('almanacSeverityFilter').value;
             const statusElement = document.getElementById('almanacStatus');
             
+            // DEBUGGING: Log the filter values
+            console.log('=== INCIDENT ALMANAC: loadIncidentAlmanac() called ===');
+            console.log('ALMANAC DEBUG: viewType =', viewType);
+            console.log('ALMANAC DEBUG: periodFilter =', periodFilter);
+            console.log('ALMANAC DEBUG: severityFilter =', severityFilter);
+            console.log('ALMANAC DEBUG: originalIncidentsData.length =', originalIncidentsData ? originalIncidentsData.length : 'null/undefined');
+            
             try {
                 statusElement.textContent = 'Loading incident data...';
                 
@@ -5881,15 +5888,18 @@ async function refreshData() {
                 if (periodFilter === 1) {
                     // Previous month
                     startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    console.log('ALMANAC DEBUG: Using Previous Month filter, startDate =', startDate);
                 } else {
                     // Last 12 months
                     startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
+                    console.log('ALMANAC DEBUG: Using Last 12 Months filter, startDate =', startDate);
                 }
                 
                 // Use existing incident data or fetch if needed
                 let incidents = originalIncidentsData || [];
                 
                 if (incidents.length === 0) {
+                    console.log('ALMANAC DEBUG: No incident data available');
                     statusElement.textContent = 'No incident data available';
                     showAlmanacView(viewType, [], periodFilter);
                     return;
@@ -5907,9 +5917,14 @@ async function refreshData() {
                     return false;
                 });
                 
+                console.log('ALMANAC DEBUG: After severity filter:', filteredIncidents.length, 'incidents');
+                
                 // Filter by time range
                 const cutoffTimestamp = Math.floor(startDate.getTime() / 1000);
+                console.log('ALMANAC DEBUG: cutoffTimestamp =', cutoffTimestamp, new Date(cutoffTimestamp * 1000));
+                
                 filteredIncidents = filteredIncidents.filter(incident => incident.startTime >= cutoffTimestamp);
+                console.log('ALMANAC DEBUG: After time filter:', filteredIncidents.length, 'incidents');
                 
                 const periodText = periodFilter === 1 ? 'previous month' : 'last 12 months';
                 statusElement.textContent = `Showing ${filteredIncidents.length} incidents from ${periodText}`;
