@@ -1042,12 +1042,28 @@ async function refreshData() {
                     loadingSection.style.display = 'none';
                     console.log('Dashboard initialization complete - hiding existing loading section');
                 }
+                
+                // CRITICAL FIX: Show the dashboard content after initialization
+                const dashboardContent = document.getElementById('dashboardContent');
+                if (dashboardContent) {
+                    dashboardContent.style.display = 'block';
+                    console.log('Dashboard initialization complete - showing dashboard content');
+                } else {
+                    console.error('dashboardContent element not found!');
+                }
             }).catch(error => {
                 // Hide loading section on error too
                 const loadingSection = document.getElementById('loadingSection');
                 if (loadingSection) {
                     loadingSection.style.display = 'none';
                 }
+                
+                // Show dashboard content even on error (with no data state)
+                const dashboardContent = document.getElementById('dashboardContent');
+                if (dashboardContent) {
+                    dashboardContent.style.display = 'block';
+                }
+                
                 console.error('Dashboard initialization failed:', error);
                 DashboardUtils.showNotification('Dashboard initialization failed. Please refresh the page.', 'error');
             });
