@@ -1821,8 +1821,8 @@ async function refreshData() {
                 }
 
                 // PHASE 2 FIX: Update door activity (use correct data from API)
-                if (yesterdayData.doors) {
-                    const doors = yesterdayData.doors;
+                if (data.sections.doors) {
+                    const doors = data.sections.doors;
                     // API provides: activeDoors, totalEvents, mostActive
                     const activeDoors = doors.activeDoors || 0;
                     const totalDoors = doors.totalDoors || 0;
@@ -2206,7 +2206,7 @@ async function refreshData() {
                 const startup = data.sections && data.sections.startup;
                 console.log('updateSystemHealthWidget: Startup section:', startup);
                 
-                if (startup) {
+                if (startup && !startup.error) {
                     console.log('updateSystemHealthWidget: Processing startup data');
                     console.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
                     console.log('updateSystemHealthWidget: Startup system:', startup.system);
@@ -2216,9 +2216,11 @@ async function refreshData() {
                     
                     // Update boot information
                     if (lastBootInfo) {
-                        // Format boot time from timestamp
-                        if (startup.bootTime) {
-                            const bootDate = new Date(parseInt(startup.bootTime) * 1000);
+                        // Format boot time from timestamp with validation
+                        if (startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
+                            const bootTime = parseInt(startup.bootTime);
+                            // Handle both seconds and milliseconds timestamps
+                            const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
                             lastBootInfo.textContent = bootDate.toLocaleString();
                         } else {
                             lastBootInfo.textContent = 'Boot time unavailable';
@@ -2353,8 +2355,8 @@ async function refreshData() {
                         }
                     }
                 } else {
-                    console.log('No startup data available in sections');
-                    if (lastBootInfo) lastBootInfo.textContent = 'No boot data available';
+                    console.log('Startup data unavailable:', startup?.error || 'No startup section');
+                    if (lastBootInfo) lastBootInfo.textContent = startup?.error ? 'Boot time unavailable' : 'No boot data available';
                     if (bootReasonInfo) bootReasonInfo.textContent = 'No data';
                 }
                 
@@ -4209,7 +4211,7 @@ async function refreshData() {
             }
 
             // Update startup information from actual API structure
-            if (data.sections && data.sections.startup) {
+            if (data.sections && data.sections.startup && !data.sections.startup.error) {
                 const startup = data.sections.startup;
                 const startupSystem = startup.system || {};
                 const startupHardware = startup.hardware || {};
@@ -4313,9 +4315,15 @@ async function refreshData() {
                 
                 // Boot Information from sections.startup
                 const lastBootInfoElement = document.getElementById('lastBootInfo');
-                if (lastBootInfoElement && startup.bootTime) {
-                    const bootDate = new Date(parseInt(startup.bootTime) * 1000);
-                    lastBootInfoElement.textContent = `${bootDate.toLocaleDateString()} ${bootDate.toLocaleTimeString()}`;
+                if (lastBootInfoElement) {
+                    if (startup && startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
+                        const bootTime = parseInt(startup.bootTime);
+                        // Handle both seconds and milliseconds timestamps
+                        const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
+                        lastBootInfoElement.textContent = `${bootDate.toLocaleDateString()} ${bootDate.toLocaleTimeString()}`;
+                    } else {
+                        lastBootInfoElement.textContent = 'Boot time unavailable';
+                    }
                 }
                 
                 const bootReasonInfoElement = document.getElementById('bootReasonInfo');
