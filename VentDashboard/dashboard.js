@@ -1034,7 +1034,24 @@ async function refreshData() {
                 if (header) header.appendChild(noDataNotice);
             }
             
-            initializeDashboard();
+            // Initialize dashboard - the existing loadingSection will be shown by default
+            initializeDashboard().then(() => {
+                // Hide the existing loading section once dashboard is ready
+                const loadingSection = document.getElementById('loadingSection');
+                if (loadingSection) {
+                    loadingSection.style.display = 'none';
+                    console.log('Dashboard initialization complete - hiding existing loading section');
+                }
+            }).catch(error => {
+                // Hide loading section on error too
+                const loadingSection = document.getElementById('loadingSection');
+                if (loadingSection) {
+                    loadingSection.style.display = 'none';
+                }
+                console.error('Dashboard initialization failed:', error);
+                DashboardUtils.showNotification('Dashboard initialization failed. Please refresh the page.', 'error');
+            });
+            
             setupEnhancedDashboard(); // Initialize Phase 2 enhancements
         });
 
