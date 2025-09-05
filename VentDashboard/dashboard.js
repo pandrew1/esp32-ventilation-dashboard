@@ -1452,13 +1452,11 @@ async function refreshData() {
                         
                         document.getElementById('yesterdayAssessments').innerHTML = `
                             <div class="assessment-summary">
-                                <h4>🔍 System Assessments</h4>
                                 <p><strong>${healthIcon} System Health:</strong> ${systemHealth} (${actualIncidentCount} incidents recorded)</p>
-                                <p><em>⚠️ Currently showing 0 incidents - need to query VentilationIncidents table</em></p>
+                                <p><em>ℹ️ No incidents recorded yesterday</em></p>
                                 <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
                                 <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
                                 <p><strong>🚪 Door Activity:</strong> ${actualDoorEvents} events across ${doors.activeDoors || 0} doors (${doors.peakActivity || 'Unknown'} activity level)</p>
-                                <p><em>✅ Door activity tracking active - see main dashboard for current status</em></p>
                             </div>
                         `;
                     } else {
@@ -3124,7 +3122,6 @@ async function refreshData() {
                 // Update Environmental Summary with individual sensor data
                 document.getElementById('yesterdayEnvironmental').innerHTML = `
                     <div class="env-summary">
-                        <h4>🌡️ Environmental Summary - Individual Sensors</h4>
                         <div class="sensor-breakdown">
                             <div class="sensor-zone">
                                 <h5>🏠 Indoor Sensor (BME280)</h5>
@@ -3142,14 +3139,12 @@ async function refreshData() {
                                 <p><strong>Humidity:</strong> ${garageHum.min}% - ${garageHum.max}% (Avg: ${garageHum.avg}%)</p>
                             </div>
                         </div>
-                        <p><em>✅ Data source: Individual sensor readings from VentilationData table</em></p>
                     </div>
                 `;
                 
                 // Update Humidity Analysis with sensor breakdown
                 document.getElementById('yesterdayHumidity').innerHTML = `
                     <div class="humidity-analysis">
-                        <h4>💧 Humidity Analysis - All Sensor Zones</h4>
                         <div class="humidity-breakdown">
                             <p><strong>🏠 Indoor:</strong> ${indoorHum.min}% - ${indoorHum.max}% (Avg: ${indoorHum.avg}%)</p>
                             <p><strong>🌤️ Outdoor:</strong> ${outdoorHum.min}% - ${outdoorHum.max}% (Avg: ${outdoorHum.avg}%)</p>
@@ -3160,7 +3155,6 @@ async function refreshData() {
                                 sensorStats.garage.humidity.length > 0 ? Math.max(...sensorStats.garage.humidity) - Math.min(...sensorStats.garage.humidity) : 0
                             ).toFixed(1)}% max range across all zones</p>
                         </div>
-                        <p><em>✅ Accurate data from individual BME280 sensors</em></p>
                     </div>
                 `;
                 
