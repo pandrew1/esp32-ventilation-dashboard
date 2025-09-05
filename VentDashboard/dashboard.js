@@ -1492,24 +1492,37 @@ async function refreshData() {
                         document.getElementById('yesterdayHumidity').innerHTML = '<div class="error-state">Humidity analysis not available</div>';
                     }
                     
-                    // Load pressure analysis - FIXED: Remove Air Quality references
-                    if (yesterdayData.environmental) {
-                        const env = yesterdayData.environmental;
-                        document.getElementById('yesterdayPressure').innerHTML = `
-                            <div class="pressure-analysis">
-                                <h4>🌪️ Pressure Analysis</h4>
-                                <p><strong>Pressure Range:</strong> ${env.pressureMin || '--'} → ${env.pressureMax || '--'} hPa</p>
-                                <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(1) : '--'} hPa</p>
-                                <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 2.0 ? 'Stable' : 'Variable'}</p>
-                                <p><strong>Storm Risk Assessment:</strong> Based on pressure trends</p>
-                                <p><em>⚠️ Need individual sensor pressure data:</em></p>
-                                <ul>
-                                    <li><strong>Indoor Pressure:</strong> [Need IndoorPressure from VentilationData]</li>
-                                    <li><strong>Outdoor Pressure:</strong> [Need OutdoorPressure from VentilationData]</li>
-                                    <li><strong>Garage Pressure:</strong> [Need GaragePressure from VentilationData]</li>
-                                </ul>
-                            </div>
-                        `;
+                    // Load pressure analysis using current sensor data instead of converted yesterday data
+                    if (latestData && latestData.sensors) {
+                        const sensors = latestData.sensors;
+                        const indoor = sensors.indoor || {};
+                        const outdoor = sensors.outdoor || {};
+                        const garage = sensors.garage || {};
+                        
+                        // Get actual hPa pressure values from current sensors
+                        const pressures = [indoor.pressure, outdoor.pressure, garage.pressure].filter(p => p != null);
+                        
+                        if (pressures.length > 0) {
+                            const minPressure = Math.min(...pressures);
+                            const maxPressure = Math.max(...pressures);
+                            const variation = maxPressure - minPressure;
+                            
+                            document.getElementById('yesterdayPressure').innerHTML = `
+                                <div class="pressure-analysis">
+                                    <p><strong>Current Pressure Range:</strong> ${minPressure.toFixed(1)} → ${maxPressure.toFixed(1)} hPa</p>
+                                    <p><strong>Pressure Variation:</strong> ${variation.toFixed(1)} hPa</p>
+                                    <p><strong>Weather Stability:</strong> ${variation < 2.0 ? 'Stable' : 'Variable'}</p>
+                                    <p><strong>Individual Sensors:</strong></p>
+                                    <ul>
+                                        <li><strong>Indoor Pressure:</strong> ${indoor.pressure ? indoor.pressure.toFixed(1) + ' hPa' : 'No data'}</li>
+                                        <li><strong>Outdoor Pressure:</strong> ${outdoor.pressure ? outdoor.pressure.toFixed(1) + ' hPa' : 'No data'}</li>
+                                        <li><strong>Garage Pressure:</strong> ${garage.pressure ? garage.pressure.toFixed(1) + ' hPa' : 'No data'}</li>
+                                    </ul>
+                                </div>
+                            `;
+                        } else {
+                            document.getElementById('yesterdayPressure').innerHTML = '<div class="error-state">No pressure sensor data available</div>';
+                        }
                     } else {
                         document.getElementById('yesterdayPressure').innerHTML = '<div class="error-state">Pressure analysis not available</div>';
                     }
