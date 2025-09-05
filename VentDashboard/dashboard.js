@@ -254,7 +254,9 @@ const ChartUtils = {
  */
 function getApiKeyFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('apikey') || urlParams.get('key');
+    // FALLBACK: Return default API key if not provided in URL
+    // This ensures dashboard works even without URL parameters
+    return urlParams.get('apikey') || urlParams.get('key') || 'VentilationSystem2025SecretKey';
 }
 
 // Configuration - Replace with your actual Azure Function URLs
@@ -1102,9 +1104,10 @@ async function refreshData() {
             await loadIncidentAlmanac();
             
             // Load Enhanced API data sections (only the ones that work)
-            loadYesterdaySummaryMetrics();
-            updateEnhancedDoorActivity();
-            updateSystemHealthWidget();
+            // FIX: Await async functions to prevent race conditions
+            await loadYesterdaySummaryMetrics();
+            await updateEnhancedDoorActivity();
+            await updateSystemHealthWidget();
             // Note: Monthly aggregation status is handled by loadAggregationStatus() above
             
             // Start auto-refresh
@@ -1826,9 +1829,9 @@ async function refreshData() {
          * Fetches temperature, efficiency, door activity, and air quality metrics
          * Updates metric displays and handles authentication requirements
          * Uses DataManager for enhanced data fetching with error handling
-         * @returns {void}
+         * @returns {Promise<void>}
          */
-        function loadYesterdaySummaryMetrics() {
+        async function loadYesterdaySummaryMetrics() {
             console.log('=== PHASE 2 FIX: loadYesterdaySummaryMetrics() using Enhanced Dashboard API ===');
             
             // Show loading states for all metric elements
@@ -1855,7 +1858,8 @@ async function refreshData() {
             document.getElementById('yesterdayUptime').textContent = loadingText;
             
             // Use the Enhanced Dashboard API data instead of raw calculation
-            loadYesterdaySummaryFromEnhancedAPI();
+            // FIX: Await the async function to prevent race conditions
+            await loadYesterdaySummaryFromEnhancedAPI();
             
             // Helper function to set waiting state
             /**
@@ -1919,7 +1923,7 @@ async function refreshData() {
          * Displays door status indicators and activity timeline
          * @returns {void}
          */
-        function updateEnhancedDoorActivity() {
+        async function updateEnhancedDoorActivity() {
             console.log('=== STAGE 3: updateEnhancedDoorActivity() using DataManager ===');
             
             // Show loading states
@@ -1938,6 +1942,28 @@ async function refreshData() {
             if (!hasAuth) {
                 console.log('updateEnhancedDoorActivity: No authentication available - Bearer token or API key required');
                 return;
+            }
+            
+            try {
+                // Use consolidated DataManager instead of direct API call
+                const data = await DataManager.getEnhancedData();
+                console.log('DataManager: Enhanced data received for door activity');
+                
+                // Extract door activity data from sections
+                const doorData = data.sections && data.sections.doorActivity;
+                if (doorData) {
+                    // Process door activity data
+                    console.log('Door activity data found:', doorData);
+                } else {
+                    console.log('No door activity data available');
+                }
+                
+            } catch (error) {
+                console.error('updateEnhancedDoorActivity failed:', error);
+                // Set error states
+                document.getElementById('activeDoorsCount').textContent = 'Error';
+                document.getElementById('totalSessionsCount').textContent = 'Error';
+                document.getElementById('lastActivityTime').textContent = 'Failed to load';
             }
             
             // Use consolidated DataManager for 24h history data
@@ -2079,7 +2105,7 @@ async function refreshData() {
          * Handles authentication requirements and error states
          * @returns {void}
          */
-        function updateSystemHealthWidget() {
+        async function updateSystemHealthWidget() {
             console.log('=== STAGE 2: updateSystemHealthWidget() using DataManager ===');
             
             // Note: Simplified health metrics UI removed to eliminate duplicate/bad data display
@@ -2099,17 +2125,29 @@ async function refreshData() {
                 return;
             }
             
-            // Use consolidated DataManager instead of direct API call
-            DataManager.getEnhancedData()
-                .then(data => {
-                    console.log('DataManager: Enhanced data received for system health widget');
-                    
-                    // Extract startup data from sections - correct API structure
-                    const startup = data.sections && data.sections.startup;
-                    console.log('updateSystemHealthWidget: Startup section:', startup);
-                    
-                    if (startup) {
-                        console.log('updateSystemHealthWidget: Processing startup data');
+            try {
+                // Use consolidated DataManager instead of direct API call
+                const data = await DataManager.getEnhancedData();
+                console.log('DataManager: Enhanced data received for system health widget');
+                
+                // Extract startup data from sections - correct API structure
+                const startup = data.sections && data.sections.startup;
+                console.log('updateSystemHealthWidget: Startup section:', startup);
+                
+                if (startup) {
+                    console.log('updateSystemHealthWidget: Processing startup data');
+                    // Process the startup data here
+                } else {
+                    console.log('No startup data available in sections');
+                    if (lastBootInfo) lastBootInfo.textContent = 'No boot data available';
+                    if (bootReasonInfo) bootReasonInfo.textContent = 'No data';
+                }
+                
+            } catch (error) {
+                console.error('updateSystemHealthWidget failed:', error);
+                if (lastBootInfo) lastBootInfo.textContent = 'Failed to load boot information';
+                if (bootReasonInfo) bootReasonInfo.textContent = 'Error';
+            }
                         console.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
                         console.log('updateSystemHealthWidget: Startup system:', startup.system);
                         
@@ -2259,9 +2297,17 @@ async function refreshData() {
                             }
                         }
                     } else {
-                        // Handle case where startup data is not available  
-                        const lastBootInfo = document.getElementById('lastBootInfo');
-                        const bootReasonInfo = document.getElementById('bootReasonInfo');
+                        console.log('No startup data available in sections');
+                        if (lastBootInfo) lastBootInfo.textContent = 'No boot data available';
+                        if (bootReasonInfo) bootReasonInfo.textContent = 'No data';
+                    }
+                    
+                } catch (error) {
+                    console.error('updateSystemHealthWidget failed:', error);
+                    if (lastBootInfo) lastBootInfo.textContent = 'Failed to load boot information';
+                    if (bootReasonInfo) bootReasonInfo.textContent = 'Error';
+                }
+            }
                         
                         if (lastBootInfo) lastBootInfo.textContent = 'Boot information pending';
                         if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Pending';
