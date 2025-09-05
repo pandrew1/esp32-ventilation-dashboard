@@ -2137,7 +2137,150 @@ async function refreshData() {
                 
                 if (startup) {
                     console.log('updateSystemHealthWidget: Processing startup data');
-                    // Process the startup data here
+                    console.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
+                    console.log('updateSystemHealthWidget: Startup system:', startup.system);
+                    
+                    // Update boot information only (health metrics UI removed)
+                    // Note: lastBootInfo and bootReasonInfo already declared at top of function
+                    
+                    // Update boot information
+                    if (lastBootInfo) {
+                        // Format boot time from timestamp
+                        if (startup.bootTime) {
+                            const bootDate = new Date(parseInt(startup.bootTime) * 1000);
+                            lastBootInfo.textContent = bootDate.toLocaleString();
+                        } else {
+                            lastBootInfo.textContent = 'Boot time unavailable';
+                        }
+                    }
+                    
+                    if (bootReasonInfo) {
+                        // Use bootReason field (not boot_reason)
+                        bootReasonInfo.textContent = `Reason: ${startup.bootReason || 'Unknown'}`;
+                    }
+                    
+                    // Update System Specifications elements
+                    const chipModel = document.getElementById('chipModel');
+                    const cpuFreq = document.getElementById('cpuFreq');
+                    const flashSize = document.getElementById('flashSize');
+                    const freeHeap = document.getElementById('freeHeap');
+                    const wifiIP = document.getElementById('wifiIP');
+                    const macAddress = document.getElementById('macAddress');
+                    
+                    if (chipModel) chipModel.textContent = startup.system?.chipModel || startup.systemStatus?.chipModel || 'Unknown';
+                    if (cpuFreq) cpuFreq.textContent = (startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency) ? `${startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency} MHz` : 'Unknown';
+                    if (flashSize) {
+                        // Try multiple data paths for Flash size - some APIs store in bytes, others in MB
+                        const flashFromSystem = startup.system?.flashSize;
+                        const flashFromStatus = startup.systemStatus?.flashSize;
+                        
+                        let flashMB = null;
+                        if (flashFromSystem) {
+                            // If > 100, likely in bytes, convert to MB
+                            flashMB = flashFromSystem > 100 ? Math.round(flashFromSystem / (1024 * 1024)) : flashFromSystem;
+                        } else if (flashFromStatus) {
+                            // systemStatus.flashSize is typically already in MB
+                            flashMB = flashFromStatus;
+                        }
+                        
+                        flashSize.textContent = flashMB ? `${flashMB} MB` : 'Unknown';
+                    }
+                    if (freeHeap) freeHeap.textContent = startup.system?.freeHeap ? `${Math.round(startup.system.freeHeap / 1024)} KB` : 'Unknown';
+                    if (wifiIP) wifiIP.textContent = startup.system?.wifiIP || 'Unknown';
+                    if (macAddress) macAddress.textContent = startup.system?.macAddress || 'Unknown';
+                    
+                    // Update Hardware Status elements
+                    const displayStatus = document.getElementById('displayStatus');
+                    const sensorStatus = document.getElementById('sensorStatus');
+                    
+                    if (displayStatus) displayStatus.textContent = startup.hardware?.display ? 'OK' : 'Error';
+                    if (sensorStatus) {
+                        // Count working sensors
+                        const workingSensors = [
+                            startup.hardware?.indoorBME,
+                            startup.hardware?.outdoorBME,
+                            startup.hardware?.garageBME
+                        ].filter(Boolean).length;
+                        sensorStatus.textContent = `${workingSensors}/3 OK`;
+                    }
+                    
+                    // Calculate health percentage based on available metrics
+                    const gaugeContainer = document.querySelector('.gauge-container');
+                    if (gaugeContainer) {
+                        let healthScore = 100;
+                        
+                        // Reduce score based on WiFi signal strength
+                        const signal = startup.system?.signalStrength;
+                        if (signal && signal < -70) healthScore -= 20;
+                        else if (signal && signal < -50) healthScore -= 10;
+                        
+                        // Reduce score based on memory usage
+                        const freeHeap = startup.system?.freeHeap;
+                        const heapSize = startup.system?.heapSize;
+                        if (freeHeap && heapSize) {
+                            const memoryUsed = ((heapSize - freeHeap) / heapSize) * 100;
+                            if (memoryUsed > 80) healthScore -= 20;
+                            else if (memoryUsed > 60) healthScore -= 10;
+                        }
+                        
+                        // Check hardware status
+                        const hardware = startup.hardware;
+                        if (hardware) {
+                            let workingComponents = 0;
+                            let totalComponents = 0;
+                            
+                            if (hardware.indoorBME !== undefined) { totalComponents++; if (hardware.indoorBME) workingComponents++; }
+                            if (hardware.outdoorBME !== undefined) { totalComponents++; if (hardware.outdoorBME) workingComponents++; }
+                            if (hardware.garageBME !== undefined) { totalComponents++; if (hardware.garageBME) workingComponents++; }
+                            if (hardware.display !== undefined) { totalComponents++; if (hardware.display) workingComponents++; }
+                            
+                            if (totalComponents > 0) {
+                                const hardwareHealth = (workingComponents / totalComponents) * 100;
+                                if (hardwareHealth < 100) {
+                                    healthScore = Math.min(healthScore, hardwareHealth + 20);
+                                }
+                            }
+                        }
+                        
+                        healthScore = Math.max(0, Math.min(100, healthScore));
+                        gaugeContainer.style.setProperty('--health-percentage', `${healthScore}%`);
+                        
+                        // Update the percentage text in the donut chart with detailed tooltip
+                        const healthPercentageElement = document.getElementById('systemHealthPercentage');
+                        if (healthPercentageElement) {
+                            healthPercentageElement.textContent = `${Math.round(healthScore)}%`;
+                            
+                            // Add detailed tooltip explaining the health score
+                            let healthDescription = 'Overall System Health Score\n';
+                            healthDescription += 'Factors: Hardware + WiFi + Memory\n\n';
+                            
+                            if (hardware) {
+                                const workingComponents = [
+                                    hardware.indoorBME && 'Indoor BME280',
+                                    hardware.outdoorBME && 'Outdoor BME280', 
+                                    hardware.garageBME && 'Garage BME280',
+                                    hardware.display && 'eInk Display'
+                                ].filter(Boolean);
+                                healthDescription += `Hardware: ${workingComponents.length}/4 sensors working\n`;
+                            }
+                            
+                            const signal = startup.system?.signalStrength;
+                            if (signal) {
+                                const signalImpact = signal < -70 ? '-20pts' : signal < -50 ? '-10pts' : '0pts';
+                                healthDescription += `WiFi: ${signal} dBm (${signalImpact})\n`;
+                            }
+                            
+                            const freeHeap = startup.system?.freeHeap;
+                            const heapSize = startup.system?.heapSize;
+                            if (freeHeap && heapSize) {
+                                const memoryUsed = Math.round(((heapSize - freeHeap) / heapSize) * 100);
+                                const memoryImpact = memoryUsed > 80 ? '-20pts' : memoryUsed > 60 ? '-10pts' : '0pts';
+                                healthDescription += `Memory: ${memoryUsed}% used (${memoryImpact})`;
+                            }
+                            
+                            healthPercentageElement.title = healthDescription;
+                        }
+                    }
                 } else {
                     console.log('No startup data available in sections');
                     if (lastBootInfo) lastBootInfo.textContent = 'No boot data available';
@@ -2148,245 +2291,6 @@ async function refreshData() {
                 console.error('updateSystemHealthWidget failed:', error);
                 if (lastBootInfo) lastBootInfo.textContent = 'Failed to load boot information';
                 if (bootReasonInfo) bootReasonInfo.textContent = 'Error';
-            }
-                        console.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
-                        console.log('updateSystemHealthWidget: Startup system:', startup.system);
-                        
-                        // Update boot information only (health metrics UI removed)
-                        // Note: lastBootInfo and bootReasonInfo already declared at top of function
-                        
-                        // Update boot information
-                        if (lastBootInfo) {
-                            // Format boot time from timestamp
-                            if (startup.bootTime) {
-                                const bootDate = new Date(parseInt(startup.bootTime) * 1000);
-                                lastBootInfo.textContent = bootDate.toLocaleString();
-                            } else {
-                                lastBootInfo.textContent = 'Boot time unavailable';
-                            }
-                        }
-                        
-                        if (bootReasonInfo) {
-                            // Use bootReason field (not boot_reason)
-                            bootReasonInfo.textContent = `Reason: ${startup.bootReason || 'Unknown'}`;
-                        }
-                        
-                        // Update System Specifications elements
-                        const chipModel = document.getElementById('chipModel');
-                        const cpuFreq = document.getElementById('cpuFreq');
-                        const flashSize = document.getElementById('flashSize');
-                        const freeHeap = document.getElementById('freeHeap');
-                        const wifiIP = document.getElementById('wifiIP');
-                        const macAddress = document.getElementById('macAddress');
-                        
-                        if (chipModel) chipModel.textContent = startup.system?.chipModel || startup.systemStatus?.chipModel || 'Unknown';
-                        if (cpuFreq) cpuFreq.textContent = (startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency) ? `${startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency} MHz` : 'Unknown';
-                        if (flashSize) {
-                            // Try multiple data paths for Flash size - some APIs store in bytes, others in MB
-                            const flashFromSystem = startup.system?.flashSize;
-                            const flashFromStatus = startup.systemStatus?.flashSize;
-                            
-                            let flashMB = null;
-                            if (flashFromSystem) {
-                                // If > 100, likely in bytes, convert to MB
-                                flashMB = flashFromSystem > 100 ? Math.round(flashFromSystem / (1024 * 1024)) : flashFromSystem;
-                            } else if (flashFromStatus) {
-                                // systemStatus.flashSize is typically already in MB
-                                flashMB = flashFromStatus;
-                            }
-                            
-                            flashSize.textContent = flashMB ? `${flashMB} MB` : 'Unknown';
-                        }
-                        if (freeHeap) freeHeap.textContent = startup.system?.freeHeap ? `${Math.round(startup.system.freeHeap / 1024)} KB` : 'Unknown';
-                        if (wifiIP) wifiIP.textContent = startup.system?.wifiIP || 'Unknown';
-                        if (macAddress) macAddress.textContent = startup.system?.macAddress || 'Unknown';
-                        
-                        // Update Hardware Status elements
-                        const displayStatus = document.getElementById('displayStatus');
-                        const sensorStatus = document.getElementById('sensorStatus');
-                        
-                        if (displayStatus) displayStatus.textContent = startup.hardware?.display ? 'OK' : 'Error';
-                        if (sensorStatus) {
-                            // Count working sensors
-                            const workingSensors = [
-                                startup.hardware?.indoorBME,
-                                startup.hardware?.outdoorBME,
-                                startup.hardware?.garageBME
-                            ].filter(Boolean).length;
-                            sensorStatus.textContent = `${workingSensors}/3 OK`;
-                        }
-                        
-                        // Note: Relay and Watchdog status are updated in updateDashboard() function
-                        // to avoid conflicts with the more detailed status display
-                        
-                        // Calculate health percentage based on available metrics
-                        const gaugeContainer = document.querySelector('.gauge-container');
-                        if (gaugeContainer) {
-                            let healthScore = 100;
-                            
-                            // Reduce score based on WiFi signal strength
-                            const signal = startup.system?.signalStrength;
-                            if (signal && signal < -70) healthScore -= 20;
-                            else if (signal && signal < -50) healthScore -= 10;
-                            
-                            // Reduce score based on memory usage
-                            const freeHeap = startup.system?.freeHeap;
-                            const heapSize = startup.system?.heapSize;
-                            if (freeHeap && heapSize) {
-                                const memoryUsed = ((heapSize - freeHeap) / heapSize) * 100;
-                                if (memoryUsed > 80) healthScore -= 20;
-                                else if (memoryUsed > 60) healthScore -= 10;
-                            }
-                            
-                            // Check hardware status
-                            const hardware = startup.hardware;
-                            if (hardware) {
-                                let workingComponents = 0;
-                                let totalComponents = 0;
-                                
-                                if (hardware.indoorBME !== undefined) { totalComponents++; if (hardware.indoorBME) workingComponents++; }
-                                if (hardware.outdoorBME !== undefined) { totalComponents++; if (hardware.outdoorBME) workingComponents++; }
-                                if (hardware.garageBME !== undefined) { totalComponents++; if (hardware.garageBME) workingComponents++; }
-                                if (hardware.display !== undefined) { totalComponents++; if (hardware.display) workingComponents++; }
-                                
-                                if (totalComponents > 0) {
-                                    const hardwareHealth = (workingComponents / totalComponents) * 100;
-                                    if (hardwareHealth < 100) {
-                                        healthScore = Math.min(healthScore, hardwareHealth + 20);
-                                    }
-                                }
-                            }
-                            
-                            healthScore = Math.max(0, Math.min(100, healthScore));
-                            gaugeContainer.style.setProperty('--health-percentage', `${healthScore}%`);
-                            
-                            // Update the percentage text in the donut chart with detailed tooltip
-                            const healthPercentageElement = document.getElementById('systemHealthPercentage');
-                            if (healthPercentageElement) {
-                                healthPercentageElement.textContent = `${Math.round(healthScore)}%`;
-                                
-                                // Add detailed tooltip explaining the health score
-                                let healthDescription = 'Overall System Health Score\n';
-                                healthDescription += 'Factors: Hardware + WiFi + Memory\n\n';
-                                
-                                if (hardware) {
-                                    const workingComponents = [
-                                        hardware.indoorBME && 'Indoor BME280',
-                                        hardware.outdoorBME && 'Outdoor BME280', 
-                                        hardware.garageBME && 'Garage BME280',
-                                        hardware.display && 'eInk Display'
-                                    ].filter(Boolean);
-                                    healthDescription += `Hardware: ${workingComponents.length}/4 sensors working\n`;
-                                }
-                                
-                                const signal = startup.system?.signalStrength;
-                                if (signal) {
-                                    const signalImpact = signal < -70 ? '-20pts' : signal < -50 ? '-10pts' : '0pts';
-                                    healthDescription += `WiFi: ${signal} dBm (${signalImpact})\n`;
-                                }
-                                
-                                const freeHeap = startup.system?.freeHeap;
-                                const heapSize = startup.system?.heapSize;
-                                if (freeHeap && heapSize) {
-                                    const memoryUsed = Math.round(((heapSize - freeHeap) / heapSize) * 100);
-                                    const memoryImpact = memoryUsed > 80 ? '-20pts' : memoryUsed > 60 ? '-10pts' : '0pts';
-                                    healthDescription += `Memory: ${memoryUsed}% used (${memoryImpact})`;
-                                }
-                                
-                                healthPercentageElement.title = healthDescription;
-                            }
-                        }
-                    } else {
-                        console.log('No startup data available in sections');
-                        if (lastBootInfo) lastBootInfo.textContent = 'No boot data available';
-                        if (bootReasonInfo) bootReasonInfo.textContent = 'No data';
-                    }
-                    
-                } catch (error) {
-                    console.error('updateSystemHealthWidget failed:', error);
-                    if (lastBootInfo) lastBootInfo.textContent = 'Failed to load boot information';
-                    if (bootReasonInfo) bootReasonInfo.textContent = 'Error';
-                }
-            }
-                        
-                        if (lastBootInfo) lastBootInfo.textContent = 'Boot information pending';
-                        if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Pending';
-                        
-                        // Handle System Specifications waiting states
-                        const chipModel = document.getElementById('chipModel');
-                        const cpuFreq = document.getElementById('cpuFreq');
-                        const flashSize = document.getElementById('flashSize');
-                        const freeHeap = document.getElementById('freeHeap');
-                        const wifiIP = document.getElementById('wifiIP');
-                        const macAddress = document.getElementById('macAddress');
-                        
-                        if (chipModel) chipModel.textContent = 'Waiting...';
-                        if (cpuFreq) cpuFreq.textContent = 'Waiting...';
-                        if (flashSize) flashSize.textContent = 'Waiting...';
-                        if (freeHeap) freeHeap.textContent = 'Waiting...';
-                        if (wifiIP) wifiIP.textContent = 'Waiting...';
-                        if (macAddress) macAddress.textContent = 'Waiting...';
-                        
-                        // Handle Hardware Status waiting states
-                        const displayStatus = document.getElementById('displayStatus');
-                        const sensorStatus = document.getElementById('sensorStatus');
-                        const relayStatus = document.getElementById('relayStatus');
-                        const watchdogStatus = document.getElementById('watchdogStatus');
-                        
-                        if (displayStatus) displayStatus.textContent = 'Waiting...';
-                        if (sensorStatus) sensorStatus.textContent = 'Waiting...';
-                        if (relayStatus) relayStatus.textContent = 'Unknown';
-                        if (watchdogStatus) watchdogStatus.textContent = 'Unknown';
-                    }
-                })
-                .catch(error => {
-                    console.error('DataManager: Error loading enhanced data for system health widget:', error);
-                    
-                    // Show error states for remaining elements
-                    const lastBootInfo = document.getElementById('lastBootInfo');
-                    const bootReasonInfo = document.getElementById('bootReasonInfo');
-                    
-                    if (lastBootInfo) lastBootInfo.textContent = 'Boot information unavailable';
-                    if (bootReasonInfo) bootReasonInfo.textContent = 'Reason: Data not available';
-                    
-                    // Handle System Specifications error states
-                    const chipModel = document.getElementById('chipModel');
-                    const cpuFreq = document.getElementById('cpuFreq');
-                    const flashSize = document.getElementById('flashSize');
-                    const freeHeap = document.getElementById('freeHeap');
-                    const wifiIP = document.getElementById('wifiIP');
-                    const macAddress = document.getElementById('macAddress');
-                    
-                    if (chipModel) chipModel.textContent = 'Error';
-                    if (cpuFreq) cpuFreq.textContent = 'Error';
-                    if (flashSize) flashSize.textContent = 'Error';
-                    if (freeHeap) freeHeap.textContent = 'Error';
-                    if (wifiIP) wifiIP.textContent = 'Error';
-                    if (macAddress) macAddress.textContent = 'Error';
-                    
-                    // Handle System Configuration error state - FIX for stuck "Loading configuration..."
-                    const systemConfigElement = document.getElementById('systemConfig');
-                    if (systemConfigElement) systemConfigElement.textContent = 'Configuration unavailable';
-                    
-                    // Handle Hardware Status error states
-                    const displayStatus = document.getElementById('displayStatus');
-                    const sensorStatus = document.getElementById('sensorStatus');
-                    const relayStatus = document.getElementById('relayStatus');
-                    const watchdogStatus = document.getElementById('watchdogStatus');
-                    
-                    if (displayStatus) displayStatus.textContent = 'Error';
-                    if (sensorStatus) sensorStatus.textContent = 'Error';
-                    if (relayStatus) relayStatus.textContent = 'Unknown';
-                    if (watchdogStatus) watchdogStatus.textContent = 'Unknown';
-                    
-                    // Show error state in gauge
-                    updateSystemHealthGauge(0);
-                });
-            
-            // Update health gauge percentage
-            const gauge = document.querySelector('.gauge-container');
-            if (gauge) {
-                gauge.style.setProperty('--health-percentage', '98%');
             }
         }
 
