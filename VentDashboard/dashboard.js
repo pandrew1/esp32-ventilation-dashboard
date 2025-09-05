@@ -2153,8 +2153,7 @@ async function refreshData() {
                         console.log('updateSystemHealthWidget: Startup system:', startup.system);
                         
                         // Update boot information only (health metrics UI removed)
-                        const lastBootInfo = document.getElementById('lastBootInfo');
-                        const bootReasonInfo = document.getElementById('bootReasonInfo');
+                        // Note: lastBootInfo and bootReasonInfo already declared at top of function
                         
                         // Update boot information
                         if (lastBootInfo) {
