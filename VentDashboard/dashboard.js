@@ -3007,6 +3007,12 @@ async function refreshData() {
                     return;
                 }
                 
+                // DEBUG: Show what fields are actually available in the first record
+                if (historyData.length > 0) {
+                    console.log('DEBUG: First record fields:', Object.keys(historyData[0]));
+                    console.log('DEBUG: First record sample:', historyData[0]);
+                }
+                
                 // Process individual sensor data from VentilationData records
                 const sensorStats = {
                     indoor: { temps: [], humidity: [], pressure: [] },
