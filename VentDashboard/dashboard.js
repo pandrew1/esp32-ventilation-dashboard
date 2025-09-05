@@ -205,7 +205,7 @@ const ValidationUtils = {
     },
 
     isValidPressureReading(pressure) {
-        return pressure && typeof pressure === 'number' && pressure > 25 && pressure < 35;
+        return pressure && typeof pressure === 'number' && pressure > 900 && pressure < 1100;
     }
 };
 
@@ -1373,7 +1373,7 @@ async function refreshData() {
                                     <li><strong>Garage Sensor:</strong> [Need GarageTemp data from VentilationData]</li>
                                 </ul>
                                 <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
-                                <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} inHg</p>
+                                <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} hPa</p>
                                 <p><em>⚠️ Air Quality removed - no PM2.5 sensor available</em></p>
                             </div>
                         `;
@@ -1498,9 +1498,9 @@ async function refreshData() {
                         document.getElementById('yesterdayPressure').innerHTML = `
                             <div class="pressure-analysis">
                                 <h4>🌪️ Pressure Analysis</h4>
-                                <p><strong>Pressure Range:</strong> ${env.pressureMin || '--'} → ${env.pressureMax || '--'} inHg</p>
-                                <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(2) : '--'} inHg</p>
-                                <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 0.1 ? 'Stable' : 'Variable'}</p>
+                                <p><strong>Pressure Range:</strong> ${env.pressureMin || '--'} → ${env.pressureMax || '--'} hPa</p>
+                                <p><strong>Pressure Variation:</strong> ${env.pressureMax && env.pressureMin ? (env.pressureMax - env.pressureMin).toFixed(1) : '--'} hPa</p>
+                                <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 2.0 ? 'Stable' : 'Variable'}</p>
                                 <p><strong>Storm Risk Assessment:</strong> Based on pressure trends</p>
                                 <p><em>⚠️ Need individual sensor pressure data:</em></p>
                                 <ul>
@@ -3711,15 +3711,15 @@ async function refreshData() {
             
             document.getElementById('indoorTemp').textContent = indoor.temp != null ? `${indoor.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('indoorHumidity').textContent = indoor.humidity != null ? `${indoor.humidity.toFixed(0)}%` : 'No data';
-            document.getElementById('indoorPressure').textContent = indoor.pressure != null ? `${indoor.pressure.toFixed(2)} inHg` : 'No data';
+            document.getElementById('indoorPressure').textContent = indoor.pressure != null ? `${indoor.pressure.toFixed(1)} hPa` : 'No data';
             
             document.getElementById('outdoorTemp').textContent = outdoor.temp != null ? `${outdoor.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('outdoorHumidity').textContent = outdoor.humidity != null ? `${outdoor.humidity.toFixed(0)}%` : 'No data';
-            document.getElementById('outdoorPressure').textContent = outdoor.pressure != null ? `${outdoor.pressure.toFixed(2)} inHg` : 'No data';
+            document.getElementById('outdoorPressure').textContent = outdoor.pressure != null ? `${outdoor.pressure.toFixed(1)} hPa` : 'No data';
             
             document.getElementById('garageTemp').textContent = garage.temp != null ? `${garage.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('garageHumidity').textContent = garage.humidity != null ? `${garage.humidity.toFixed(0)}%` : 'No data';
-            document.getElementById('garagePressure').textContent = garage.pressure != null ? `${garage.pressure.toFixed(2)} inHg` : 'No data';
+            document.getElementById('garagePressure').textContent = garage.pressure != null ? `${garage.pressure.toFixed(1)} hPa` : 'No data';
 
             // Update system status with proper null/undefined handling
             const system = data.system || {};
