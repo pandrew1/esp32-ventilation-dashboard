@@ -2022,7 +2022,7 @@ async function refreshData() {
                 console.log('DataManager: Enhanced data received for door activity');
                 
                 // Extract door activity data from sections
-                const doorData = data.sections && data.sections.doorActivity;
+                const doorData = data.sections && data.sections.doors;
                 if (doorData) {
                     // Process door activity data
                     console.log('Door activity data found:', doorData);
