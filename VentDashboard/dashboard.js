@@ -1095,8 +1095,8 @@ async function refreshData() {
                 await loadChartsWithModularSystem();
             } else {
                 // Fallback to legacy chart loading
-                await loadChart(6); // Load 6-hour chart by default
-                await loadPressureChart(6); // Load 6-hour pressure chart by default
+                await createTemperatureChart(6); // Load 6-hour chart by default
+                await createPressureChart(6); // Load 6-hour pressure chart by default
             }
             
             await loadIncidentAlmanac();
@@ -1176,8 +1176,8 @@ async function refreshData() {
                 
             } catch (error) {
                 console.error('STAGE 5: Enhanced chart loading failed, falling back to legacy:', error);
-                await loadChart(6);
-                await loadPressureChart(6);
+                await createTemperatureChart(6);
+                await createPressureChart(6);
             }
         }
 
@@ -1185,7 +1185,7 @@ async function refreshData() {
         /**
          * Loads temperature chart for specified time period using modular system
          * Uses GlobalChartManager for intelligent updates and emits chart update events
-         * Falls back to legacy loadChart() if modular system is unavailable
+         * Falls back to legacy createTemperatureChart() if modular system is unavailable
          * @param {number} hours - Number of hours of data to display
          * @returns {void}
          */
@@ -1200,17 +1200,17 @@ async function refreshData() {
                     })
                     .catch(error => {
                         console.error('STAGE 5: Enhanced temperature chart update failed:', error);
-                        loadChart(hours); // Fallback
+                        createTemperatureChart(hours); // Fallback
                     });
             } else {
-                loadChart(hours); // Fallback
+                createTemperatureChart(hours); // Fallback
             }
         }
 
         /**
          * Loads pressure chart for specified time period using modular system
          * Uses GlobalChartManager for intelligent updates and emits chart update events
-         * Falls back to legacy loadPressureChart() if modular system is unavailable
+         * Falls back to legacy createPressureChart() if modular system is unavailable
          * @param {number} hours - Number of hours of data to display
          * @returns {void}
          */
@@ -1225,10 +1225,10 @@ async function refreshData() {
                     })
                     .catch(error => {
                         console.error('STAGE 5: Enhanced pressure chart update failed:', error);
-                        loadPressureChart(hours); // Fallback
+                        createPressureChart(hours); // Fallback
                     });
             } else {
-                loadPressureChart(hours); // Fallback
+                createPressureChart(hours); // Fallback
             }
         }
 
@@ -1678,6 +1678,150 @@ async function refreshData() {
         }
 
         /**
+         * PHASE 2 FIX: Loads yesterday's summary metrics using Enhanced Dashboard API
+         * Uses GetEnhancedDashboardData with pre-calculated sections.yesterday data
+         * Shows real values (74.8°F, 27.6%, 6.62h) instead of N/A placeholders
+         * @returns {Promise<void>}
+         */
+        async function loadYesterdaySummaryFromEnhancedAPI() {
+            console.log('=== PHASE 2 FIX: loadYesterdaySummaryFromEnhancedAPI() using sections.yesterday ===');
+            
+            // Helper function to set waiting state
+            const setYesterdayMetricsToWaiting = () => {
+                const waitingText = 'Waiting for data';
+                
+                const safeUpdate = (id, text) => {
+                    const element = document.getElementById(id);
+                    if (element) element.textContent = text;
+                };
+                
+                safeUpdate('yesterdayAvgTemp', waitingText);
+                safeUpdate('yesterdayTempRange', waitingText);
+                safeUpdate('yesterdayTempTrend', 'Pending');
+                safeUpdate('yesterdayEfficiency', waitingText);
+                safeUpdate('yesterdayRuntime', waitingText);
+                safeUpdate('yesterdayEfficiencyTrend', 'Pending');
+                safeUpdate('yesterdayDoorsActive', waitingText);
+                safeUpdate('yesterdaySessions', waitingText);
+                safeUpdate('yesterdayPeakTime', 'Pending');
+                safeUpdate('yesterdaySystemHealth', waitingText);
+                safeUpdate('yesterdayIncidents', waitingText);
+                safeUpdate('yesterdayUptime', 'Pending');
+            };
+            
+            try {
+                const headers = getAuthHeaders();
+                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                
+                if (!hasAuth) {
+                    console.log('loadYesterdaySummaryFromEnhancedAPI: No authentication available');
+                    setYesterdayMetricsToWaiting();
+                    return;
+                }
+
+                // Use DataManager to get Enhanced Dashboard Data
+                const data = await DataManager.getEnhancedData();
+                console.log('PHASE 2 FIX: Enhanced data received for summary metrics');
+                
+                // PHASE 2 FIX: Access data at sections.yesterday (not response.yesterday)
+                const yesterdayData = data.sections && data.sections.yesterday;
+                if (!yesterdayData) {
+                    console.log('PHASE 2 FIX: Yesterday section not found in sections.yesterday');
+                    setYesterdayMetricsToWaiting();
+                    return;
+                }
+
+                console.log('PHASE 2 FIX: Yesterday data structure:', yesterdayData);
+
+                // Helper function to safely update DOM elements
+                const safeUpdate = (id, text, className = null) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = text;
+                        if (className) element.className = className;
+                    } else {
+                        console.warn(`PHASE 2 FIX: Element with id '${id}' not found`);
+                    }
+                };
+
+                // PHASE 2 FIX: Update temperature metrics using sections.yesterday.environmental
+                if (yesterdayData.environmental) {
+                    const env = yesterdayData.environmental;
+                    safeUpdate('yesterdayAvgTemp', env.tempAvg ? `${env.tempAvg}°F` : 'N/A');
+                    safeUpdate('yesterdayTempRange', env.tempMin && env.tempMax ? `${env.tempMin}° - ${env.tempMax}°` : 'N/A');
+                    safeUpdate('yesterdayTempTrend', env.tempAvg ? 'Real data ✅' : 'No data', 'metric-trend positive');
+                } else {
+                    safeUpdate('yesterdayAvgTemp', 'N/A');
+                    safeUpdate('yesterdayTempRange', 'N/A');
+                    safeUpdate('yesterdayTempTrend', 'No environmental data', 'metric-trend neutral');
+                }
+
+                // PHASE 2 FIX: Update efficiency metrics using sections.yesterday.performance
+                if (yesterdayData.performance) {
+                    const perf = yesterdayData.performance;
+                    safeUpdate('yesterdayEfficiency', perf.efficiency ? `${perf.efficiency}%` : 'N/A');
+                    safeUpdate('yesterdayRuntime', perf.runtime ? `${perf.runtime} hrs runtime` : 'N/A');
+                    safeUpdate('yesterdayEfficiencyTrend', perf.efficiency ? 'Real data ✅' : 'No data', 'metric-trend positive');
+                } else {
+                    safeUpdate('yesterdayEfficiency', 'N/A');
+                    safeUpdate('yesterdayRuntime', 'N/A');
+                    safeUpdate('yesterdayEfficiencyTrend', 'No performance data', 'metric-trend neutral');
+                }
+
+                // PHASE 2 FIX: Update door activity (use correct DOM element names)
+                if (yesterdayData.doors) {
+                    const doors = yesterdayData.doors;
+                    // FIXED: Use yesterdayDoorsActive (not yesterdayDoorEvents)
+                    safeUpdate('yesterdayDoorsActive', doors.activeCount ? `${doors.activeCount}/${doors.totalDoors}` : 'See below');
+                    safeUpdate('yesterdaySessions', doors.sessions ? `${doors.sessions} sessions` : 'See timeline');
+                    // FIXED: Use yesterdayPeakTime (not yesterdayDoorTrend) 
+                    safeUpdate('yesterdayPeakTime', doors.peakHour ? `Peak: ${doors.peakHour}` : 'Activity tracked', 'metric-trend positive');
+                } else {
+                    safeUpdate('yesterdayDoorsActive', 'See timeline below');
+                    safeUpdate('yesterdaySessions', 'See timeline below');
+                    safeUpdate('yesterdayPeakTime', 'Activity tracked', 'metric-trend neutral');
+                }
+
+                // Update system health metrics
+                if (yesterdayData.system || yesterdayData.incidents) {
+                    const system = yesterdayData.system || {};
+                    const incidents = yesterdayData.incidents || {};
+                    safeUpdate('yesterdaySystemHealth', system.healthScore ? `${system.healthScore}%` : 'See assessments');
+                    safeUpdate('yesterdayIncidents', incidents.totalCount ? `${incidents.totalCount} incidents` : 'See summary');
+                    safeUpdate('yesterdayUptime', system.uptime ? system.uptime : 'See assessments', 'metric-trend positive');
+                } else {
+                    safeUpdate('yesterdaySystemHealth', 'See assessments below');
+                    safeUpdate('yesterdayIncidents', 'See incident summary');
+                    safeUpdate('yesterdayUptime', 'See assessments below', 'metric-trend neutral');
+                }
+
+                console.log('PHASE 2 FIX: Yesterday summary updated with Enhanced API data from sections.yesterday');
+
+            } catch (error) {
+                console.error('PHASE 2 FIX: Enhanced API summary loading failed:', error);
+                // Use the same error handling as the raw data function
+                const safeUpdate = (id, text) => {
+                    const element = document.getElementById(id);
+                    if (element) element.textContent = text;
+                };
+                
+                const errorText = 'Error';
+                safeUpdate('yesterdayAvgTemp', errorText);
+                safeUpdate('yesterdayTempRange', 'Failed to load');
+                safeUpdate('yesterdayTempTrend', 'No data');
+                safeUpdate('yesterdayEfficiency', errorText);
+                safeUpdate('yesterdayRuntime', 'Failed to load');
+                safeUpdate('yesterdayEfficiencyTrend', 'No data');
+                safeUpdate('yesterdayDoorsActive', errorText);
+                safeUpdate('yesterdaySessions', 'Failed to load');
+                safeUpdate('yesterdayPeakTime', 'No data');
+                safeUpdate('yesterdaySystemHealth', errorText);
+                safeUpdate('yesterdayIncidents', 'Failed to load');
+                safeUpdate('yesterdayUptime', 'No data');
+            }
+        }
+
+        /**
          * Loads and displays yesterday's summary metrics in the dashboard
          * Fetches temperature, efficiency, door activity, and air quality metrics
          * Updates metric displays and handles authentication requirements
@@ -1685,7 +1829,7 @@ async function refreshData() {
          * @returns {void}
          */
         function loadYesterdaySummaryMetrics() {
-            console.log('=== ENHANCED: loadYesterdaySummaryMetrics() using raw data calculation ===');
+            console.log('=== PHASE 2 FIX: loadYesterdaySummaryMetrics() using Enhanced Dashboard API ===');
             
             // Show loading states for all metric elements
             const loadingText = 'Loading...';
@@ -1710,8 +1854,8 @@ async function refreshData() {
             document.getElementById('yesterdayIncidents').textContent = loadingText;
             document.getElementById('yesterdayUptime').textContent = loadingText;
             
-            // Use the enhanced summary calculation that works with raw VentilationData
-            calculateYesterdaySummaryFromRawData();
+            // Use the Enhanced Dashboard API data instead of raw calculation
+            loadYesterdaySummaryFromEnhancedAPI();
             
             // Helper function to set waiting state
             /**
@@ -4706,8 +4850,8 @@ async function refreshData() {
          * @param {number} hours - Number of hours of historical data to display
          * @returns {Promise<void>}
          */
-        async function loadChart(hours) {
-            console.log(`=== STAGE 3 FIX: loadChart(${hours}) using DataManager ===`);
+        async function createTemperatureChart(hours) {
+            console.log(`=== STAGE 3 FIX: createTemperatureChart(${hours}) using DataManager ===`);
             
             // Clear previous data source tracking to prevent accumulation
             if (window.dataSourceTracker) {
@@ -4719,7 +4863,7 @@ async function refreshData() {
             currentChartHours = hours;
             
             // Update active button using consolidated utility
-            ChartUtils.updateActiveButton('', hours, 'loadChart');
+            ChartUtils.updateActiveButton('', hours, 'createTemperatureChart');
 
             try {
                 const token = localStorage.getItem('ventilation_auth_token');
@@ -4770,8 +4914,8 @@ async function refreshData() {
         // Pressure chart now uses real data from Azure Functions API
         // The fetchPressureData sample function has been removed
 
-        async function loadPressureChart(hours) {
-            console.log(`=== STAGE 3 FIX: loadPressureChart(${hours}) using DataManager ===`);
+        async function createPressureChart(hours) {
+            console.log(`=== STAGE 3 FIX: createPressureChart(${hours}) using DataManager ===`);
             
             // Check if time range changed before updating currentPressureChartHours
             const previousHours = currentPressureChartHours;
@@ -4782,7 +4926,7 @@ async function refreshData() {
             currentPressureChartHours = hours;
             
             // Update active button using consolidated utility
-            ChartUtils.updateActiveButton('', hours, 'loadPressureChart');
+            ChartUtils.updateActiveButton('', hours, 'createPressureChart');
 
             try {
                 // Fetch real pressure and forecast data from Azure Functions API
@@ -5173,7 +5317,7 @@ async function refreshData() {
         // Function to refresh the pressure chart with current time period
         async function refreshCurrentPressureChart() {
             if (pressureChart && currentPressureChartHours) {
-                await loadPressureChart(currentPressureChartHours);
+                await createPressureChart(currentPressureChartHours);
             }
         }
 
