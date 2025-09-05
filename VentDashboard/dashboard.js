@@ -256,7 +256,8 @@ function getApiKeyFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     // FALLBACK: Return default API key if not provided in URL
     // This ensures dashboard works even without URL parameters
-    return urlParams.get('apikey') || urlParams.get('key') || 'VentilationSystem2025SecretKey';
+    // NEVER ADD THE APIKEY TO THE JS FILE SINCE IT IS CHECKED INTO A PUBLIC GIT REPO
+    return urlParams.get('apikey') || urlParams.get('key');
 }
 
 // Configuration - Replace with your actual Azure Function URLs
