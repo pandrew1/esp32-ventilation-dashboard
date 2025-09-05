@@ -1109,6 +1109,11 @@ async function refreshData() {
             await loadYesterdaySummaryMetrics();
             await updateEnhancedDoorActivity();
             await updateSystemHealthWidget();
+            
+            // ENHANCED: Load individual sensor data for accurate temperature readings
+            // This ensures the Yesterday Report shows accurate temperatures instead of N/A
+            await loadYesterdayIndividualSensorData();
+            
             // Note: Monthly aggregation status is handled by loadAggregationStatus() above
             
             // Start auto-refresh
