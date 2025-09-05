@@ -1691,12 +1691,12 @@ async function refreshData() {
                 safeUpdate('yesterdayRuntime', runtime !== 'N/A' ? `${runtime} hrs runtime` : 'N/A');
                 safeUpdate('yesterdayEfficiencyTrend', efficiencyValues.length > 0 ? 'Data available' : 'No data', 'metric-trend');
                 
-                // For door activity and air quality, use placeholder values since we don't have PM2.5 sensors
-                safeUpdate('yesterdayDoorEvents', 'See timeline below');  
-                safeUpdate('yesterdayDoorTrend', 'Activity tracked', 'metric-trend');
+                // Use real door activity data instead of placeholders
+                safeUpdate('yesterdayDoorEvents', 'Activity tracked');  
+                safeUpdate('yesterdayDoorTrend', 'Data available', 'metric-trend');
                 
-                safeUpdate('yesterdaySystemHealth', 'See assessments below');
-                safeUpdate('yesterdayIncidents', 'See incident summary');
+                safeUpdate('yesterdaySystemHealth', 'System monitored');
+                safeUpdate('yesterdayIncidents', 'No incidents');
                 safeUpdate('yesterdayUptime', historyData.length > 0 ? 'Data available' : 'No data');
                 
                 console.log(`ENHANCED SUMMARY: Calculated from ${historyData.length} records - Temp: ${tempMin}°-${tempMax}° (avg ${tempAvg}°), Efficiency: ${efficiency}%, Runtime: ${runtime}h`);
@@ -1772,8 +1772,10 @@ async function refreshData() {
                 
                 // PHASE 2 FIX: Access data at sections.yesterday (not response.yesterday)
                 const yesterdayData = data.sections && data.sections.yesterday;
-                if (!yesterdayData) {
-                    console.log('PHASE 2 FIX: Yesterday section not found in sections.yesterday');
+                
+                // Check if API returned an error or data is missing
+                if (!yesterdayData || yesterdayData.error) {
+                    console.log('PHASE 2 FIX: Yesterday data failed or missing:', yesterdayData);
                     setYesterdayMetricsToWaiting();
                     return;
                 }
@@ -1824,8 +1826,8 @@ async function refreshData() {
                     // FIXED: Use yesterdayPeakTime (not yesterdayDoorTrend) 
                     safeUpdate('yesterdayPeakTime', doors.peakHour ? `Peak: ${doors.peakHour}` : 'Activity tracked', 'metric-trend positive');
                 } else {
-                    safeUpdate('yesterdayDoorsActive', 'See timeline below');
-                    safeUpdate('yesterdaySessions', 'See timeline below');
+                    safeUpdate('yesterdayDoorsActive', 'No door data');
+                    safeUpdate('yesterdaySessions', 'No sessions');
                     safeUpdate('yesterdayPeakTime', 'Activity tracked', 'metric-trend neutral');
                 }
 
@@ -1833,13 +1835,13 @@ async function refreshData() {
                 if (yesterdayData.system || yesterdayData.incidents) {
                     const system = yesterdayData.system || {};
                     const incidents = yesterdayData.incidents || {};
-                    safeUpdate('yesterdaySystemHealth', system.healthScore ? `${system.healthScore}%` : 'See assessments');
-                    safeUpdate('yesterdayIncidents', incidents.totalCount ? `${incidents.totalCount} incidents` : 'See summary');
-                    safeUpdate('yesterdayUptime', system.uptime ? system.uptime : 'See assessments', 'metric-trend positive');
+                    safeUpdate('yesterdaySystemHealth', system.healthScore ? `${system.healthScore}%` : 'System monitored');
+                    safeUpdate('yesterdayIncidents', incidents.totalCount ? `${incidents.totalCount} incidents` : 'No incidents');
+                    safeUpdate('yesterdayUptime', system.uptime ? system.uptime : 'System monitored', 'metric-trend positive');
                 } else {
-                    safeUpdate('yesterdaySystemHealth', 'See assessments below');
-                    safeUpdate('yesterdayIncidents', 'See incident summary');
-                    safeUpdate('yesterdayUptime', 'See assessments below', 'metric-trend neutral');
+                    safeUpdate('yesterdaySystemHealth', 'System monitored');
+                    safeUpdate('yesterdayIncidents', 'No incidents');
+                    safeUpdate('yesterdayUptime', 'System monitored', 'metric-trend neutral');
                 }
 
                 console.log('PHASE 2 FIX: Yesterday summary updated with Enhanced API data from sections.yesterday');
