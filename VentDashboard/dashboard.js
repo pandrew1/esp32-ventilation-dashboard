@@ -1120,6 +1120,13 @@ async function refreshData() {
             if (GlobalDataManager) {
                 // Use enhanced data manager
                 await refreshDataWithModularSystem();
+                // ADDITIONAL FIX: Ensure main sensor data is loaded even if modular system has issues
+                console.log('INITIALIZATION: Ensuring sensor data is loaded for main widgets...');
+                try {
+                    await refreshData(); // Also call legacy refresh to populate main widgets
+                } catch (error) {
+                    console.error('INITIALIZATION: Legacy refresh also failed:', error);
+                }
             } else {
                 // Fallback to legacy data refresh
                 await refreshData();
@@ -1173,7 +1180,8 @@ async function refreshData() {
                 const statusData = await GlobalDataManager.getStatusData();
                 if (statusData && statusData.length > 0) {
                     const latestRecord = statusData[statusData.length - 1];
-                    updateMainDisplay(latestRecord);
+                    // FIX: Use correct updateDashboard() function instead of missing updateMainDisplay()
+                    updateDashboard(latestRecord);
                     GlobalEventSystem.emit('data:updated', { type: 'status', count: statusData.length });
                 }
                 
@@ -1182,7 +1190,8 @@ async function refreshData() {
                     console.log('STAGE 5: Status data subscription update received');
                     if (data && data.length > 0) {
                         const latestRecord = data[data.length - 1];
-                        updateMainDisplay(latestRecord);
+                        // FIX: Use correct updateDashboard() function instead of missing updateMainDisplay()
+                        updateDashboard(latestRecord);
                     }
                 });
                 
