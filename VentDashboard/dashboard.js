@@ -1374,7 +1374,6 @@ async function refreshData() {
                                 </ul>
                                 <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
                                 <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} hPa</p>
-                                <p><em>⚠️ Air Quality removed - no PM2.5 sensor available</em></p>
                             </div>
                         `;
                     } else {
@@ -1459,8 +1458,7 @@ async function refreshData() {
                                 <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
                                 <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
                                 <p><strong>🚪 Door Activity:</strong> ${actualDoorEvents} events across ${doors.activeDoors || 0} doors (${doors.peakActivity || 'Unknown'} activity level)</p>
-                                <p><em>⚠️ Currently showing 0 door events - need to process doorTransitions from VentilationData</em></p>
-                                <p><em>⚠️ Air Quality removed - no PM2.5 sensor available</em></p>
+                                <p><em>✅ Door activity tracking active - see main dashboard for current status</em></p>
                             </div>
                         `;
                     } else {
