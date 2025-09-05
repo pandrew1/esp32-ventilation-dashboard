@@ -3038,6 +3038,7 @@ async function refreshData() {
                 
                 // Calculate statistics for each sensor
                 const calculateStats = (values) => {
+                    console.log('DEBUG calculateStats called with:', values.length, 'values, sample:', values.slice(0, 3));
                     if (values.length === 0) return { min: 'N/A', max: 'N/A', avg: 'N/A' };
                     const min = Math.min(...values).toFixed(1);
                     const max = Math.max(...values).toFixed(1);
@@ -3095,6 +3096,16 @@ async function refreshData() {
                         <p><em>✅ Accurate data from individual BME280 sensors</em></p>
                     </div>
                 `;
+                
+                // DEBUG: Show what values were extracted
+                console.log('DEBUG: Extracted data counts:', {
+                    indoorTemps: sensorStats.indoor.temps.length,
+                    outdoorTemps: sensorStats.outdoor.temps.length,
+                    garageTemps: sensorStats.garage.temps.length,
+                    indoorHumidity: sensorStats.indoor.humidity.length,
+                    sampleIndoorTemp: sensorStats.indoor.temps.slice(0, 3),
+                    sampleOutdoorTemp: sensorStats.outdoor.temps.slice(0, 3)
+                });
                 
                 console.log(`ENHANCED SENSOR DATA: Processed ${historyData.length} records for individual sensor analysis`);
                 
