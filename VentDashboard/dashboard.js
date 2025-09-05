@@ -1817,27 +1817,50 @@ async function refreshData() {
                     safeUpdate('yesterdayEfficiencyTrend', 'No performance data', 'metric-trend neutral');
                 }
 
-                // PHASE 2 FIX: Update door activity (use correct DOM element names)
+                // PHASE 2 FIX: Update door activity (use correct data from API)
                 if (yesterdayData.doors) {
                     const doors = yesterdayData.doors;
-                    // FIXED: Use yesterdayDoorsActive (not yesterdayDoorEvents)
-                    safeUpdate('yesterdayDoorsActive', doors.activeCount ? `${doors.activeCount}/${doors.totalDoors}` : 'See below');
-                    safeUpdate('yesterdaySessions', doors.sessions ? `${doors.sessions} sessions` : 'See timeline');
-                    // FIXED: Use yesterdayPeakTime (not yesterdayDoorTrend) 
-                    safeUpdate('yesterdayPeakTime', doors.peakHour ? `Peak: ${doors.peakHour}` : 'Activity tracked', 'metric-trend positive');
+                    // API provides: activeDoors, totalEvents, mostActive
+                    const activeDoors = doors.activeDoors || 0;
+                    const totalDoors = doors.totalDoors || 0;
+                    const totalEvents = doors.totalEvents || 0;
+                    const mostActive = doors.mostActive || 'None';
+                    
+                    // Show meaningful door activity summary
+                    if (totalEvents > 0) {
+                        safeUpdate('yesterdayDoorsActive', `${totalEvents} events across ${activeDoors} doors`);
+                        safeUpdate('yesterdaySessions', `${mostActive} most active`);
+                        safeUpdate('yesterdayPeakTime', doors.usagePattern || 'Activity tracked', 'metric-trend positive');
+                    } else {
+                        safeUpdate('yesterdayDoorsActive', `${activeDoors}/${totalDoors} doors monitored`);
+                        safeUpdate('yesterdaySessions', 'No activity');
+                        safeUpdate('yesterdayPeakTime', 'Activity tracked', 'metric-trend neutral');
+                    }
                 } else {
                     safeUpdate('yesterdayDoorsActive', 'No door data');
                     safeUpdate('yesterdaySessions', 'No sessions');
                     safeUpdate('yesterdayPeakTime', 'Activity tracked', 'metric-trend neutral');
                 }
 
-                // Update system health metrics
-                if (yesterdayData.system || yesterdayData.incidents) {
-                    const system = yesterdayData.system || {};
+                // Update system health metrics (use correct data from API)
+                if (yesterdayData.incidents || yesterdayData.assessments) {
                     const incidents = yesterdayData.incidents || {};
-                    safeUpdate('yesterdaySystemHealth', system.healthScore ? `${system.healthScore}%` : 'System monitored');
-                    safeUpdate('yesterdayIncidents', incidents.totalCount ? `${incidents.totalCount} incidents` : 'No incidents');
-                    safeUpdate('yesterdayUptime', system.uptime ? system.uptime : 'System monitored', 'metric-trend positive');
+                    const assessments = yesterdayData.assessments || {};
+                    
+                    // API provides: totalIncidents, overallStatus
+                    const totalIncidents = incidents.totalIncidents || 0;
+                    const systemStatus = assessments.overallStatus || 'System monitored';
+                    
+                    // Show meaningful system health summary
+                    if (totalIncidents === 0) {
+                        safeUpdate('yesterdaySystemHealth', '✅ System healthy');
+                        safeUpdate('yesterdayIncidents', `${totalIncidents} incidents detected`);
+                        safeUpdate('yesterdayUptime', systemStatus, 'metric-trend positive');
+                    } else {
+                        safeUpdate('yesterdaySystemHealth', `${totalIncidents} issues detected`);
+                        safeUpdate('yesterdayIncidents', `${totalIncidents} incidents`);
+                        safeUpdate('yesterdayUptime', systemStatus, 'metric-trend negative');
+                    }
                 } else {
                     safeUpdate('yesterdaySystemHealth', 'System monitored');
                     safeUpdate('yesterdayIncidents', 'No incidents');
