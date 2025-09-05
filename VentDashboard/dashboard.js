@@ -1439,16 +1439,19 @@ async function refreshData() {
                         
                         const tempRangeText = (env.tempMax && env.tempMin) ? tempRange.toFixed(1) : 'Unknown';
                         
-                        // FIXED: Get real incident and door activity data instead of defaulting to 0
-                        // Current issue: Using summary data that defaults to 0, need actual data from:
-                        // - VentilationIncidents table for real incident counts
-                        // - VentilationData table doorTransitions for real door activity
+                        // FIXED: Get real incident and door activity data from API instead of defaulting to 0
+                        // Use actual data from yesterdayData sections
                         
-                        let actualIncidentCount = 0;
-                        let actualDoorEvents = 0;
+                        let actualIncidentCount = incidents.totalIncidents || 0;
+                        let actualDoorEvents = doors.totalEvents || 0;
                         
-                        // TODO: Query VentilationIncidents table for yesterday's date range
-                        // TODO: Query VentilationData doorTransitions for yesterday's activity
+                        // API provides complete door and incident data
+                        console.log('System Assessments using real data:', {
+                            doorEvents: actualDoorEvents,
+                            incidents: actualIncidentCount,
+                            activeDoors: doors.activeDoors,
+                            mostActive: doors.mostActive
+                        });
                         
                         document.getElementById('yesterdayAssessments').innerHTML = `
                             <div class="assessment-summary">
@@ -1456,7 +1459,7 @@ async function refreshData() {
                                 <p><em>ℹ️ No incidents recorded yesterday</em></p>
                                 <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
                                 <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
-                                <p><strong>🚪 Door Activity:</strong> ${actualDoorEvents} events across ${doors.activeDoors || 0} doors (${doors.peakActivity || 'Unknown'} activity level)</p>
+                                <p><strong>🚪 Door Activity:</strong> ${actualDoorEvents} events across ${doors.activeDoors || 0} doors${doors.mostActive ? ` (${doors.mostActive} most active)` : ''}</p>
                             </div>
                         `;
                     } else {
