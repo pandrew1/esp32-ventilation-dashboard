@@ -5882,17 +5882,43 @@ async function refreshData() {
             try {
                 statusElement.textContent = 'Loading incident data...';
                 
-                // Calculate time range
+                // Calculate time range with better granularity
                 const now = new Date();
                 let startDate;
+                let periodDescription;
+                
                 if (periodFilter === 1) {
-                    // Previous month
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                    console.log('ALMANAC DEBUG: Using Previous Month filter, startDate =', startDate);
-                } else {
+                    // Previous month - more precise calculation
+                    const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                    startDate = new Date(firstOfThisMonth.getFullYear(), firstOfThisMonth.getMonth() - 1, 1);
+                    const endOfPrevMonth = new Date(firstOfThisMonth.getTime() - 1);
+                    
+                    console.log('ALMANAC DEBUG: Previous Month - from', startDate, 'to', endOfPrevMonth);
+                    periodDescription = `${startDate.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}`;
+                } else if (periodFilter === 7) {
+                    // Last 7 days
+                    startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+                    console.log('ALMANAC DEBUG: Last 7 Days - from', startDate, 'to', now);
+                    periodDescription = `Last 7 days (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})})`;
+                } else if (periodFilter === 30) {
+                    // Last 30 days
+                    startDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+                    console.log('ALMANAC DEBUG: Last 30 Days - from', startDate, 'to', now);
+                    periodDescription = `Last 30 days (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})})`;
+                } else if (periodFilter === 90) {
+                    // Last 90 days
+                    startDate = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000));
+                    console.log('ALMANAC DEBUG: Last 90 Days - from', startDate, 'to', now);
+                    periodDescription = `Last 90 days (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})})`;
+                } else if (periodFilter === 12) {
                     // Last 12 months
                     startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
-                    console.log('ALMANAC DEBUG: Using Last 12 Months filter, startDate =', startDate);
+                    console.log('ALMANAC DEBUG: Last 12 Months - from', startDate, 'to', now);
+                    periodDescription = `Last 12 months (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})})`;
+                } else {
+                    // Default case
+                    startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
+                    periodDescription = 'Last 12 months';
                 }
                 
                 // Use existing incident data or fetch if needed
@@ -5919,15 +5945,25 @@ async function refreshData() {
                 
                 console.log('ALMANAC DEBUG: After severity filter:', filteredIncidents.length, 'incidents');
                 
-                // Filter by time range
+                // Filter by time range with additional debugging
                 const cutoffTimestamp = Math.floor(startDate.getTime() / 1000);
                 console.log('ALMANAC DEBUG: cutoffTimestamp =', cutoffTimestamp, new Date(cutoffTimestamp * 1000));
                 
+                // Show sample incident timestamps for debugging
+                const sampleIncidents = filteredIncidents.slice(0, 3);
+                console.log('ALMANAC DEBUG: Sample incident timestamps:');
+                sampleIncidents.forEach((incident, i) => {
+                    const incidentDate = new Date(incident.startTime * 1000);
+                    console.log(`  Incident ${i+1}: ${incident.startTime} (${incidentDate.toLocaleString()}) - ${incident.startTime >= cutoffTimestamp ? 'PASSES' : 'FILTERED OUT'}`);
+                });
+                
+                const beforeTimeFilter = filteredIncidents.length;
                 filteredIncidents = filteredIncidents.filter(incident => incident.startTime >= cutoffTimestamp);
+                console.log('ALMANAC DEBUG: Before time filter:', beforeTimeFilter, 'incidents');
                 console.log('ALMANAC DEBUG: After time filter:', filteredIncidents.length, 'incidents');
                 
-                const periodText = periodFilter === 1 ? 'previous month' : 'last 12 months';
-                statusElement.textContent = `Showing ${filteredIncidents.length} incidents from ${periodText}`;
+                // More descriptive status message
+                statusElement.textContent = `Showing ${filteredIncidents.length} incidents from ${periodDescription} (${beforeTimeFilter - filteredIncidents.length} filtered out by date)`;
                 
                 // Show the appropriate view
                 showAlmanacView(viewType, filteredIncidents, periodFilter);
