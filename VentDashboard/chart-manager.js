@@ -123,9 +123,9 @@ export class ChartManager {
     }
 
     async _performTemperatureChartUpdate(data, hours, existingChart) {
-        // Use existing global chart creation function
+        // Use existing global chart creation function with correct parameter order
         if (typeof createTemperatureChart === 'function') {
-            return createTemperatureChart(data, hours, existingChart);
+            return createTemperatureChart(hours, existingChart);
         } else {
             console.error('ChartManager: createTemperatureChart function not available');
             return existingChart;
@@ -133,9 +133,9 @@ export class ChartManager {
     }
 
     async _performPressureChartUpdate(data, hours, existingChart) {
-        // Use existing global chart creation function
+        // Use existing global chart creation function with correct parameter order  
         if (typeof createPressureChart === 'function') {
-            return createPressureChart(data, hours, existingChart);
+            return createPressureChart(hours, existingChart);
         } else {
             console.error('ChartManager: createPressureChart function not available');
             return existingChart;
