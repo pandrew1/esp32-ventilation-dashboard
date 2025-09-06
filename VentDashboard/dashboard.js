@@ -2492,7 +2492,6 @@ async function refreshData() {
                 });
             });
         });
-        }
 
         /**
          * Updates the system health widget with boot information and system status
