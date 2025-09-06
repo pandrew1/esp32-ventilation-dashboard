@@ -1581,7 +1581,7 @@ async function refreshData() {
                                 </div>
                                 <div style="padding: 15px; background-color: #e2e3e5; border-radius: 8px;">
                                     <p><strong>📈 Pressure Insights:</strong></p>
-                                    <ul style="margin-bottom: 10px;">
+                                    <ul style="margin-bottom: 10px; list-style-position: inside; padding-left: 0;">
                                         <li>Pressure stability: ${pressureData.range && pressureData.range < 0.05 ? 'Very stable weather conditions' : 'Variable conditions detected'}</li>
                                         <li>Weather pattern: ${pressureData.pattern || 'Standard diurnal variation'}</li>
                                         <li>Ventilation impact: ${pressureData.ventilationRecommendation || 'Normal operation recommended'}</li>
@@ -1650,7 +1650,7 @@ async function refreshData() {
                                 </div>
                                 <div style="padding: 15px; background-color: #fff3cd; border-radius: 8px; margin-top: 15px;">
                                     <p><strong>💡 Optimization Insights:</strong></p>
-                                    <ul style="margin-bottom: 10px;">
+                                    <ul style="margin-bottom: 10px; list-style-position: inside; padding-left: 0;">
                                         <li>Runtime optimization: ${dutyCyclePercent < 20 ? 'Low usage - consider increasing for better air quality' : dutyCyclePercent > 80 ? 'High usage - check for efficiency opportunities' : 'Optimal usage pattern'}</li>
                                         <li>Energy efficiency: ${ventData.energyEfficiencyTip || 'Monitor usage patterns for optimization opportunities'}</li>
                                         <li>Air quality impact: ${ventData.airQualityImpact || 'Positive impact on indoor environment'}</li>
