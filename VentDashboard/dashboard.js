@@ -1867,43 +1867,139 @@ async function refreshData() {
          * @returns {Promise<void>}
          */
         async function loadYesterdaySummaryFromEnhancedAPI() {
-            console.log('=== PHASE 2 FIX: loadYesterdaySummaryFromEnhancedAPI() using sections.yesterday ===');
+            console.log('=== PHASE 3: Enhanced loadYesterdaySummaryFromEnhancedAPI with improved error handling ===');
             
-            // Helper function to set waiting state
-            const setYesterdayMetricsToWaiting = () => {
-                const waitingText = 'Waiting for data';
+            // PHASE 3: Enhanced loading state management
+            const setLoadingState = () => {
+                const loadingText = 'Loading...';
+                const loadingClass = 'loading-state';
                 
-                const safeUpdate = (id, text) => {
+                const safeUpdate = (id, text, className = null) => {
                     const element = document.getElementById(id);
-                    if (element) element.textContent = text;
+                    if (element) {
+                        element.textContent = text;
+                        if (className) element.className = className;
+                    }
                 };
                 
-                safeUpdate('yesterdayAvgTemp', waitingText);
-                safeUpdate('yesterdayTempRange', waitingText);
-                safeUpdate('yesterdayTempTrend', 'Pending');
-                safeUpdate('yesterdayEfficiency', waitingText);
-                safeUpdate('yesterdayRuntime', waitingText);
-                safeUpdate('yesterdayEfficiencyTrend', 'Pending');
-                safeUpdate('yesterdayDoorsActive', waitingText);
-                safeUpdate('yesterdaySessions', waitingText);
-                safeUpdate('yesterdayPeakTime', 'Pending');
-                safeUpdate('yesterdaySystemHealth', waitingText);
-                safeUpdate('yesterdayIncidents', waitingText);
-                safeUpdate('yesterdayUptime', 'Pending');
+                // Set loading states for all summary boxes
+                safeUpdate('yesterdayAvgTemp', loadingText, loadingClass);
+                safeUpdate('yesterdayTempRange', loadingText, loadingClass);
+                safeUpdate('yesterdayTempTrend', 'Loading', loadingClass);
+                safeUpdate('yesterdayEfficiency', loadingText, loadingClass);
+                safeUpdate('yesterdayRuntime', loadingText, loadingClass);
+                safeUpdate('yesterdayEfficiencyTrend', 'Loading', loadingClass);
+                safeUpdate('yesterdayDoorsActive', loadingText, loadingClass);
+                safeUpdate('yesterdaySessions', loadingText, loadingClass);
+                safeUpdate('yesterdayPeakTime', 'Loading', loadingClass);
+                safeUpdate('yesterdaySystemHealth', loadingText, loadingClass);
+                safeUpdate('yesterdayIncidents', loadingText, loadingClass);
+                safeUpdate('yesterdayUptime', 'Loading', loadingClass);
+                
+                // Set loading states for all detail widgets
+                const widgets = ['yesterdayEnvironment', 'yesterdayPerformance', 'yesterdayPressure', 
+                               'yesterdayVentilation', 'yesterdayDoors', 'yesterdayAggregation', 
+                               'yesterdayIncidents', 'yesterdayHumidity'];
+                widgets.forEach(widgetId => {
+                    const widget = document.getElementById(widgetId);
+                    if (widget) {
+                        widget.innerHTML = '<div class="loading-content"><p><strong>Loading...</strong> Fetching data from system...</p></div>';
+                        widget.className += ' loading-state';
+                    }
+                });
             };
+            
+            // PHASE 3: Enhanced error state management
+            const setErrorState = (errorMessage = 'Data temporarily unavailable') => {
+                const errorText = '-- Error --';
+                const errorClass = 'error-state';
+                
+                const safeUpdate = (id, text, className = null) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = text;
+                        if (className) element.className = className;
+                    }
+                };
+                
+                // Set error states for summary boxes
+                safeUpdate('yesterdayAvgTemp', errorText, errorClass);
+                safeUpdate('yesterdayTempRange', errorText, errorClass);
+                safeUpdate('yesterdayTempTrend', 'Error', errorClass);
+                safeUpdate('yesterdayEfficiency', errorText, errorClass);
+                safeUpdate('yesterdayRuntime', errorText, errorClass);
+                safeUpdate('yesterdayEfficiencyTrend', 'Error', errorClass);
+                safeUpdate('yesterdayDoorsActive', errorText, errorClass);
+                safeUpdate('yesterdaySessions', errorText, errorClass);
+                safeUpdate('yesterdayPeakTime', 'Error', errorClass);
+                safeUpdate('yesterdaySystemHealth', errorText, errorClass);
+                safeUpdate('yesterdayIncidents', errorText, errorClass);
+                safeUpdate('yesterdayUptime', 'Error', errorClass);
+                
+                // Set error states for detail widgets
+                const widgets = ['yesterdayEnvironment', 'yesterdayPerformance', 'yesterdayPressure', 
+                               'yesterdayVentilation', 'yesterdayDoors', 'yesterdayAggregation', 
+                               'yesterdayIncidents', 'yesterdayHumidity'];
+                widgets.forEach(widgetId => {
+                    const widget = document.getElementById(widgetId);
+                    if (widget) {
+                        widget.innerHTML = `<div class="error-content"><p><strong>⚠️ ${errorMessage}</strong></p><p>Please check your connection and try refreshing the page.</p></div>`;
+                        widget.className = widget.className.replace('loading-state', '') + ' error-state';
+                    }
+                });
+            };
+            
+            // Helper function to set waiting state (no auth available)
+            const setYesterdayMetricsToWaiting = () => {
+                const waitingText = 'Authentication required';
+                const waitingClass = 'waiting-state';
+                
+                const safeUpdate = (id, text, className = null) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = text;
+                        if (className) element.className = className;
+                    }
+                };
+                
+                safeUpdate('yesterdayAvgTemp', waitingText, waitingClass);
+                safeUpdate('yesterdayTempRange', waitingText, waitingClass);
+                safeUpdate('yesterdayTempTrend', 'Pending', waitingClass);
+                safeUpdate('yesterdayEfficiency', waitingText, waitingClass);
+                safeUpdate('yesterdayRuntime', waitingText, waitingClass);
+                safeUpdate('yesterdayEfficiencyTrend', 'Pending', waitingClass);
+                safeUpdate('yesterdayDoorsActive', waitingText, waitingClass);
+                safeUpdate('yesterdaySessions', waitingText, waitingClass);
+                safeUpdate('yesterdayPeakTime', 'Pending', waitingClass);
+                safeUpdate('yesterdaySystemHealth', waitingText, waitingClass);
+                safeUpdate('yesterdayIncidents', waitingText, waitingClass);
+                safeUpdate('yesterdayUptime', 'Pending', waitingClass);
+            };
+            
+            // PHASE 3: Start with loading state
+            setLoadingState();
             
             try {
                 const headers = getAuthHeaders();
                 const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
                 
                 if (!hasAuth) {
-                    console.log('loadYesterdaySummaryFromEnhancedAPI: No authentication available');
+                    console.log('PHASE 3: No authentication available');
                     setYesterdayMetricsToWaiting();
                     return;
                 }
 
-                // Use DataManager to get Enhanced Dashboard Data
-                const data = await DataManager.getEnhancedData();
+                console.log('PHASE 3: Loading data with enhanced error handling...');
+                
+                // Use DataManager to get Enhanced Dashboard Data with timeout
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Request timeout')), 15000)
+                );
+                
+                const data = await Promise.race([
+                    DataManager.getEnhancedData(),
+                    timeoutPromise
+                ]);
                 console.log('PHASE 2 FIX: Enhanced data received for summary metrics');
                 
                 // PHASE 2 FIX: Access data at sections.yesterday (not response.yesterday)
@@ -2094,26 +2190,27 @@ async function refreshData() {
                 console.log('PHASE 1 FIX: Summary boxes updated with corrected API data paths');
 
             } catch (error) {
-                console.error('PHASE 2 FIX: Enhanced API summary loading failed:', error);
-                // Use the same error handling as the raw data function
-                const safeUpdate = (id, text) => {
-                    const element = document.getElementById(id);
-                    if (element) element.textContent = text;
-                };
+                console.error('PHASE 3: Enhanced API summary loading failed:', error);
                 
-                const errorText = 'Error';
-                safeUpdate('yesterdayAvgTemp', errorText);
-                safeUpdate('yesterdayTempRange', 'Failed to load');
-                safeUpdate('yesterdayTempTrend', 'No data');
-                safeUpdate('yesterdayEfficiency', errorText);
-                safeUpdate('yesterdayRuntime', 'Failed to load');
-                safeUpdate('yesterdayEfficiencyTrend', 'No data');
-                safeUpdate('yesterdayDoorsActive', errorText);
-                safeUpdate('yesterdaySessions', 'Failed to load');
-                safeUpdate('yesterdayPeakTime', 'No data');
-                safeUpdate('yesterdaySystemHealth', errorText);
-                safeUpdate('yesterdayIncidents', 'Failed to load');
-                safeUpdate('yesterdayUptime', 'No data');
+                // PHASE 3: Use enhanced error state management
+                if (error.message === 'Request timeout') {
+                    setErrorState('Request timed out after 15 seconds');
+                } else if (error.message && error.message.includes('network')) {
+                    setErrorState('Network connection error');
+                } else if (error.status === 401 || error.status === 403) {
+                    setErrorState('Authentication failed');
+                } else if (error.status === 500) {
+                    setErrorState('Server error - please try again later');
+                } else {
+                    setErrorState('Data temporarily unavailable');
+                }
+                
+                // Log detailed error for debugging
+                console.error('PHASE 3: Error details:', {
+                    message: error.message,
+                    status: error.status,
+                    stack: error.stack
+                });
             }
         }
 
@@ -2435,14 +2532,36 @@ async function refreshData() {
                     // Update boot information only (health metrics UI removed)
                     // Note: lastBootInfo and bootReasonInfo already declared at top of function
                     
-                    // Update boot information
+                    // PHASE 3: Enhanced boot information with Unix epoch fix
                     if (lastBootInfo) {
-                        // Format boot time from timestamp with validation
+                        // BUG FIX #18: Fix Last Boot Date Regression - Unix Epoch Display Error
                         if (startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
                             const bootTime = parseInt(startup.bootTime);
-                            // Handle both seconds and milliseconds timestamps
-                            const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
-                            lastBootInfo.textContent = bootDate.toLocaleString();
+                            
+                            // PHASE 3: Enhanced timestamp validation to prevent Unix epoch display
+                            if (bootTime > 0 && bootTime !== 0) {
+                                // Handle both seconds and milliseconds timestamps
+                                // Unix epoch: seconds since 1970-01-01 00:00:00 UTC
+                                // If timestamp is < 1000000000 (before Sep 2001), it's likely invalid
+                                if (bootTime < 1000000000) {
+                                    lastBootInfo.textContent = 'Boot time invalid (system clock not set)';
+                                } else {
+                                    // Convert to milliseconds if needed (timestamps > 1e12 are already in ms)
+                                    const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
+                                    
+                                    // Additional validation: ensure date is reasonable (after 2020)
+                                    const minValidDate = new Date('2020-01-01');
+                                    const maxValidDate = new Date(Date.now() + 86400000); // Tomorrow
+                                    
+                                    if (bootDate >= minValidDate && bootDate <= maxValidDate) {
+                                        lastBootInfo.textContent = bootDate.toLocaleString();
+                                    } else {
+                                        lastBootInfo.textContent = 'Boot time invalid (unreasonable date)';
+                                    }
+                                }
+                            } else {
+                                lastBootInfo.textContent = 'Boot time not recorded';
+                            }
                         } else {
                             lastBootInfo.textContent = 'Boot time unavailable';
                         }
@@ -4534,14 +4653,32 @@ async function refreshData() {
                     monthlyAggElement.innerHTML = '<div class="error-state">Monthly aggregation status not available</div>';
                 }
                 
-                // Boot Information from sections.startup
+                // PHASE 3: Enhanced Boot Information from sections.startup (BUG FIX #18)
                 const lastBootInfoElement = document.getElementById('lastBootInfo');
                 if (lastBootInfoElement) {
                     if (startup && startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
                         const bootTime = parseInt(startup.bootTime);
-                        // Handle both seconds and milliseconds timestamps
-                        const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
-                        lastBootInfoElement.textContent = `${bootDate.toLocaleDateString()} ${bootDate.toLocaleTimeString()}`;
+                        
+                        // PHASE 3: Apply same Unix epoch fix as main function
+                        if (bootTime > 0 && bootTime !== 0) {
+                            if (bootTime < 1000000000) {
+                                lastBootInfoElement.textContent = 'Boot time invalid (system clock not set)';
+                            } else {
+                                const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
+                                
+                                // Additional validation: ensure date is reasonable (after 2020)
+                                const minValidDate = new Date('2020-01-01');
+                                const maxValidDate = new Date(Date.now() + 86400000); // Tomorrow
+                                
+                                if (bootDate >= minValidDate && bootDate <= maxValidDate) {
+                                    lastBootInfoElement.textContent = `${bootDate.toLocaleDateString()} ${bootDate.toLocaleTimeString()}`;
+                                } else {
+                                    lastBootInfoElement.textContent = 'Boot time invalid (unreasonable date)';
+                                }
+                            }
+                        } else {
+                            lastBootInfoElement.textContent = 'Boot time not recorded';
+                        }
                     } else {
                         lastBootInfoElement.textContent = 'Boot time unavailable';
                     }
