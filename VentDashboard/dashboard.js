@@ -1803,115 +1803,162 @@ async function refreshData() {
                     }
                 };
 
-                // PHASE 2 FIX: Update temperature metrics using sections.yesterday.environmental
-                console.log('🐛 TEMPERATURE DEBUG: Checking environmental data...');
-                console.log('🐛 yesterdayData.environmental:', yesterdayData.environmental);
+                // PHASE 1 FIX: Update temperature metrics using correct nested structure
+                console.log('� PHASE 1: Fixing temperature box data paths...');
+                console.log('� yesterdayData.environmental:', yesterdayData.environmental);
                 
-                if (yesterdayData.environmental) {
-                    const env = yesterdayData.environmental;
-                    console.log('🐛 TEMPERATURE: Using environmental data:', env);
-                    console.log('🐛 TEMPERATURE VALUES:', {
-                        tempAvg: env.tempAvg,
-                        tempMin: env.tempMin, 
-                        tempMax: env.tempMax,
-                        temperature: env.temperature
-                    });
-                    
-                    safeUpdate('yesterdayAvgTemp', env.tempAvg ? `${env.tempAvg}°F` : 'N/A');
-                    safeUpdate('yesterdayTempRange', env.tempMin && env.tempMax ? `${env.tempMin}° - ${env.tempMax}°` : 'N/A');
-                    safeUpdate('yesterdayTempTrend', env.tempAvg ? 'Real data ✅' : 'No data', 'metric-trend positive');
-                } else {
-                    console.log('🐛 TEMPERATURE: No environmental data found');
-                    safeUpdate('yesterdayAvgTemp', 'N/A');
-                    safeUpdate('yesterdayTempRange', 'N/A');
-                    safeUpdate('yesterdayTempTrend', 'No environmental data', 'metric-trend neutral');
-                }
-
-                // PHASE 2 FIX: Update efficiency metrics using sections.yesterday.performance
-                if (yesterdayData.performance) {
-                    const perf = yesterdayData.performance;
-                    safeUpdate('yesterdayEfficiency', perf.efficiency ? `${perf.efficiency}%` : 'N/A');
-                    safeUpdate('yesterdayRuntime', perf.runtime ? `${perf.runtime} hrs runtime` : 'N/A');
-                    safeUpdate('yesterdayEfficiencyTrend', perf.efficiency ? 'Real data ✅' : 'No data', 'metric-trend positive');
-                } else {
-                    safeUpdate('yesterdayEfficiency', 'N/A');
-                    safeUpdate('yesterdayRuntime', 'N/A');
-                    safeUpdate('yesterdayEfficiencyTrend', 'No performance data', 'metric-trend neutral');
-                }
-
-                // PHASE 2 FIX: Update door activity (use correct data from API)
-                console.log('🐛 DOOR WIDGET DEBUG: Checking door data paths...');
-                console.log('🐛 data.sections.doors:', data.sections.doors);
-                console.log('🐛 yesterdayData.doors:', yesterdayData.doors);
-                console.log('🐛 yesterdayData.doorActivity:', yesterdayData.doorActivity);
+                // FIX 1: Use nested temperature structure from API response
+                const envData = yesterdayData.environmental;
+                const tempData = envData && envData.temperature && envData.temperature.indoor;
                 
-                if (data.sections.doors) {
-                    const doors = data.sections.doors;
-                    console.log('🐛 DOOR WIDGET: Using data.sections.doors:', doors);
-                    // API provides: activeDoors, totalEvents, mostActive
-                    const activeDoors = doors.activeDoors || 0;
-                    const totalDoors = doors.totalDoors || 0;
-                    const totalEvents = doors.totalEvents || 0;
-                    const mostActive = doors.mostActive || 'None';
-                    
-                    console.log('🐛 DOOR WIDGET VALUES:', {activeDoors, totalDoors, totalEvents, mostActive});
-                    
-                    // Show meaningful door activity summary
-                    if (totalEvents > 0) {
-                        console.log('🐛 DOOR WIDGET: Setting active event display');
-                        safeUpdate('yesterdayDoorsActive', `${totalEvents} events across ${activeDoors} doors`);
-                        safeUpdate('yesterdaySessions', `${mostActive} most active`);
-                        safeUpdate('yesterdayPeakTime', doors.usagePattern || 'Activity tracked', 'metric-trend positive');
+                console.log('� TEMPERATURE DATA CHECK:', {
+                    envData: !!envData,
+                    tempData: !!tempData,
+                    structure: tempData
+                });
+                
+                if (tempData && tempData.avg !== undefined) {
+                    console.log('� TEMPERATURE: Using nested temperature.indoor data:', tempData);
+                    safeUpdate('yesterdayAvgTemp', `${tempData.avg}°F`);
+                    safeUpdate('yesterdayTempRange', `${tempData.min}° - ${tempData.max}°`);
+                    safeUpdate('yesterdayTempTrend', tempData.trend || 'Stable', 'metric-trend positive');
+                } else {
+                    console.log('🔧 TEMPERATURE: Nested structure not found, checking flat structure...');
+                    // Fallback to flat structure if nested doesn't exist
+                    if (envData && envData.tempAvg !== undefined) {
+                        safeUpdate('yesterdayAvgTemp', `${envData.tempAvg}°F`);
+                        safeUpdate('yesterdayTempRange', `${envData.tempMin}° - ${envData.tempMax}°`);
+                        safeUpdate('yesterdayTempTrend', 'Real data ✅', 'metric-trend positive');
                     } else {
-                        console.log('🐛 DOOR WIDGET: Setting no events display');
-                        safeUpdate('yesterdayDoorsActive', `${activeDoors}/${totalDoors} doors monitored`);
-                        safeUpdate('yesterdaySessions', 'No activity');
-                        safeUpdate('yesterdayPeakTime', 'Activity tracked', 'metric-trend neutral');
+                        console.log('� TEMPERATURE: No temperature data found in either structure');
+                        safeUpdate('yesterdayAvgTemp', 'No data');
+                        safeUpdate('yesterdayTempRange', 'No data');
+                        safeUpdate('yesterdayTempTrend', 'Data missing', 'metric-trend neutral');
+                    }
+                }
+
+                // PHASE 1 FIX: Update efficiency metrics using correct ventilation structure
+                console.log('🔧 PHASE 1: Fixing efficiency box data paths...');
+                console.log('🔧 yesterdayData.ventilation:', yesterdayData.ventilation);
+                console.log('🔧 yesterdayData.systemPerformance:', yesterdayData.systemPerformance);
+                
+                // FIX 2: Use ventilation data for efficiency and runtime
+                const ventData = yesterdayData.ventilation;
+                const perfData = yesterdayData.systemPerformance;
+                
+                if (ventData) {
+                    console.log('🔧 EFFICIENCY: Using ventilation data:', ventData);
+                    
+                    // Extract efficiency (remove % if present)
+                    let efficiency = ventData.efficiency;
+                    if (typeof efficiency === 'string') {
+                        efficiency = efficiency.replace('%', '');
+                    }
+                    
+                    // Calculate runtime in hours from fanMinutesToday
+                    let runtimeHours = 'N/A';
+                    if (ventData.fanMinutesToday) {
+                        runtimeHours = Math.round(ventData.fanMinutesToday / 60 * 10) / 10;
+                    } else if (perfData && perfData.runtime) {
+                        runtimeHours = perfData.runtime;
+                    }
+                    
+                    safeUpdate('yesterdayEfficiency', `${efficiency}%`);
+                    safeUpdate('yesterdayRuntime', `${runtimeHours}h runtime`);
+                    safeUpdate('yesterdayEfficiencyTrend', `${ventData.mode || 'AUTO'} mode`, 'metric-trend positive');
+                } else if (perfData) {
+                    console.log('🔧 EFFICIENCY: Using system performance data:', perfData);
+                    safeUpdate('yesterdayEfficiency', `${perfData.efficiency}%`);
+                    safeUpdate('yesterdayRuntime', `${perfData.runtime}h runtime`);
+                    safeUpdate('yesterdayEfficiencyTrend', 'Performance data', 'metric-trend positive');
+                } else {
+                    console.log('🔧 EFFICIENCY: No efficiency/performance data found');
+                    safeUpdate('yesterdayEfficiency', 'No data');
+                    safeUpdate('yesterdayRuntime', 'No data');
+                    safeUpdate('yesterdayEfficiencyTrend', 'Data missing', 'metric-trend neutral');
+                }
+
+                // PHASE 1 FIX: Update door activity using correct doorActivity structure
+                console.log('� PHASE 1: Fixing door activity box data paths...');
+                console.log('� yesterdayData.doorActivity:', yesterdayData.doorActivity);
+                console.log('� data.sections.doors:', data.sections.doors);
+                
+                // FIX 3: Use doorActivity data first, fallback to sections.doors
+                const doorData = yesterdayData.doorActivity || data.sections.doors;
+                
+                if (doorData && doorData.totalEvents !== undefined) {
+                    console.log('� DOOR ACTIVITY: Using door data:', doorData);
+                    
+                    const totalEvents = doorData.totalEvents || 0;
+                    const activeDoors = doorData.activeDoors || 0;
+                    const totalDoors = doorData.totalDoors || 4;
+                    const mostActive = doorData.mostActive || 'None';
+                    const peakActivity = doorData.peakActivity || 'Low';
+                    
+                    if (totalEvents > 0) {
+                        safeUpdate('yesterdayDoorsActive', `${totalEvents} events`);
+                        safeUpdate('yesterdaySessions', `${activeDoors}/${totalDoors} doors active`);
+                        safeUpdate('yesterdayPeakTime', peakActivity, 'metric-trend positive');
+                    } else {
+                        safeUpdate('yesterdayDoorsActive', 'No activity');
+                        safeUpdate('yesterdaySessions', `${activeDoors}/${totalDoors} doors monitored`);
+                        safeUpdate('yesterdayPeakTime', 'Quiet day', 'metric-trend neutral');
                     }
                 } else {
-                    console.log('🐛 DOOR WIDGET: No door data found at data.sections.doors');
-                    safeUpdate('yesterdayDoorsActive', 'No door data');
-                    safeUpdate('yesterdaySessions', 'No sessions');
-                    safeUpdate('yesterdayPeakTime', 'Activity tracked', 'metric-trend neutral');
+                    console.log('� DOOR ACTIVITY: No door data found');
+                    safeUpdate('yesterdayDoorsActive', 'No data');
+                    safeUpdate('yesterdaySessions', 'No data');
+                    safeUpdate('yesterdayPeakTime', 'Data missing', 'metric-trend neutral');
                 }
 
-                // Update system health metrics (use correct data from API)
-                console.log('🐛 SYSTEM HEALTH DEBUG: Checking incident data paths...');
-                console.log('🐛 yesterdayData.incidents:', yesterdayData.incidents);
-                console.log('🐛 yesterdayData.assessments:', yesterdayData.assessments);
+                // PHASE 1 FIX: Update system health using correct systemHealth and incidents structure  
+                console.log('� PHASE 1: Fixing system health box data paths...');
+                console.log('� yesterdayData.systemHealth:', yesterdayData.systemHealth);
+                console.log('� yesterdayData.incidents:', yesterdayData.incidents);
                 
-                if (yesterdayData.incidents || yesterdayData.assessments) {
-                    const incidents = yesterdayData.incidents || {};
-                    const assessments = yesterdayData.assessments || {};
+                // FIX 4: Use systemHealth and incidents data
+                const healthData = yesterdayData.systemHealth;
+                const incidentData = yesterdayData.incidents;
+                
+                if (healthData || incidentData) {
+                    console.log('� SYSTEM HEALTH: Using health/incident data:', {healthData, incidentData});
                     
-                    console.log('🐛 SYSTEM HEALTH: Found incident/assessment data:', {incidents, assessments});
+                    // Get incident count
+                    const totalIncidents = incidentData ? (incidentData.total || 0) : 0;
                     
-                    // API provides: totalIncidents, overallStatus
-                    const totalIncidents = incidents.totalIncidents || 0;
-                    const systemStatus = assessments.overallStatus || 'System monitored';
+                    // Get system health status
+                    const overallHealth = healthData ? (healthData.overallHealth || 'Unknown') : 'Unknown';
                     
-                    console.log('🐛 SYSTEM HEALTH VALUES:', {totalIncidents, systemStatus});
+                    // Get uptime data
+                    let uptimeDisplay = 'System monitored';
+                    if (healthData && healthData.uptime) {
+                        const uptimeHours = Math.floor(healthData.uptime / 60);
+                        const uptimeMinutes = healthData.uptime % 60;
+                        uptimeDisplay = `${uptimeHours}h ${uptimeMinutes}m uptime`;
+                    } else if (healthData && healthData.uptimeMinutes) {
+                        const uptimeHours = Math.floor(healthData.uptimeMinutes / 60);
+                        uptimeDisplay = `${uptimeHours}h uptime`;
+                    }
                     
                     // Show meaningful system health summary
                     if (totalIncidents === 0) {
-                        console.log('🐛 SYSTEM HEALTH: Setting healthy display');
-                        safeUpdate('yesterdaySystemHealth', '✅ System healthy');
-                        safeUpdate('yesterdayIncidents', `${totalIncidents} incidents detected`);
-                        safeUpdate('yesterdayUptime', systemStatus, 'metric-trend positive');
+                        safeUpdate('yesterdaySystemHealth', `✅ ${overallHealth}`);
+                        safeUpdate('yesterdayIncidents', 'No incidents');
+                        safeUpdate('yesterdayUptime', uptimeDisplay, 'metric-trend positive');
                     } else {
-                        console.log('🐛 SYSTEM HEALTH: Setting incidents display');
-                        safeUpdate('yesterdaySystemHealth', `${totalIncidents} issues detected`);
-                        safeUpdate('yesterdayIncidents', `${totalIncidents} incidents`);
-                        safeUpdate('yesterdayUptime', systemStatus, 'metric-trend negative');
+                        const severity = incidentData.severity || 'Unknown';
+                        safeUpdate('yesterdaySystemHealth', `⚠️ ${totalIncidents} issues`);
+                        safeUpdate('yesterdayIncidents', `${severity} severity`);
+                        safeUpdate('yesterdayUptime', uptimeDisplay, 'metric-trend negative');
                     }
                 } else {
-                    console.log('🐛 SYSTEM HEALTH: No incident/assessment data found');
-                    safeUpdate('yesterdaySystemHealth', 'System monitored');
-                    safeUpdate('yesterdayIncidents', 'No incidents');
-                    safeUpdate('yesterdayUptime', 'System monitored', 'metric-trend neutral');
+                    console.log('� SYSTEM HEALTH: No health/incident data found');
+                    safeUpdate('yesterdaySystemHealth', 'No data');
+                    safeUpdate('yesterdayIncidents', 'No data');
+                    safeUpdate('yesterdayUptime', 'Data missing', 'metric-trend neutral');
                 }
 
-                console.log('PHASE 2 FIX: Yesterday summary updated with Enhanced API data from sections.yesterday');
+                console.log('PHASE 1 FIX: Summary boxes updated with corrected API data paths');
 
             } catch (error) {
                 console.error('PHASE 2 FIX: Enhanced API summary loading failed:', error);
