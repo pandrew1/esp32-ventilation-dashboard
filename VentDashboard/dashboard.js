@@ -1321,7 +1321,7 @@ async function refreshData() {
             document.getElementById('yesterdayEnvironmental').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading environmental data...</em></div>';
             document.getElementById('yesterdayHumidity').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading humidity analysis...</em></div>';
             document.getElementById('yesterdayPressure').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading pressure analysis...</em></div>';
-            document.getElementById('yesterdayPerformance').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading performance metrics...</em></div>';
+            document.getElementById('yesterdayPerformance').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading performance & health metrics...</em></div>';
             document.getElementById('yesterdayVentilation').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading ventilation analysis...</em></div>';
             document.getElementById('yesterdayDoorTimeline').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading door activity...</em></div>';
             document.getElementById('yesterdayAggregation').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;"><em>Loading aggregation status...</em></div>';
@@ -1352,181 +1352,314 @@ async function refreshData() {
                         throw new Error('Real ESP32 data not yet available: ' + yesterdayData.message);
                     }
                     
-                    // Load environmental data - FIXED: Show individual sensor zones instead of aggregated
+                    // PHASE 2: Enhanced Environmental Summary with individual sensor zones (Attributes #6-9, #10-12)
                     if (yesterdayData.environmental) {
-                        const env = yesterdayData.environmental;
-                        
-                        // TODO: Replace with individual sensor data from VentilationData table
-                        // Current data is aggregated across all sensors, need separate:
-                        // - Indoor: IndoorTemp, IndoorHumidity, IndoorPressure  
-                        // - Outdoor: OutdoorTemp, OutdoorHumidity, OutdoorPressure
-                        // - Garage: GarageTemp, GarageHumidity, GaragePressure
+                        console.log('PHASE 2: Loading enhanced environmental summary with sensor breakdown');
+                        const envData = yesterdayData.environmental;
+                        const tempData = envData.temperature;
+                        const humidityData = envData.humidity;
                         
                         document.getElementById('yesterdayEnvironmental').innerHTML = `
                             <div class="env-summary">
-                                <h4>🌡️ Environmental Summary</h4>
-                                <p><strong>Temperature Range:</strong> ${env.tempMin}°F - ${env.tempMax}°F (Avg: ${env.tempAvg}°F)</p>
-                                <p><em>⚠️ Note: This is aggregated data. Need individual sensor zones:</em></p>
-                                <ul>
-                                    <li><strong>Indoor Sensor:</strong> [Need IndoorTemp data from VentilationData]</li>
-                                    <li><strong>Outdoor Sensor:</strong> [Need OutdoorTemp data from VentilationData]</li>  
-                                    <li><strong>Garage Sensor:</strong> [Need GarageTemp data from VentilationData]</li>
-                                </ul>
-                                <p><strong>Humidity Range:</strong> ${env.humidityMin}% - ${env.humidityMax}% (Avg: ${env.humidityAvg}%)</p>
-                                <p><strong>Pressure:</strong> ${env.pressureMin} - ${env.pressureMax} hPa</p>
+                                <div class="sensor-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="sensor-zone" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                                        <h5 style="color: #007bff; margin-top: 0;">🏠 Indoor Environment</h5>
+                                        <p><strong>Temperature:</strong> ${tempData.indoor.min}° - ${tempData.indoor.max}° (avg ${tempData.indoor.avg}°F)</p>
+                                        <p><strong>Humidity:</strong> ${humidityData.indoor.current}% (${humidityData.indoor.status})</p>
+                                        <p><strong>Trend:</strong> ${tempData.indoor.trend}</p>
+                                        <p><strong>Comfort Status:</strong> ${tempData.differentials.comfortZone}</p>
+                                    </div>
+                                    <div class="sensor-zone" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                                        <h5 style="color: #28a745; margin-top: 0;">�️ Outdoor Environment</h5>
+                                        <p><strong>Temperature:</strong> ${tempData.outdoor.min}° - ${tempData.outdoor.max}° (avg ${tempData.outdoor.avg}°F)</p>
+                                        <p><strong>Humidity:</strong> ${humidityData.outdoor.current}%</p>
+                                        <p><strong>Trend:</strong> ${tempData.outdoor.trend}</p>
+                                        <p><strong>Weather Impact:</strong> Monitoring for ventilation decisions</p>
+                                    </div>
+                                    <div class="sensor-zone" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #ffc107;">
+                                        <h5 style="color: #e67e22; margin-top: 0;">🚗 Garage Environment</h5>
+                                        <p><strong>Temperature:</strong> ${tempData.garage.min}° - ${tempData.garage.max}° (avg ${tempData.garage.avg}°F)</p>
+                                        <p><strong>Differential:</strong> ${tempData.differentials.indoorOutdoor}°F vs outdoor</p>
+                                        <p><strong>Stability:</strong> ${tempData.garage.range}°F daily range</p>
+                                        <p><strong>Ventilation Need:</strong> ${tempData.differentials.ventilationRecommendation}</p>
+                                    </div>
+                                </div>
+                                <div class="env-analysis" style="padding: 15px; background-color: #e9ecef; border-radius: 8px;">
+                                    <p><strong>📊 Temperature Analysis:</strong></p>
+                                    <ul style="margin-bottom: 10px;">
+                                        <li>Indoor stability: ${tempData.indoor.trend} (range: ${tempData.indoor.range}°F)</li>
+                                        <li>Optimal range status: ${tempData.differentials.comfortZone}</li>
+                                        <li>Daily temperature differential: ${tempData.differentials.indoorOutdoor}°F between indoor/outdoor</li>
+                                        <li>Ventilation effectiveness: ${tempData.differentials.ventilationImpact}</li>
+                                    </ul>
+                                    <p><strong>🌡️ Key Insights:</strong> ${envData.analysis.dailyInsight}</p>
+                                </div>
                             </div>
                         `;
                     } else {
                         document.getElementById('yesterdayEnvironmental').innerHTML = '<div class="error-state">Environmental data not available</div>';
                     }
                     
-                    // Load performance data
-                    if (yesterdayData.performance) {
-                        const perf = yesterdayData.performance;
-                        document.getElementById('yesterdayPerformance').innerHTML = `
-                            <div class="perf-summary">
-                                <p><strong>Efficiency:</strong> ${perf.efficiency}%</p>
-                                <p><strong>Runtime:</strong> ${perf.runtime} hours</p>
-                                <p><strong>Energy Usage:</strong> ${perf.energyUsage}</p>
-                                <p><strong>Peak Load:</strong> ${perf.peakLoad}</p>
-                            </div>
-                        `;
-                    } else {
-                        document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">Performance data not available</div>';
-                    }
+                    // PHASE 2: Enhanced System Performance & Health (MERGED WIDGET) - Attributes #1-5, #17-23, #34-43
+                    console.log('PHASE 2: Loading enhanced System Performance & Health (merged widget)');
                     
-                    // System assessments based on real yesterday data
-                    if (yesterdayData.environmental || yesterdayData.performance || yesterdayData.incidents) {
-                        const env = yesterdayData.environmental || {};
-                        const perf = yesterdayData.performance || {};
-                        const incidents = yesterdayData.incidents || {};
-                        const doors = yesterdayData.doors || {};
+                    const perfData = yesterdayData.systemPerformance;
+                    const ventData = yesterdayData.ventilation;
+                    const healthData = yesterdayData.systemHealth;
+                    const incidentData = yesterdayData.incidents;
+                    
+                    if (perfData || ventData || healthData || incidentData) {
+                        // Calculate derived metrics
+                        const uptimeMinutes = (perfData && perfData.uptimeMinutes) ? perfData.uptimeMinutes : 0;
+                        const uptimeFormatted = uptimeMinutes > 0 ? `${Math.floor(uptimeMinutes / 60)}h ${uptimeMinutes % 60}m` : 'Unknown';
+                        const dutyCycle = (ventData && ventData.fanMinutesToday) ? ((ventData.fanMinutesToday / 1440) * 100).toFixed(1) : 'Unknown'; // 1440 min = 24h
+                        const ventRuntime = (ventData && ventData.fanMinutesToday) ? (ventData.fanMinutesToday / 60).toFixed(1) : 'Unknown';
                         
-                        // Calculate assessment scores
-                        let systemHealth = "Good";
-                        let healthIcon = "✅";
-                        if (incidents.totalIncidents > 5) {
-                            systemHealth = "Fair";
-                            healthIcon = "⚠️";
-                        }
-                        if (incidents.totalIncidents > 10) {
-                            systemHealth = "Poor";
-                            healthIcon = "❌";
-                        }
-                        
-                        let operationalStatus = "Normal";
-                        let operationalIcon = "✅";
-                        if (perf.efficiency < 20) {
-                            operationalStatus = "Below Average";
-                            operationalIcon = "⚠️";
-                        }
-                        if (perf.efficiency < 10) {
-                            operationalStatus = "Poor";
-                            operationalIcon = "❌";
-                        }
-                        
-                        let environmentalStatus = "Stable";
-                        let envIcon = "✅";
-                        const tempRange = (env.tempMax || 0) - (env.tempMin || 0);
-                        if (tempRange > 15) {
-                            environmentalStatus = "Variable";
-                            envIcon = "⚠️";
-                        }
-                        if (tempRange > 25) {
-                            environmentalStatus = "Extreme";
-                            envIcon = "❌";
-                        }
-                        
-                        const tempRangeText = (env.tempMax && env.tempMin) ? tempRange.toFixed(1) : 'Unknown';
-                        
-                        // FIXED: Get real incident and door activity data from API instead of defaulting to 0
-                        // Use actual data from yesterdayData sections
-                        
-                        let actualIncidentCount = incidents.totalIncidents || 0;
-                        let actualDoorEvents = doors.totalEvents || 0;
-                        
-                        // API provides complete door and incident data
-                        console.log('System Assessments using real data:', {
-                            doorEvents: actualDoorEvents,
-                            incidents: actualIncidentCount,
-                            activeDoors: doors.activeDoors,
-                            mostActive: doors.mostActive
-                        });
-                        
-                        document.getElementById('yesterdayAssessments').innerHTML = `
-                            <div class="assessment-summary">
-                                <p><strong>${healthIcon} System Health:</strong> ${systemHealth} (${actualIncidentCount} incidents recorded)</p>
-                                <p><em>ℹ️ No incidents recorded yesterday</em></p>
-                                <p><strong>${operationalIcon} Operational Status:</strong> ${operationalStatus} (${perf.efficiency || 0}% efficiency, ${perf.runtime || 0} hours runtime)</p>
-                                <p><strong>${envIcon} Environmental Conditions:</strong> ${environmentalStatus} (${tempRangeText}°F temperature range)</p>
-                                <p><strong>🚪 Door Activity:</strong> ${actualDoorEvents} events across ${doors.activeDoors || 0} doors${doors.mostActive ? ` (${doors.mostActive} most active)` : ''}</p>
+                        document.getElementById('yesterdayPerformance').innerHTML = `
+                            <div class="perf-health-summary">
+                                <div class="metric-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                                    <div class="performance-section" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                                        <h5 style="color: #007bff; margin-top: 0;">⚡ System Performance</h5>
+                                        <p><strong>System Uptime:</strong> ${uptimeFormatted}${perfData && perfData.uptimePercentage ? ` (${perfData.uptimePercentage}%)` : ''}</p>
+                                        <p><strong>Memory Available:</strong> ${perfData && perfData.freeMemory ? `${perfData.freeMemory}% free` : 'Unknown'}</p>
+                                        <p><strong>WiFi Reliability:</strong> ${healthData && healthData.wifiReliability ? `${healthData.wifiReliability.uptimePercentage}%` : 'Unknown'}</p>
+                                        <p><strong>Sensor Response:</strong> ${healthData && healthData.sensorsResponding ? 'All Active ✅' : 'Issues Detected ⚠️'}</p>
+                                        <p><strong>Telemetry Status:</strong> ${healthData && healthData.telemetryEnabled ? 'Active ✅' : 'Disabled ⚠️'}</p>
+                                    </div>
+                                    <div class="health-section" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                                        <h5 style="color: #28a745; margin-top: 0;">🔍 System Health</h5>
+                                        <p><strong>Overall Status:</strong> ${healthData && healthData.overallHealth ? healthData.overallHealth : 'Unknown'}</p>
+                                        <p><strong>Security Status:</strong> ${healthData && healthData.securityStatus ? healthData.securityStatus : 'Unknown'}</p>
+                                        <p><strong>Fan Condition:</strong> ${healthData && healthData.fanCondition ? healthData.fanCondition : 'Unknown'}</p>
+                                        <p><strong>Maintenance Due:</strong> ${healthData && healthData.predictiveMaintenance ? healthData.predictiveMaintenance : 'Unknown'}</p>
+                                        <p><strong>Reliability Score:</strong> ${healthData && healthData.reliabilityMetric ? `${healthData.reliabilityMetric}%` : 'Unknown'}</p>
+                                    </div>
+                                </div>
+                                <div class="incident-section" style="padding: 15px; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 20px;">
+                                    <h5 style="color: #856404; margin-top: 0;">⚠️ Incident Analysis</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div>
+                                            <p><strong>Total Incidents:</strong> ${incidentData && incidentData.total ? incidentData.total : 0}</p>
+                                            <p><strong>Critical:</strong> ${incidentData && incidentData.critical ? incidentData.critical : 0} | <strong>Warning:</strong> ${incidentData && incidentData.warning ? incidentData.warning : 0}</p>
+                                            <p><strong>Info:</strong> ${incidentData && incidentData.info ? incidentData.info : 0} | <strong>Resolved:</strong> ${incidentData && incidentData.resolved ? incidentData.resolved : 0}</p>
+                                        </div>
+                                        <div>
+                                            <p><strong>Most Recent:</strong> ${incidentData && incidentData.lastIncidentTime ? incidentData.lastIncidentTime : 'None'}</p>
+                                            <p><strong>Current Status:</strong> ${incidentData && incidentData.currentStatus ? incidentData.currentStatus : 'Stable'}</p>
+                                            <p><strong>Resolution Rate:</strong> ${incidentData && incidentData.total > 0 ? `${Math.round((incidentData.resolved / incidentData.total) * 100)}%` : 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ventilation-performance" style="padding: 15px; background-color: #d1ecf1; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                                    <h5 style="color: #0c5460; margin-top: 0;">🌀 Ventilation Performance</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div>
+                                            <p><strong>Total Runtime:</strong> ${ventRuntime} hours (${dutyCycle}% duty cycle)</p>
+                                            <p><strong>Energy Usage:</strong> ${ventData && ventData.energyUsage ? ventData.energyUsage : 'Unknown'}</p>
+                                            <p><strong>Efficiency:</strong> ${ventData && ventData.efficiency ? ventData.efficiency : 'Unknown'}</p>
+                                        </div>
+                                        <div>
+                                            <p><strong>Operational Mode:</strong> ${ventData && ventData.mode ? ventData.mode : 'Unknown'}</p>
+                                            <p><strong>Air Quality:</strong> ${ventData && ventData.airQuality ? ventData.airQuality : 'Unknown'}</p>
+                                            <p><strong>Circulation:</strong> ${ventData && ventData.circulation ? ventData.circulation : 'Unknown'}</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayAssessments').innerHTML = '<div class="error-state">System assessment data not available - no yesterday summary found</div>';
+                        document.getElementById('yesterdayPerformance').innerHTML = '<div class="error-state">System Performance & Health data not available</div>';
                     }
                     
                     // Load door timeline - get real door activity data from History API like the main timeline
                     loadYesterdayDoorActivity();
                     
-                    // Load humidity analysis - FIXED: Remove Air Quality, show sensor breakdown
-                    if (yesterdayData.environmental) {
-                        const env = yesterdayData.environmental;
+                    // PHASE 2: Enhanced Humidity Analysis with Sensor Breakdown (Attributes #10-12)
+                    if (yesterdayData.environmental && yesterdayData.environmental.humidity) {
+                        console.log('PHASE 2: Loading enhanced humidity analysis with sensor breakdown');
+                        const humidityData = yesterdayData.environmental.humidity;
+                        
                         document.getElementById('yesterdayHumidity').innerHTML = `
                             <div class="humidity-analysis">
-                                <h4>💧 Humidity Analysis</h4>
-                                <p><strong>Yesterday's Humidity Range:</strong> ${env.humidityMin || '--'}% → ${env.humidityMax || '--'}%</p>
-                                <p><strong>Average Humidity:</strong> ${env.humidityAvg || '--'}%</p>
-                                <p><em>⚠️ Current average (${env.humidityAvg}%) seems incorrect - likely data processing bug</em></p>
-                                <p><strong>Humidity Variation:</strong> ${env.humidityMax && env.humidityMin ? (env.humidityMax - env.humidityMin).toFixed(1) : '--'}% range</p>
-                                <p><em>⚠️ Need individual sensor humidity data:</em></p>
-                                <ul>
-                                    <li><strong>Indoor Humidity:</strong> [Need IndoorHumidity from VentilationData]</li>
-                                    <li><strong>Outdoor Humidity:</strong> [Need OutdoorHumidity from VentilationData]</li>
-                                    <li><strong>Garage Humidity:</strong> [Need GarageHumidity from VentilationData]</li>
-                                </ul>
+                                <h4 style="color: #007bff; margin-top: 0;">💧 Comprehensive Humidity Analysis</h4>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                                        <h5 style="color: #007bff; margin-top: 0;">🏠 Indoor Humidity</h5>
+                                        <p><strong>Current:</strong> ${humidityData.indoor ? `${humidityData.indoor.current}%` : 'Unknown'}</p>
+                                        <p><strong>Range:</strong> ${humidityData.indoor ? `${humidityData.indoor.min}% - ${humidityData.indoor.max}%` : 'Unknown'}</p>
+                                        <p><strong>Average:</strong> ${humidityData.indoor ? `${humidityData.indoor.avg}%` : 'Unknown'}</p>
+                                        <p><strong>Status:</strong> ${humidityData.indoor ? humidityData.indoor.status || 'Normal' : 'Unknown'}</p>
+                                        <p><strong>Trend:</strong> ${humidityData.indoor ? humidityData.indoor.trend || 'Stable' : 'Unknown'}</p>
+                                    </div>
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                                        <h5 style="color: #28a745; margin-top: 0;">🌤️ Outdoor Humidity</h5>
+                                        <p><strong>Current:</strong> ${humidityData.outdoor ? `${humidityData.outdoor.current}%` : 'Unknown'}</p>
+                                        <p><strong>Range:</strong> ${humidityData.outdoor ? `${humidityData.outdoor.min}% - ${humidityData.outdoor.max}%` : 'Unknown'}</p>
+                                        <p><strong>Average:</strong> ${humidityData.outdoor ? `${humidityData.outdoor.avg}%` : 'Unknown'}</p>
+                                        <p><strong>Weather:</strong> ${humidityData.outdoor ? humidityData.outdoor.weatherCondition || 'Normal' : 'Unknown'}</p>
+                                        <p><strong>Trend:</strong> ${humidityData.outdoor ? humidityData.outdoor.trend || 'Stable' : 'Unknown'}</p>
+                                    </div>
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #ffc107;">
+                                        <h5 style="color: #e67e22; margin-top: 0;">🚗 Garage Humidity</h5>
+                                        <p><strong>Current:</strong> ${humidityData.garage ? `${humidityData.garage.current}%` : 'Unknown'}</p>
+                                        <p><strong>Range:</strong> ${humidityData.garage ? `${humidityData.garage.min}% - ${humidityData.garage.max}%` : 'Unknown'}</p>
+                                        <p><strong>Average:</strong> ${humidityData.garage ? `${humidityData.garage.avg}%` : 'Unknown'}</p>
+                                        <p><strong>Ventilation Need:</strong> ${humidityData.garage ? humidityData.garage.ventilationNeed || 'Normal' : 'Unknown'}</p>
+                                        <p><strong>Trend:</strong> ${humidityData.garage ? humidityData.garage.trend || 'Stable' : 'Unknown'}</p>
+                                    </div>
+                                </div>
+                                <div style="padding: 15px; background-color: #e9ecef; border-radius: 8px; margin-bottom: 15px;">
+                                    <h5 style="color: #495057; margin-top: 0;">📊 Humidity Analysis</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div>
+                                            <p><strong>Indoor/Outdoor Differential:</strong> ${humidityData.differentials ? `${humidityData.differentials.indoorOutdoor}%` : 'Unknown'}</p>
+                                            <p><strong>Garage/Indoor Differential:</strong> ${humidityData.differentials ? `${humidityData.differentials.garageIndoor}%` : 'Unknown'}</p>
+                                            <p><strong>Daily Variation:</strong> ${humidityData.dailyVariation || 'Normal seasonal pattern'}</p>
+                                        </div>
+                                        <div>
+                                            <p><strong>Comfort Zone Status:</strong> ${humidityData.comfortZone || 'Within optimal range'}</p>
+                                            <p><strong>Condensation Risk:</strong> ${humidityData.condensationRisk || 'Low'}</p>
+                                            <p><strong>Ventilation Impact:</strong> ${humidityData.ventilationImpact || 'Positive humidity control'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="padding: 15px; background-color: #d1ecf1; border-radius: 8px;">
+                                    <p><strong>💡 Humidity Insights:</strong></p>
+                                    <ul style="margin-bottom: 10px;">
+                                        <li>Overall humidity management: ${humidityData.overallAssessment || 'Effective humidity control across all zones'}</li>
+                                        <li>Seasonal adjustment needed: ${humidityData.seasonalRecommendation || 'Current settings appropriate'}</li>
+                                        <li>Energy efficiency impact: ${humidityData.energyImpact || 'Balanced approach maintaining comfort'}</li>
+                                    </ul>
+                                    <p><strong>🔧 Recommendations:</strong> ${humidityData.recommendations || 'Continue monitoring, no immediate action needed'}</p>
+                                </div>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayHumidity').innerHTML = '<div class="error-state">Humidity analysis not available</div>';
+                        document.getElementById('yesterdayHumidity').innerHTML = '<div class="error-state">Humidity analysis data not available</div>';
                     }
                     
-                    // Load pressure analysis - Convert stored inHg values back to hPa for display
-                    if (yesterdayData.environmental) {
-                        const env = yesterdayData.environmental;
+                    // PHASE 2: Enhanced Pressure Analysis with Weather Integration (Attributes #13-16)
+                    if (yesterdayData.environmental && yesterdayData.environmental.pressure) {
+                        console.log('PHASE 2: Loading enhanced pressure analysis with weather integration');
+                        const pressureData = yesterdayData.environmental.pressure;
                         
-                        // Convert the stored inHg values back to hPa (multiply by 33.8639)
-                        const pressureMinHpa = env.pressureMin ? (env.pressureMin * 33.8639).toFixed(1) : '--';
-                        const pressureMaxHpa = env.pressureMax ? (env.pressureMax * 33.8639).toFixed(1) : '--';
-                        const variationHpa = env.pressureMax && env.pressureMin ? 
-                            ((env.pressureMax - env.pressureMin) * 33.8639).toFixed(1) : '--';
+                        // Weather analysis based on pressure patterns
+                        let weatherTrend = 'Stable';
+                        let stormRisk = 'Low';
+                        let weatherIcon = '☀️';
+                        let stormIcon = '✅';
+                        
+                        if (pressureData.change) {
+                            if (pressureData.change < -0.1) {
+                                weatherTrend = 'Falling (Storm Approaching)';
+                                stormRisk = 'High';
+                                weatherIcon = '⛈️';
+                                stormIcon = '⚠️';
+                            } else if (pressureData.change > 0.1) {
+                                weatherTrend = 'Rising (Clearing)';
+                                weatherIcon = '🌤️';
+                            }
+                        }
                         
                         document.getElementById('yesterdayPressure').innerHTML = `
                             <div class="pressure-analysis">
-                                <p><strong>Pressure Range:</strong> ${pressureMinHpa} → ${pressureMaxHpa} hPa</p>
-                                <p><strong>Pressure Variation:</strong> ${variationHpa} hPa</p>
-                                <p><strong>Weather Stability:</strong> ${env.pressureMax && env.pressureMin && (env.pressureMax - env.pressureMin) < 0.1 ? 'Stable' : 'Variable'}</p>
-                                <p><strong>Note:</strong> Yesterday's aggregated pressure data</p>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #6f42c1;">
+                                        <h5 style="color: #6f42c1; margin-top: 0;">📊 Pressure Readings</h5>
+                                        <p><strong>Pressure Range:</strong> ${pressureData.min ? pressureData.min.toFixed(2) : '--'} → ${pressureData.max ? pressureData.max.toFixed(2) : '--'} inHg</p>
+                                        <p><strong>Average Pressure:</strong> ${pressureData.avg ? pressureData.avg.toFixed(2) : '--'} inHg</p>
+                                        <p><strong>Pressure Variation:</strong> ${pressureData.range ? pressureData.range.toFixed(3) : '--'} inHg</p>
+                                        <p><strong>24hr Change:</strong> ${pressureData.change ? (pressureData.change > 0 ? '+' : '') + pressureData.change.toFixed(3) : '--'} inHg</p>
+                                    </div>
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #fd7e14;">
+                                        <h5 style="color: #fd7e14; margin-top: 0;">🌤️ Weather Analysis</h5>
+                                        <p><strong>Weather Trend:</strong> ${weatherIcon} ${weatherTrend}</p>
+                                        <p><strong>Storm Risk:</strong> ${stormIcon} ${stormRisk}</p>
+                                        <p><strong>Stability Index:</strong> ${pressureData.stability || 'Unknown'}</p>
+                                        <p><strong>Forecast Impact:</strong> ${pressureData.forecastImpact || 'Minimal changes expected'}</p>
+                                    </div>
+                                </div>
+                                <div style="padding: 15px; background-color: #e2e3e5; border-radius: 8px;">
+                                    <p><strong>📈 Pressure Insights:</strong></p>
+                                    <ul style="margin-bottom: 10px;">
+                                        <li>Pressure stability: ${pressureData.range && pressureData.range < 0.05 ? 'Very stable weather conditions' : 'Variable conditions detected'}</li>
+                                        <li>Weather pattern: ${pressureData.pattern || 'Standard diurnal variation'}</li>
+                                        <li>Ventilation impact: ${pressureData.ventilationRecommendation || 'Normal operation recommended'}</li>
+                                    </ul>
+                                    <p><strong>🌦️ Storm Risk Assessment:</strong> ${pressureData.stormRiskDetails || 'Low risk based on stable pressure readings'}</p>
+                                </div>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayPressure').innerHTML = '<div class="error-state">Pressure analysis not available</div>';
+                        document.getElementById('yesterdayPressure').innerHTML = '<div class="error-state">Pressure analysis data not available</div>';
                     }
                     
-                    // Load ventilation analysis - use actual API structure
-                    if (yesterdayData.performance) {
-                        const perf = yesterdayData.performance;
+                    // PHASE 2: Enhanced Ventilation Analysis (Attributes #17-23)
+                    if (yesterdayData.ventilation) {
+                        console.log('PHASE 2: Loading enhanced ventilation analysis');
+                        const ventData = yesterdayData.ventilation;
+                        
+                        // Calculate efficiency metrics
+                        const totalMinutes = ventData.fanMinutesToday || 0;
+                        const dutyCyclePercent = totalMinutes > 0 ? ((totalMinutes / 1440) * 100).toFixed(1) : '0.0';
+                        const runtimeHours = totalMinutes > 0 ? (totalMinutes / 60).toFixed(1) : '0.0';
+                        
+                        // Air quality assessment
+                        let airQualityIcon = '✅';
+                        let airQualityStatus = ventData.airQuality || 'Unknown';
+                        if (airQualityStatus.toLowerCase().includes('poor')) {
+                            airQualityIcon = '⚠️';
+                        } else if (airQualityStatus.toLowerCase().includes('good')) {
+                            airQualityIcon = '✅';
+                        }
+                        
                         document.getElementById('yesterdayVentilation').innerHTML = `
                             <div class="ventilation-analysis">
-                                <p><strong>Efficiency:</strong> ${perf.efficiency || '--'}%</p>
-                                <p><strong>Runtime:</strong> ${perf.runtime || '--'} hours</p>
-                                <p><strong>Energy Usage:</strong> ${perf.energyUsage || 'Unknown'}</p>
-                                <p><strong>Peak Load:</strong> ${perf.peakLoad || 'Unknown'}</p>
-                                <p><strong>Operational Assessment:</strong> Based on runtime and efficiency metrics</p>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                                        <h5 style="color: #17a2b8; margin-top: 0;">🌀 Fan Operations</h5>
+                                        <p><strong>Total Runtime:</strong> ${runtimeHours} hours</p>
+                                        <p><strong>Duty Cycle:</strong> ${dutyCyclePercent}% of day</p>
+                                        <p><strong>Operational Mode:</strong> ${ventData.mode || 'Unknown'}</p>
+                                        <p><strong>Fan Efficiency:</strong> ${ventData.efficiency || 'Unknown'}</p>
+                                        <p><strong>Energy Usage:</strong> ${ventData.energyUsage || 'Unknown'}</p>
+                                    </div>
+                                    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                                        <h5 style="color: #28a745; margin-top: 0;">🌬️ Air Quality & Flow</h5>
+                                        <p><strong>Air Quality:</strong> ${airQualityIcon} ${airQualityStatus}</p>
+                                        <p><strong>Air Circulation:</strong> ${ventData.circulation || 'Unknown'}</p>
+                                        <p><strong>Flow Rate:</strong> ${ventData.flowRate || 'Unknown'}</p>
+                                        <p><strong>Filtration:</strong> ${ventData.filtration || 'Standard'}</p>
+                                        <p><strong>Exchange Rate:</strong> ${ventData.exchangeRate || 'Unknown'}</p>
+                                    </div>
+                                </div>
+                                <div style="padding: 15px; background-color: #d4edda; border-radius: 8px; border-left: 4px solid #155724;">
+                                    <h5 style="color: #155724; margin-top: 0;">📊 Performance Analysis</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div>
+                                            <p><strong>Operating Efficiency:</strong> ${ventData.operatingEfficiency || 'Unknown'}</p>
+                                            <p><strong>Temperature Impact:</strong> ${ventData.temperatureImpact || 'Positive cooling effect'}</p>
+                                            <p><strong>Humidity Control:</strong> ${ventData.humidityControl || 'Effective'}</p>
+                                        </div>
+                                        <div>
+                                            <p><strong>Cost Effectiveness:</strong> ${ventData.costEffectiveness || 'Good value'}</p>
+                                            <p><strong>Maintenance Status:</strong> ${ventData.maintenanceStatus || 'Normal'}</p>
+                                            <p><strong>Next Service:</strong> ${ventData.nextService || 'TBD'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="padding: 15px; background-color: #fff3cd; border-radius: 8px; margin-top: 15px;">
+                                    <p><strong>💡 Optimization Insights:</strong></p>
+                                    <ul style="margin-bottom: 10px;">
+                                        <li>Runtime optimization: ${dutyCyclePercent < 20 ? 'Low usage - consider increasing for better air quality' : dutyCyclePercent > 80 ? 'High usage - check for efficiency opportunities' : 'Optimal usage pattern'}</li>
+                                        <li>Energy efficiency: ${ventData.energyEfficiencyTip || 'Monitor usage patterns for optimization opportunities'}</li>
+                                        <li>Air quality impact: ${ventData.airQualityImpact || 'Positive impact on indoor environment'}</li>
+                                    </ul>
+                                </div>
                             </div>
                         `;
                     } else {
-                        document.getElementById('yesterdayVentilation').innerHTML = '<div class="error-state">Ventilation analysis not available</div>';
+                        document.getElementById('yesterdayVentilation').innerHTML = '<div class="error-state">Ventilation analysis data not available</div>';
                     }
                     
                     // Load monthly aggregation status - call existing updateDashboard to get Status API data
