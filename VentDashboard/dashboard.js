@@ -1543,19 +1543,27 @@ async function refreshData() {
                         console.log('PHASE 2: Loading enhanced pressure analysis with weather integration');
                         const pressureData = yesterdayData.environmental.pressure;
                         
+                        // FIX: Use correct API structure (indoor.current, indoor.average, etc.)
+                        const indoor = pressureData.indoor || {};
+                        const currentPressure = indoor.current;
+                        const avgPressure = indoor.average;
+                        const minPressure = indoor.min;
+                        const maxPressure = indoor.max;
+                        const change24hr = pressureData.change24hr;
+                        
                         // Weather analysis based on pressure patterns
                         let weatherTrend = 'Stable';
                         let stormRisk = 'Low';
                         let weatherIcon = '☀️';
                         let stormIcon = '✅';
                         
-                        if (pressureData.change) {
-                            if (pressureData.change < -0.1) {
+                        if (change24hr) {
+                            if (change24hr < -0.1) {
                                 weatherTrend = 'Falling (Storm Approaching)';
                                 stormRisk = 'High';
                                 weatherIcon = '⛈️';
                                 stormIcon = '⚠️';
-                            } else if (pressureData.change > 0.1) {
+                            } else if (change24hr > 0.1) {
                                 weatherTrend = 'Rising (Clearing)';
                                 weatherIcon = '🌤️';
                             }
@@ -1566,10 +1574,10 @@ async function refreshData() {
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                                     <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #6f42c1;">
                                         <h5 style="color: #6f42c1; margin-top: 0;">📊 Pressure Readings</h5>
-                                        <p><strong>Pressure Range:</strong> ${pressureData.min ? pressureData.min.toFixed(2) : '--'} → ${pressureData.max ? pressureData.max.toFixed(2) : '--'} inHg</p>
-                                        <p><strong>Average Pressure:</strong> ${pressureData.avg ? pressureData.avg.toFixed(2) : '--'} inHg</p>
-                                        <p><strong>Pressure Variation:</strong> ${pressureData.range ? pressureData.range.toFixed(3) : '--'} inHg</p>
-                                        <p><strong>24hr Change:</strong> ${pressureData.change ? (pressureData.change > 0 ? '+' : '') + pressureData.change.toFixed(3) : '--'} inHg</p>
+                                        <p><strong>Current Pressure:</strong> ${currentPressure ? currentPressure.toFixed(2) + ' inHg' : 'Not available'}</p>
+                                        <p><strong>Average Pressure:</strong> ${avgPressure ? avgPressure.toFixed(2) + ' inHg' : 'Not available'}</p>
+                                        <p><strong>Pressure Range:</strong> ${minPressure && maxPressure ? minPressure.toFixed(2) + ' → ' + maxPressure.toFixed(2) + ' inHg' : 'Not available'}</p>
+                                        <p><strong>24hr Change:</strong> ${change24hr ? (change24hr > 0 ? '+' : '') + change24hr.toFixed(3) + ' inHg' : 'Not available'}</p>
                                     </div>
                                     <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #fd7e14;">
                                         <h5 style="color: #fd7e14; margin-top: 0;">🌤️ Weather Analysis</h5>
@@ -1867,139 +1875,43 @@ async function refreshData() {
          * @returns {Promise<void>}
          */
         async function loadYesterdaySummaryFromEnhancedAPI() {
-            console.log('=== PHASE 3: Enhanced loadYesterdaySummaryFromEnhancedAPI with improved error handling ===');
-            
-            // PHASE 3: Enhanced loading state management
-            const setLoadingState = () => {
-                const loadingText = 'Loading...';
-                const loadingClass = 'loading-state';
-                
-                const safeUpdate = (id, text, className = null) => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.textContent = text;
-                        if (className) element.className = className;
-                    }
-                };
-                
-                // Set loading states for all summary boxes
-                safeUpdate('yesterdayAvgTemp', loadingText, loadingClass);
-                safeUpdate('yesterdayTempRange', loadingText, loadingClass);
-                safeUpdate('yesterdayTempTrend', 'Loading', loadingClass);
-                safeUpdate('yesterdayEfficiency', loadingText, loadingClass);
-                safeUpdate('yesterdayRuntime', loadingText, loadingClass);
-                safeUpdate('yesterdayEfficiencyTrend', 'Loading', loadingClass);
-                safeUpdate('yesterdayDoorsActive', loadingText, loadingClass);
-                safeUpdate('yesterdaySessions', loadingText, loadingClass);
-                safeUpdate('yesterdayPeakTime', 'Loading', loadingClass);
-                safeUpdate('yesterdaySystemHealth', loadingText, loadingClass);
-                safeUpdate('yesterdayIncidents', loadingText, loadingClass);
-                safeUpdate('yesterdayUptime', 'Loading', loadingClass);
-                
-                // Set loading states for all detail widgets
-                const widgets = ['yesterdayEnvironment', 'yesterdayPerformance', 'yesterdayPressure', 
-                               'yesterdayVentilation', 'yesterdayDoors', 'yesterdayAggregation', 
-                               'yesterdayIncidents', 'yesterdayHumidity'];
-                widgets.forEach(widgetId => {
-                    const widget = document.getElementById(widgetId);
-                    if (widget) {
-                        widget.innerHTML = '<div class="loading-content"><p><strong>Loading...</strong> Fetching data from system...</p></div>';
-                        widget.className += ' loading-state';
-                    }
-                });
-            };
-            
-            // PHASE 3: Enhanced error state management
-            const setErrorState = (errorMessage = 'Data temporarily unavailable') => {
-                const errorText = '-- Error --';
-                const errorClass = 'error-state';
-                
-                const safeUpdate = (id, text, className = null) => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.textContent = text;
-                        if (className) element.className = className;
-                    }
-                };
-                
-                // Set error states for summary boxes
-                safeUpdate('yesterdayAvgTemp', errorText, errorClass);
-                safeUpdate('yesterdayTempRange', errorText, errorClass);
-                safeUpdate('yesterdayTempTrend', 'Error', errorClass);
-                safeUpdate('yesterdayEfficiency', errorText, errorClass);
-                safeUpdate('yesterdayRuntime', errorText, errorClass);
-                safeUpdate('yesterdayEfficiencyTrend', 'Error', errorClass);
-                safeUpdate('yesterdayDoorsActive', errorText, errorClass);
-                safeUpdate('yesterdaySessions', errorText, errorClass);
-                safeUpdate('yesterdayPeakTime', 'Error', errorClass);
-                safeUpdate('yesterdaySystemHealth', errorText, errorClass);
-                safeUpdate('yesterdayIncidents', errorText, errorClass);
-                safeUpdate('yesterdayUptime', 'Error', errorClass);
-                
-                // Set error states for detail widgets
-                const widgets = ['yesterdayEnvironment', 'yesterdayPerformance', 'yesterdayPressure', 
-                               'yesterdayVentilation', 'yesterdayDoors', 'yesterdayAggregation', 
-                               'yesterdayIncidents', 'yesterdayHumidity'];
-                widgets.forEach(widgetId => {
-                    const widget = document.getElementById(widgetId);
-                    if (widget) {
-                        widget.innerHTML = `<div class="error-content"><p><strong>⚠️ ${errorMessage}</strong></p><p>Please check your connection and try refreshing the page.</p></div>`;
-                        widget.className = widget.className.replace('loading-state', '') + ' error-state';
-                    }
-                });
-            };
+            console.log('=== FIXED: loadYesterdaySummaryFromEnhancedAPI() with readable text ===');
             
             // Helper function to set waiting state (no auth available)
             const setYesterdayMetricsToWaiting = () => {
                 const waitingText = 'Authentication required';
-                const waitingClass = 'waiting-state';
                 
-                const safeUpdate = (id, text, className = null) => {
+                const safeUpdate = (id, text) => {
                     const element = document.getElementById(id);
-                    if (element) {
-                        element.textContent = text;
-                        if (className) element.className = className;
-                    }
+                    if (element) element.textContent = text;
                 };
                 
-                safeUpdate('yesterdayAvgTemp', waitingText, waitingClass);
-                safeUpdate('yesterdayTempRange', waitingText, waitingClass);
-                safeUpdate('yesterdayTempTrend', 'Pending', waitingClass);
-                safeUpdate('yesterdayEfficiency', waitingText, waitingClass);
-                safeUpdate('yesterdayRuntime', waitingText, waitingClass);
-                safeUpdate('yesterdayEfficiencyTrend', 'Pending', waitingClass);
-                safeUpdate('yesterdayDoorsActive', waitingText, waitingClass);
-                safeUpdate('yesterdaySessions', waitingText, waitingClass);
-                safeUpdate('yesterdayPeakTime', 'Pending', waitingClass);
-                safeUpdate('yesterdaySystemHealth', waitingText, waitingClass);
-                safeUpdate('yesterdayIncidents', waitingText, waitingClass);
-                safeUpdate('yesterdayUptime', 'Pending', waitingClass);
+                safeUpdate('yesterdayAvgTemp', waitingText);
+                safeUpdate('yesterdayTempRange', waitingText);
+                safeUpdate('yesterdayTempTrend', 'Pending');
+                safeUpdate('yesterdayEfficiency', waitingText);
+                safeUpdate('yesterdayRuntime', waitingText);
+                safeUpdate('yesterdayEfficiencyTrend', 'Pending');
+                safeUpdate('yesterdayDoorsActive', waitingText);
+                safeUpdate('yesterdaySessions', waitingText);
+                safeUpdate('yesterdayPeakTime', 'Pending');
+                safeUpdate('yesterdaySystemHealth', waitingText);
+                safeUpdate('yesterdayIncidents', waitingText);
+                safeUpdate('yesterdayUptime', 'Pending');
             };
-            
-            // PHASE 3: Start with loading state
-            setLoadingState();
             
             try {
                 const headers = getAuthHeaders();
                 const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
                 
                 if (!hasAuth) {
-                    console.log('PHASE 3: No authentication available');
+                    console.log('loadYesterdaySummaryFromEnhancedAPI: No authentication available');
                     setYesterdayMetricsToWaiting();
                     return;
                 }
 
-                console.log('PHASE 3: Loading data with enhanced error handling...');
-                
-                // Use DataManager to get Enhanced Dashboard Data with timeout
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Request timeout')), 15000)
-                );
-                
-                const data = await Promise.race([
-                    DataManager.getEnhancedData(),
-                    timeoutPromise
-                ]);
+                // Use DataManager to get Enhanced Dashboard Data
+                const data = await DataManager.getEnhancedData();
                 console.log('PHASE 2 FIX: Enhanced data received for summary metrics');
                 
                 // PHASE 2 FIX: Access data at sections.yesterday (not response.yesterday)
@@ -2190,27 +2102,26 @@ async function refreshData() {
                 console.log('PHASE 1 FIX: Summary boxes updated with corrected API data paths');
 
             } catch (error) {
-                console.error('PHASE 3: Enhanced API summary loading failed:', error);
+                console.error('Enhanced API summary loading failed:', error);
+                // Use simple, readable error handling
+                const safeUpdate = (id, text) => {
+                    const element = document.getElementById(id);
+                    if (element) element.textContent = text;
+                };
                 
-                // PHASE 3: Use enhanced error state management
-                if (error.message === 'Request timeout') {
-                    setErrorState('Request timed out after 15 seconds');
-                } else if (error.message && error.message.includes('network')) {
-                    setErrorState('Network connection error');
-                } else if (error.status === 401 || error.status === 403) {
-                    setErrorState('Authentication failed');
-                } else if (error.status === 500) {
-                    setErrorState('Server error - please try again later');
-                } else {
-                    setErrorState('Data temporarily unavailable');
-                }
-                
-                // Log detailed error for debugging
-                console.error('PHASE 3: Error details:', {
-                    message: error.message,
-                    status: error.status,
-                    stack: error.stack
-                });
+                const errorText = 'Error';
+                safeUpdate('yesterdayAvgTemp', errorText);
+                safeUpdate('yesterdayTempRange', 'Failed to load');
+                safeUpdate('yesterdayTempTrend', 'No data');
+                safeUpdate('yesterdayEfficiency', errorText);
+                safeUpdate('yesterdayRuntime', 'Failed to load');
+                safeUpdate('yesterdayEfficiencyTrend', 'No data');
+                safeUpdate('yesterdayDoorsActive', errorText);
+                safeUpdate('yesterdaySessions', 'Failed to load');
+                safeUpdate('yesterdayPeakTime', 'No data');
+                safeUpdate('yesterdaySystemHealth', errorText);
+                safeUpdate('yesterdayIncidents', 'Failed to load');
+                safeUpdate('yesterdayUptime', 'No data');
             }
         }
 
