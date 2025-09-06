@@ -2250,17 +2250,13 @@ async function refreshData() {
             }
             
             try {
-                // Get enhanced door analytics data from the new API
-                const response = await fetch('/api/GetEnhancedDoorAnalytics', {
-                    method: 'POST',
+                // FIXED: Changed from POST to GET method with query parameters
+                // ESP32 Source Alignment: Use 'analysis' and 'timeRange' parameters as defined by Azure Function
+                const response = await fetch(`/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01`, {
+                    method: 'GET',
                     headers: {
-                        ...headers,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        analysis_type: 'detailed',
-                        hours: hours
-                    })
+                        ...headers
+                    }
                 });
 
                 if (!response.ok) {
@@ -2336,11 +2332,13 @@ async function refreshData() {
 
         // NEW: Update door activity display with enhanced data
         function updateDoorActivityDisplay(data) {
-            if (data.summary) {
-                const summary = data.summary;
+            // FIXED: Align with ESP32 source data structure from GetEnhancedDoorAnalytics API
+            // API returns: totalEvents, systemHealth, eventSummary, recentPerformance
+            if (data.eventSummary || data.totalEvents !== undefined) {
+                const summary = data.eventSummary || {};
                 
                 document.getElementById('activeDoorsCount').textContent = summary.unique_doors || 0;
-                document.getElementById('totalSessionsCount').textContent = summary.total_events || 0;
+                document.getElementById('totalSessionsCount').textContent = data.totalEvents || 0;
                 
                 if (summary.latest_activity) {
                     const latestTime = new Date(summary.latest_activity * 1000);
@@ -2348,6 +2346,8 @@ async function refreshData() {
                         month: 'short', day: 'numeric', 
                         hour: '2-digit', minute: '2-digit'
                     });
+                } else if (data.totalEvents === 0) {
+                    document.getElementById('lastActivityTime').textContent = 'No recent activity';
                 }
                 
                 if (summary.earliest_activity) {
@@ -2356,15 +2356,25 @@ async function refreshData() {
                         month: 'short', day: 'numeric', 
                         hour: '2-digit', minute: '2-digit'
                     })}`;
+                } else {
+                    document.getElementById('firstActivityStat').textContent = 'No activity';
                 }
                 
-                document.getElementById('totalSessionsStat').textContent = `${summary.total_events || 0} events`;
+                document.getElementById('totalSessionsStat').textContent = `${data.totalEvents || 0} events`;
                 
-                // NEW: Detection method breakdown
+                // FIXED: Align with ESP32 detectionMethod field structure
                 const methodBreakdown = summary.detection_method_breakdown || {};
                 const pressureCount = methodBreakdown['pressure-analysis'] || 0;
                 const reedCount = methodBreakdown['reed-switch'] || 0;
                 document.getElementById('detectionMethodStat').textContent = `Pressure: ${pressureCount}, Reed: ${reedCount}`;
+            } else {
+                // Handle case where no data is available
+                document.getElementById('activeDoorsCount').textContent = '0';
+                document.getElementById('totalSessionsCount').textContent = '0';
+                document.getElementById('lastActivityTime').textContent = 'No data available';
+                document.getElementById('firstActivityStat').textContent = 'No data';
+                document.getElementById('totalSessionsStat').textContent = '0 events';
+                document.getElementById('detectionMethodStat').textContent = 'No detections';
             }
         }
 
@@ -2373,55 +2383,76 @@ async function refreshData() {
             const confidenceCanvas = document.getElementById('confidenceChart');
             if (!confidenceCanvas || !confidenceCanvas.chartInstance) return;
             
-            if (data.confidence_analysis) {
-                const confidence = data.confidence_analysis;
+            // FIXED: Align with ESP32 source structure - API returns confidenceDistribution
+            if (data.confidenceDistribution) {
+                const confidence = data.confidenceDistribution;
                 const chart = confidenceCanvas.chartInstance;
                 
-                // Update chart data
+                // Update chart data - handle ESP32 structure
                 chart.data.datasets[0].data = [
-                    confidence.high_confidence || 0,
-                    confidence.medium_confidence || 0,
-                    confidence.low_confidence || 0,
+                    confidence.high || confidence.high_confidence || 0,
+                    confidence.medium || confidence.medium_confidence || 0,
+                    confidence.low || confidence.low_confidence || 0,
                     confidence.reed_switch || 0
                 ];
                 chart.update();
                 
-                // Update stats
-                document.getElementById('highConfidenceCount').textContent = confidence.high_confidence || 0;
-                document.getElementById('mediumConfidenceCount').textContent = confidence.medium_confidence || 0;
-                document.getElementById('lowConfidenceCount').textContent = confidence.low_confidence || 0;
+                // Update stats with ESP32-aligned field names
+                document.getElementById('highConfidenceCount').textContent = confidence.high || confidence.high_confidence || 0;
+                document.getElementById('mediumConfidenceCount').textContent = confidence.medium || confidence.medium_confidence || 0;
+                document.getElementById('lowConfidenceCount').textContent = confidence.low || confidence.low_confidence || 0;
+            } else {
+                // No confidence data available - show empty state
+                const chart = confidenceCanvas.chartInstance;
+                chart.data.datasets[0].data = [0, 0, 0, 0];
+                chart.update();
+                
+                document.getElementById('highConfidenceCount').textContent = '--';
+                document.getElementById('mediumConfidenceCount').textContent = '--';
+                document.getElementById('lowConfidenceCount').textContent = '--';
             }
         }
 
-        // NEW: Update pressure analytics
+        // FIXED: Update pressure analytics to align with ESP32 source structure  
         function updatePressureAnalytics(data) {
-            if (data.pressure_analysis) {
-                const pressure = data.pressure_analysis;
-                
+            // ESP32 source structure: API may return recentPerformance, zoneActivity, or pressureAnalysis
+            const pressure = data.recentPerformance || data.pressureAnalysis || data.pressure_analysis;
+            
+            if (pressure) {
                 document.getElementById('avgPressureChange').textContent = 
-                    pressure.average_pressure_change ? `${pressure.average_pressure_change.toFixed(3)} hPa` : '-- hPa';
+                    pressure.average_pressure_change || pressure.avgPressureChange ? 
+                    `${(pressure.average_pressure_change || pressure.avgPressureChange).toFixed(3)} hPa` : '-- hPa';
                 
                 document.getElementById('maxPressureChange').textContent = 
-                    pressure.max_pressure_change ? `${pressure.max_pressure_change.toFixed(3)} hPa` : '-- hPa';
-                
-                // Zone breakdown
-                const zones = pressure.zone_breakdown || {};
-                document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
-                document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
-                document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
-                
-                // Most active zone
+                    pressure.max_pressure_change || pressure.maxPressureChange ? 
+                    `${(pressure.max_pressure_change || pressure.maxPressureChange).toFixed(3)} hPa` : '-- hPa';
+            } else {
+                document.getElementById('avgPressureChange').textContent = '-- hPa';
+                document.getElementById('maxPressureChange').textContent = '-- hPa';
+            }
+            
+            // FIXED: Zone breakdown - align with ESP32 zone field structure
+            const zones = data.zoneActivity || pressure?.zone_breakdown || {};
+            document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
+            document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
+            document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+            
+            // Most active zone - handle ESP32 structure
+            if (data.mostActiveZone) {
+                document.getElementById('mostActiveZone').textContent = data.mostActiveZone === 'None' ? '--' : data.mostActiveZone;
+            } else {
                 const mostActive = Object.keys(zones).reduce((a, b) => zones[a] > zones[b] ? a : b, 'unknown');
-                document.getElementById('mostActiveZone').textContent = mostActive || '--';
+                document.getElementById('mostActiveZone').textContent = zones[mostActive] > 0 ? mostActive : '--';
             }
         }
 
-        // NEW: Update door timeline with enhanced visualization
+        // FIXED: Update door timeline with ESP32-aligned data structure
         function updateDoorTimeline(data) {
             const timelineCanvas = document.getElementById('doorTimelineChart');
             if (!timelineCanvas || !timelineCanvas.chartInstance) return;
             
-            if (data.hourly_breakdown) {
+            // FIXED: API returns hourlyBreakdown (camelCase), not hourly_breakdown (underscore)
+            if (data.hourlyBreakdown && Array.isArray(data.hourlyBreakdown)) {
                 const chart = timelineCanvas.chartInstance;
                 const datasets = [];
                 
@@ -2430,20 +2461,27 @@ async function refreshData() {
                 const pressureData = [];
                 const lowConfidenceData = [];
                 
-                Object.entries(data.hourly_breakdown).forEach(([hour, events]) => {
+                // FIXED: Handle ESP32 hourlyBreakdown array structure
+                data.hourlyBreakdown.forEach(entry => {
+                    if (!entry.hour && entry.hour !== 0) return;
+                    
                     const timestamp = new Date();
-                    timestamp.setHours(parseInt(hour), 0, 0, 0);
+                    timestamp.setHours(parseInt(entry.hour), 0, 0, 0);
                     
-                    if (events.reed_switch) {
-                        reedSwitchData.push({ x: timestamp, y: events.reed_switch });
+                    // Handle different event types - align with ESP32 structure
+                    const events = entry.events || entry;
+                    
+                    if (entry.reed_switch || events.reed_switch) {
+                        reedSwitchData.push({ x: timestamp, y: entry.reed_switch || events.reed_switch });
                     }
                     
-                    if (events.pressure_high_confidence) {
-                        pressureData.push({ x: timestamp, y: events.pressure_high_confidence });
+                    if (entry.pressure_high_confidence || events.pressure_high_confidence || entry.events) {
+                        const pressureCount = entry.pressure_high_confidence || events.pressure_high_confidence || entry.events;
+                        pressureData.push({ x: timestamp, y: pressureCount });
                     }
                     
-                    if (events.pressure_low_confidence) {
-                        lowConfidenceData.push({ x: timestamp, y: events.pressure_low_confidence });
+                    if (entry.pressure_low_confidence || events.pressure_low_confidence) {
+                        lowConfidenceData.push({ x: timestamp, y: entry.pressure_low_confidence || events.pressure_low_confidence });
                     }
                 });
                 
