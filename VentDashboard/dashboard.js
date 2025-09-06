@@ -1365,14 +1365,14 @@ async function refreshData() {
                                     <div class="sensor-zone" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
                                         <h5 style="color: #007bff; margin-top: 0;">🏠 Indoor Environment</h5>
                                         <p><strong>Temperature:</strong> ${tempData.indoor.min}° - ${tempData.indoor.max}° (avg ${tempData.indoor.avg}°F)</p>
-                                        <p><strong>Humidity:</strong> ${humidityData.indoor.current}% (${humidityData.indoor.status})</p>
+                                        <p><strong>Humidity:</strong> ${humidityData && humidityData.indoor ? `${humidityData.indoor.current}% (${humidityData.indoor.status || 'Normal'})` : 'Unknown'}</p>
                                         <p><strong>Trend:</strong> ${tempData.indoor.trend}</p>
                                         <p><strong>Comfort Status:</strong> ${tempData.differentials.comfortZone}</p>
                                     </div>
                                     <div class="sensor-zone" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
                                         <h5 style="color: #28a745; margin-top: 0;">�️ Outdoor Environment</h5>
                                         <p><strong>Temperature:</strong> ${tempData.outdoor.min}° - ${tempData.outdoor.max}° (avg ${tempData.outdoor.avg}°F)</p>
-                                        <p><strong>Humidity:</strong> ${humidityData.outdoor.current}%</p>
+                                        <p><strong>Humidity:</strong> ${humidityData && humidityData.outdoor ? `${humidityData.outdoor.current}%` : 'Unknown'}</p>
                                         <p><strong>Trend:</strong> ${tempData.outdoor.trend}</p>
                                         <p><strong>Weather Impact:</strong> Monitoring for ventilation decisions</p>
                                     </div>
@@ -1381,7 +1381,7 @@ async function refreshData() {
                                         <p><strong>Temperature:</strong> ${tempData.garage.min}° - ${tempData.garage.max}° (avg ${tempData.garage.avg}°F)</p>
                                         <p><strong>Differential:</strong> ${tempData.differentials.indoorOutdoor}°F vs outdoor</p>
                                         <p><strong>Stability:</strong> ${tempData.garage.range}°F daily range</p>
-                                        <p><strong>Ventilation Need:</strong> ${tempData.differentials.ventilationRecommendation}</p>
+                                        <p><strong>Ventilation Need:</strong> ${tempData.differentials && tempData.differentials.ventilationRecommendation ? tempData.differentials.ventilationRecommendation : 'Normal ventilation'}</p>
                                     </div>
                                 </div>
                                 <div class="env-analysis" style="padding: 15px; background-color: #e9ecef; border-radius: 8px;">
@@ -1390,9 +1390,9 @@ async function refreshData() {
                                         <li>Indoor stability: ${tempData.indoor.trend} (range: ${tempData.indoor.range}°F)</li>
                                         <li>Optimal range status: ${tempData.differentials.comfortZone}</li>
                                         <li>Daily temperature differential: ${tempData.differentials.indoorOutdoor}°F between indoor/outdoor</li>
-                                        <li>Ventilation effectiveness: ${tempData.differentials.ventilationImpact}</li>
+                                        <li>Ventilation effectiveness: ${tempData.differentials && tempData.differentials.ventilationImpact ? tempData.differentials.ventilationImpact : 'Positive impact on temperature control'}</li>
                                     </ul>
-                                    <p><strong>🌡️ Key Insights:</strong> ${envData.analysis.dailyInsight}</p>
+                                    <p><strong>🌡️ Key Insights:</strong> ${envData.analysis && envData.analysis.dailyInsight ? envData.analysis.dailyInsight : 'Environmental conditions within normal ranges'}</p>
                                 </div>
                             </div>
                         `;
