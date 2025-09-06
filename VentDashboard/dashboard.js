@@ -2224,7 +2224,7 @@ async function refreshData() {
          * Displays door status indicators and activity timeline
          * @returns {void}
          */
-        async function updateEnhancedDoorActivity() {
+        async function updateEnhancedDoorActivity(hours = 24) {
             console.log('=== STAGE 3: updateEnhancedDoorActivity() using DataManager ===');
             
             // Show loading states
@@ -2235,6 +2235,10 @@ async function refreshData() {
             document.getElementById('firstActivityStat').textContent = 'Loading...';
             document.getElementById('peakHourStat').textContent = 'Loading...';
             document.getElementById('totalSessionsStat').textContent = 'Loading...';
+            document.getElementById('detectionMethodStat').textContent = 'Loading...';
+
+            // Initialize chart canvases
+            initializeDoorCharts();
             
             // Check if we have any authentication method (Bearer token or API key)  
             const headers = getAuthHeaders();
@@ -2246,19 +2250,32 @@ async function refreshData() {
             }
             
             try {
-                // Use consolidated DataManager instead of direct API call
-                const data = await DataManager.getEnhancedData();
-                console.log('DataManager: Enhanced data received for door activity');
-                
-                // Extract door activity data from sections
-                const doorData = data.sections && data.sections.doors;
-                if (doorData) {
-                    // Process door activity data
-                    console.log('Door activity data found:', doorData);
-                } else {
-                    console.log('No door activity data available');
+                // Get enhanced door analytics data from the new API
+                const response = await fetch('/api/GetEnhancedDoorAnalytics', {
+                    method: 'POST',
+                    headers: {
+                        ...headers,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        analysis_type: 'detailed',
+                        hours: hours
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
+                const analyticsData = await response.json();
+                console.log('Enhanced door analytics received:', analyticsData);
+
+                // Process and display the enhanced data
+                updateDoorActivityDisplay(analyticsData);
+                updateConfidenceChart(analyticsData);
+                updatePressureAnalytics(analyticsData);
+                updateDoorTimeline(analyticsData);
+
             } catch (error) {
                 console.error('updateEnhancedDoorActivity failed:', error);
                 // Set error states
@@ -2266,137 +2283,215 @@ async function refreshData() {
                 document.getElementById('totalSessionsCount').textContent = 'Error';
                 document.getElementById('lastActivityTime').textContent = 'Failed to load';
             }
+        }
+
+        // NEW: Initialize chart canvases
+        function initializeDoorCharts() {
+            const timelineCanvas = document.getElementById('doorTimelineChart');
+            const confidenceCanvas = document.getElementById('confidenceChart');
             
-            // Use consolidated DataManager for 24h history data
-            DataManager.getHistoryData(24)
-                .then(data => {
-                    console.log('DataManager: History data received for door activity (24h)');
-                    
-                    // Process door data same way as Activity Timeline
-                    const doorEvents = [];
-                    const doorNames = new Set();
-                    const todaysOpenings = new Set(); // Track unique door opening sessions
-                    const hourlyActivity = {}; // Track activity by hour
-                    
-                    let latestActivity = null;
-                    let earliestActivity = null;
-                    
-                    if (data.data && Array.isArray(data.data)) {
-                        data.data.forEach(record => {
-                            if (record.doors && Array.isArray(record.doors)) {
-                                record.doors.forEach(door => {
-                                    doorNames.add(door.name);
-                                    
-                                    // Track current open doors
-                                    if (door.openedAt) {
-                                        const openTimestamp = parseInt(door.openedAt);
-                                        const openTime = new Date(openTimestamp * 1000);
-                                        const hour = openTime.getHours();
-                                        
-                                        doorEvents.push({
-                                            timestamp: openTimestamp,
-                                            door: door.name,
-                                            action: 'opened'
-                                        });
-                                        
-                                        // Update latest/earliest activity
-                                        if (!latestActivity || openTimestamp > latestActivity) {
-                                            latestActivity = openTimestamp;
-                                        }
-                                        if (!earliestActivity || openTimestamp < earliestActivity) {
-                                            earliestActivity = openTimestamp;
-                                        }
-                                        
-                                        // Count hourly activity
-                                        hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
-                                    }
-                                    
-                                    // Track today's openings for session count
-                                    if (door.firstOpenedToday) {
-                                        todaysOpenings.add(`${door.name}-${door.firstOpenedToday}`);
-                                    }
-                                    if (door.lastOpenedToday && door.lastOpenedToday !== door.firstOpenedToday) {
-                                        todaysOpenings.add(`${door.name}-${door.lastOpenedToday}`);
-                                    }
-                                });
+            if (timelineCanvas && !timelineCanvas.chartInstance) {
+                timelineCanvas.chartInstance = new Chart(timelineCanvas, {
+                    type: 'scatter',
+                    data: { datasets: [] },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'hour' },
+                                title: { display: true, text: 'Time' }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Door Events' }
                             }
-                        });
+                        }
                     }
-                    
-                    console.log('updateEnhancedDoorActivity: Processed door events:', {
-                        totalEvents: doorEvents.length,
-                        uniqueDoors: doorNames.size,
-                        todaysSessions: todaysOpenings.size,
-                        latestActivity: latestActivity,
-                        earliestActivity: earliestActivity
-                    });
-                    
-                    // Update Door Activity Center with real calculated data
-                    if (doorEvents.length > 0) {
-                        console.log('updateEnhancedDoorActivity: Displaying real door activity data');
-                        
-                        // Calculate peak activity hour
-                        const peakHour = Object.keys(hourlyActivity).reduce((a, b) => 
-                            hourlyActivity[a] > hourlyActivity[b] ? a : b
-                        );
-                        const peakHourFormatted = `${peakHour}:00-${parseInt(peakHour)+1}:00`;
-                        
-                        // Update main door activity stats
-                        document.getElementById('activeDoorsCount').textContent = doorNames.size;
-                        document.getElementById('totalSessionsCount').textContent = todaysOpenings.size;
-                        
-                        // Format last activity time
-                        const lastActivityDate = new Date(latestActivity * 1000);
-                        const lastActivityFormatted = lastActivityDate.toLocaleString([], {
-                            month: 'short', day: 'numeric', 
-                            hour: '2-digit', minute: '2-digit'
-                        });
-                        document.getElementById('lastActivityTime').textContent = lastActivityFormatted;
-                        
-                        // Update detailed stats in summary section
-                        const firstActivityDate = new Date(earliestActivity * 1000);
-                        const firstActivityFormatted = firstActivityDate.toLocaleString([], {
-                            month: 'short', day: 'numeric', 
-                            hour: '2-digit', minute: '2-digit'
-                        });
-                        
-                        document.getElementById('firstActivityStat').textContent = `First: ${firstActivityFormatted}`;
-                        document.getElementById('peakHourStat').textContent = `Peak: ${peakHourFormatted}`;
-                        document.getElementById('totalSessionsStat').textContent = `${todaysOpenings.size} sessions`;
-                        
-                        console.log('updateEnhancedDoorActivity: Updated Door Activity Center with real data:', {
-                            activeDoors: doorNames.size,
-                            totalSessions: todaysOpenings.size,
-                            lastActivity: lastActivityFormatted,
-                            firstActivity: firstActivityFormatted,
-                            peakHour: peakHourFormatted
-                        });
-                        
-                    } else {
-                        console.log('updateEnhancedDoorActivity: No door activity events found - showing honest message');
-                        
-                        // Update with honest "no data" message
-                        document.getElementById('activeDoorsCount').textContent = '0';
-                        document.getElementById('totalSessionsCount').textContent = '0';
-                        document.getElementById('lastActivityTime').textContent = 'No recent activity';
-                        
-                        document.getElementById('firstActivityStat').textContent = 'No data';
-                        document.getElementById('peakHourStat').textContent = 'No data';
-                        document.getElementById('totalSessionsStat').textContent = '0 sessions';
-                    }
-                })
-                .catch(error => {
-                    console.error('DataManager: Error loading history data for door activity:', error);
-                    
-                    // Show error state
-                    document.getElementById('activeDoorsCount').textContent = 'Error';
-                    document.getElementById('totalSessionsCount').textContent = 'Error';
-                    document.getElementById('lastActivityTime').textContent = 'Data unavailable';
-                    
-                    document.getElementById('firstActivityStat').textContent = 'Error loading';
-                    document.getElementById('peakHourStat').textContent = 'Error loading';
-                    document.getElementById('totalSessionsStat').textContent = 'Error loading';
                 });
+            }
+            
+            if (confidenceCanvas && !confidenceCanvas.chartInstance) {
+                confidenceCanvas.chartInstance = new Chart(confidenceCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['High (≥0.8)', 'Medium (0.5-0.8)', 'Low (<0.5)', 'Reed Switch (1.0)'],
+                        datasets: [{
+                            data: [0, 0, 0, 0],
+                            backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+            }
+        }
+
+        // NEW: Update door activity display with enhanced data
+        function updateDoorActivityDisplay(data) {
+            if (data.summary) {
+                const summary = data.summary;
+                
+                document.getElementById('activeDoorsCount').textContent = summary.unique_doors || 0;
+                document.getElementById('totalSessionsCount').textContent = summary.total_events || 0;
+                
+                if (summary.latest_activity) {
+                    const latestTime = new Date(summary.latest_activity * 1000);
+                    document.getElementById('lastActivityTime').textContent = latestTime.toLocaleString([], {
+                        month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+                
+                if (summary.earliest_activity) {
+                    const earliestTime = new Date(summary.earliest_activity * 1000);
+                    document.getElementById('firstActivityStat').textContent = `First: ${earliestTime.toLocaleString([], {
+                        month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit'
+                    })}`;
+                }
+                
+                document.getElementById('totalSessionsStat').textContent = `${summary.total_events || 0} events`;
+                
+                // NEW: Detection method breakdown
+                const methodBreakdown = summary.detection_method_breakdown || {};
+                const pressureCount = methodBreakdown['pressure-analysis'] || 0;
+                const reedCount = methodBreakdown['reed-switch'] || 0;
+                document.getElementById('detectionMethodStat').textContent = `Pressure: ${pressureCount}, Reed: ${reedCount}`;
+            }
+        }
+
+        // NEW: Update confidence distribution chart
+        function updateConfidenceChart(data) {
+            const confidenceCanvas = document.getElementById('confidenceChart');
+            if (!confidenceCanvas || !confidenceCanvas.chartInstance) return;
+            
+            if (data.confidence_analysis) {
+                const confidence = data.confidence_analysis;
+                const chart = confidenceCanvas.chartInstance;
+                
+                // Update chart data
+                chart.data.datasets[0].data = [
+                    confidence.high_confidence || 0,
+                    confidence.medium_confidence || 0,
+                    confidence.low_confidence || 0,
+                    confidence.reed_switch || 0
+                ];
+                chart.update();
+                
+                // Update stats
+                document.getElementById('highConfidenceCount').textContent = confidence.high_confidence || 0;
+                document.getElementById('mediumConfidenceCount').textContent = confidence.medium_confidence || 0;
+                document.getElementById('lowConfidenceCount').textContent = confidence.low_confidence || 0;
+            }
+        }
+
+        // NEW: Update pressure analytics
+        function updatePressureAnalytics(data) {
+            if (data.pressure_analysis) {
+                const pressure = data.pressure_analysis;
+                
+                document.getElementById('avgPressureChange').textContent = 
+                    pressure.average_pressure_change ? `${pressure.average_pressure_change.toFixed(3)} hPa` : '-- hPa';
+                
+                document.getElementById('maxPressureChange').textContent = 
+                    pressure.max_pressure_change ? `${pressure.max_pressure_change.toFixed(3)} hPa` : '-- hPa';
+                
+                // Zone breakdown
+                const zones = pressure.zone_breakdown || {};
+                document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
+                document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
+                document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+                
+                // Most active zone
+                const mostActive = Object.keys(zones).reduce((a, b) => zones[a] > zones[b] ? a : b, 'unknown');
+                document.getElementById('mostActiveZone').textContent = mostActive || '--';
+            }
+        }
+
+        // NEW: Update door timeline with enhanced visualization
+        function updateDoorTimeline(data) {
+            const timelineCanvas = document.getElementById('doorTimelineChart');
+            if (!timelineCanvas || !timelineCanvas.chartInstance) return;
+            
+            if (data.hourly_breakdown) {
+                const chart = timelineCanvas.chartInstance;
+                const datasets = [];
+                
+                // Create datasets for different detection methods
+                const reedSwitchData = [];
+                const pressureData = [];
+                const lowConfidenceData = [];
+                
+                Object.entries(data.hourly_breakdown).forEach(([hour, events]) => {
+                    const timestamp = new Date();
+                    timestamp.setHours(parseInt(hour), 0, 0, 0);
+                    
+                    if (events.reed_switch) {
+                        reedSwitchData.push({ x: timestamp, y: events.reed_switch });
+                    }
+                    
+                    if (events.pressure_high_confidence) {
+                        pressureData.push({ x: timestamp, y: events.pressure_high_confidence });
+                    }
+                    
+                    if (events.pressure_low_confidence) {
+                        lowConfidenceData.push({ x: timestamp, y: events.pressure_low_confidence });
+                    }
+                });
+                
+                datasets.push({
+                    label: 'Reed Switch',
+                    data: reedSwitchData,
+                    backgroundColor: '#28a745',
+                    borderColor: '#28a745',
+                    pointRadius: 6
+                });
+                
+                datasets.push({
+                    label: 'Pressure (High Conf)',
+                    data: pressureData,
+                    backgroundColor: '#17a2b8',
+                    borderColor: '#17a2b8',
+                    pointRadius: 5
+                });
+                
+                datasets.push({
+                    label: 'Pressure (Low Conf)',
+                    data: lowConfidenceData,
+                    backgroundColor: '#ffc107',
+                    borderColor: '#ffc107',
+                    pointRadius: 3
+                });
+                
+                chart.data.datasets = datasets;
+                chart.update();
+            }
+        }
+
+        // Add event listeners for time filter buttons  
+        document.addEventListener('DOMContentLoaded', function() {
+            const timeFilters = document.querySelectorAll('.time-filter');
+            timeFilters.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    timeFilters.forEach(btn => btn.classList.remove('active'));
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    // Get the hours value and refresh door activity
+                    const hours = parseInt(this.dataset.hours);
+                    updateEnhancedDoorActivity(hours);
+                });
+            });
+        });
         }
 
         /**
@@ -4441,6 +4536,33 @@ async function refreshData() {
             if (reliabilityWifiUptimeElement) reliabilityWifiUptimeElement.textContent = reliability.wifiUptimePercentage != null ? `${reliability.wifiUptimePercentage}%` : 'No data';
             const reliabilityLongestWifiOutageElement = document.getElementById('reliabilityLongestWifiOutage');
             if (reliabilityLongestWifiOutageElement) reliabilityLongestWifiOutageElement.textContent = reliability.longestWifiOutageMinutes != null ? formatMinutes(reliability.longestWifiOutageMinutes) : 'No data';
+
+            // Update SD card status
+            const sdCard = system.sdCard || {};
+            const sdCardStatusElement = document.getElementById('sdCardStatus');
+            const sdCardDetailsElement = document.getElementById('sdCardDetails');
+            
+            if (sdCardStatusElement && sdCardDetailsElement) {
+                if (sdCard.ready === true) {
+                    sdCardStatusElement.textContent = 'OK';
+                    sdCardStatusElement.className = 'status-ok';
+                    
+                    const writes = sdCard.totalWrites != null ? sdCard.totalWrites : 0;
+                    const lastWrite = sdCard.lastWriteSuccess === true ? 'Success' : 
+                                     sdCard.lastWriteSuccess === false ? 'Failed' : 'Unknown';
+                    sdCardDetailsElement.textContent = `Writes: ${writes}, Last: ${lastWrite}`;
+                } else if (sdCard.ready === false) {
+                    sdCardStatusElement.textContent = 'ERROR';
+                    sdCardStatusElement.className = 'status-error';
+                    
+                    const errorMsg = sdCard.error && sdCard.error.trim() !== '' ? sdCard.error : 'SD card not ready';
+                    sdCardDetailsElement.textContent = errorMsg;
+                } else {
+                    sdCardStatusElement.textContent = 'NOT_INITIALIZED';
+                    sdCardStatusElement.className = 'status-warning';
+                    sdCardDetailsElement.textContent = 'SD card status unknown';
+                }
+            }
 
             // Incident summary (counts by severity) using data.incidents if present
             if (data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0) {
