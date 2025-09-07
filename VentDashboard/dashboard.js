@@ -2331,42 +2331,38 @@ async function refreshData() {
 
         // NEW: Update door activity display with enhanced data
         function updateDoorActivityDisplay(data) {
-            // FIXED: Align with ESP32 source data structure from GetEnhancedDoorAnalytics API
-            // API returns: totalEvents, systemHealth, eventSummary, recentPerformance
+            // FIXED: Use actual GetEnhancedDoorAnalytics API response structure
+            console.log('updateDoorActivityDisplay: Processing data:', data);
+            
             if (data.eventSummary || data.totalEvents !== undefined) {
                 const summary = data.eventSummary || {};
                 
-                document.getElementById('activeDoorsCount').textContent = summary.unique_doors || 0;
-                document.getElementById('totalSessionsCount').textContent = data.totalEvents || 0;
+                // Use eventSummary.totalEvents for total sessions (443 in this case)
+                const totalEvents = summary.totalEvents || data.totalEvents || 0;
+                document.getElementById('totalSessionsCount').textContent = totalEvents;
                 
-                if (summary.latest_activity) {
-                    const latestTime = new Date(summary.latest_activity * 1000);
-                    document.getElementById('lastActivityTime').textContent = latestTime.toLocaleString([], {
-                        month: 'short', day: 'numeric', 
-                        hour: '2-digit', minute: '2-digit'
-                    });
-                } else if (data.totalEvents === 0) {
-                    document.getElementById('lastActivityTime').textContent = 'No recent activity';
-                }
+                // For active doors today, estimate from zone activity
+                const zoneCount = Object.keys(data.zoneActivity || {}).length;
+                document.getElementById('activeDoorsCount').textContent = zoneCount || 0;
                 
-                if (summary.earliest_activity) {
-                    const earliestTime = new Date(summary.earliest_activity * 1000);
-                    document.getElementById('firstActivityStat').textContent = `First: ${earliestTime.toLocaleString([], {
-                        month: 'short', day: 'numeric', 
-                        hour: '2-digit', minute: '2-digit'
-                    })}`;
-                } else {
-                    document.getElementById('firstActivityStat').textContent = 'No activity';
-                }
+                // For now, show placeholder for last activity since API doesn't provide latest_activity timestamp
+                document.getElementById('lastActivityTime').textContent = 'Recent activity detected';
                 
-                document.getElementById('totalSessionsStat').textContent = `${data.totalEvents || 0} events`;
+                // Use zone activity info for first activity stat
+                const mostActiveZone = data.mostActiveZone || 'None';
+                document.getElementById('firstActivityStat').textContent = `Most active: ${mostActiveZone}`;
                 
-                // FIXED: Align with ESP32 detectionMethod field structure
-                const methodBreakdown = summary.detection_method_breakdown || {};
-                const pressureCount = methodBreakdown['pressure-analysis'] || 0;
-                const reedCount = methodBreakdown['reed-switch'] || 0;
+                document.getElementById('totalSessionsStat').textContent = `${totalEvents} events`;
+                
+                // Use actual pressure and reed switch counts from API
+                const pressureCount = summary.pressureEvents || 0;
+                const reedCount = summary.reedSwitchEvents || 0;
                 document.getElementById('detectionMethodStat').textContent = `Pressure: ${pressureCount}, Reed: ${reedCount}`;
+                
+                console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
+                
             } else {
+                console.log('updateDoorActivityDisplay: No valid data found');
                 // Handle case where no data is available
                 document.getElementById('activeDoorsCount').textContent = '0';
                 document.getElementById('totalSessionsCount').textContent = '0';
