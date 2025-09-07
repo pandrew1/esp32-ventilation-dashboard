@@ -2973,10 +2973,12 @@ async function refreshData() {
                                             duration: 0,
                                             source: 'transition',
                                             detectionMethod: transition.detectionMethod || null,
-                                            confidence: transition.confidence || null
+                                            confidence: transition.confidence || null,
+                                            confirmedByReed: transition.confirmedByReed || false
                                         };
                                         uniqueEvents.set(eventKey, event);
-                                        console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp} (${event.detectionMethod || 'unknown method'})`);
+                                        const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
+                                        console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
                                     }
                                 });
                             }
@@ -3208,13 +3210,20 @@ async function refreshData() {
                                     const actionText = hasParsingError ? 'Parse Error' : 
                                         (event.action ? event.action.replace(/_/g, ' ') : 'activity');
                                     
-                                    // Add detection method info if available
+                                    // Add detection method info and confirmation status if available
                                     let detectionMethodHtml = '';
                                     if (event.detectionMethod) {
                                         const methodColor = event.detectionMethod === 'reed-switch' ? '#28a745' : '#17a2b8';
                                         const methodText = event.detectionMethod === 'reed-switch' ? 'Reed Switch' : 'Pressure Analysis';
                                         const confidenceText = event.confidence ? `(${Math.round(event.confidence * 100)}%)` : '';
-                                        detectionMethodHtml = `<span class="detection-method" style="color: ${methodColor}; font-size: 0.8em;">${methodText} ${confidenceText}</span>`;
+                                        
+                                        // Add confirmation status for pressure detections
+                                        let confirmationIcon = '';
+                                        if (event.detectionMethod === 'pressure') {
+                                            confirmationIcon = event.confirmedByReed ? ' ✅' : ' ⚠️';
+                                        }
+                                        
+                                        detectionMethodHtml = `<span class="detection-method" style="color: ${methodColor}; font-size: 0.8em;">${methodText} ${confidenceText}${confirmationIcon}</span>`;
                                     }
                                     
                                     return `
@@ -4921,7 +4930,8 @@ async function refreshData() {
 
             // Update doors if available
             if (data.doors && data.doors.length > 0) {
-                updateDoorStatus(data.doors);
+                const confirmationAnalytics = data.sections?.doors?.detectionAnalytics?.confirmationAnalytics || data.detectionAnalytics?.confirmationAnalytics;
+                updateDoorStatus(data.doors, confirmationAnalytics);
             }
 
             // Check for alerts
@@ -4973,9 +4983,10 @@ async function refreshData() {
          * Displays door names, status, and activity information
          * Hides the section if no doors are available
          * @param {Array} doors - Array of door objects with name, status, and activity data
+         * @param {Object} confirmationAnalytics - Optional confirmation analytics for pressure detections
          * @returns {void}
          */
-        function updateDoorStatus(doors) {
+        function updateDoorStatus(doors, confirmationAnalytics = null) {
             const doorSection = document.getElementById('doorSection');
             const doorList = document.getElementById('doorList');
             
@@ -4986,6 +4997,58 @@ async function refreshData() {
 
             doorSection.style.display = 'block';
             doorList.innerHTML = '';
+            
+            // Add confirmation analytics section if available
+            if (confirmationAnalytics) {
+                const confirmationSection = document.createElement('div');
+                confirmationSection.className = 'confirmation-analytics-section';
+                confirmationSection.style.cssText = `
+                    margin-bottom: 15px;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                `;
+                
+                const formatTime = (timestamp) => {
+                    if (!timestamp) return 'N/A';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString();
+                };
+                
+                confirmationSection.innerHTML = `
+                    <h6 style="margin: 0 0 10px 0; color: #495057; display: flex; align-items: center;">
+                        <span style="margin-right: 8px;">🔍</span>
+                        Reed/Pressure Correlation Analytics
+                    </h6>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                        <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
+                            <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Confirmed Detections</div>
+                            <div style="font-weight: bold; color: #28a745; font-size: 1.1em;">
+                                ✅ ${confirmationAnalytics.confirmedDetections || 0}
+                            </div>
+                        </div>
+                        <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
+                            <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Confirmation Rate</div>
+                            <div style="font-weight: bold; color: ${(confirmationAnalytics.confirmationRate || 0) > 50 ? '#28a745' : '#ffc107'}; font-size: 1.1em;">
+                                ${(confirmationAnalytics.confirmationRate || 0).toFixed(1)}%
+                            </div>
+                        </div>
+                        <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
+                            <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Latest Confirmation</div>
+                            <div style="font-weight: bold; color: #6f42c1; font-size: 0.9em;">
+                                ${formatTime(confirmationAnalytics.latestConfirmation)}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.8em; color: #6c757d; text-align: center;">
+                        Reed switch validates pressure detections within 20-second window
+                    </div>
+                `;
+                
+                doorList.appendChild(confirmationSection);
+            }
 
             doors.forEach(door => {
                 const doorItem = document.createElement('div');
