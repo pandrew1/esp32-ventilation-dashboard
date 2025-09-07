@@ -2027,6 +2027,12 @@ async function refreshData() {
                 // FIX 3: Use doorActivity data first, fallback to sections.doors
                 const doorData = yesterdayData.doorActivity || data.sections.doors;
                 
+                // FIXED: Update confidence chart with door section data from GetEnhancedDashboardData
+                if (data.sections && data.sections.doors) {
+                    console.log('🎯 CONFIDENCE: Updating confidence chart with dashboard door data');
+                    updateConfidenceChart(data.sections.doors);
+                }
+                
                 if (doorData && doorData.totalEvents !== undefined) {
                     console.log('� DOOR ACTIVITY: Using door data:', doorData);
                     
@@ -2431,27 +2437,48 @@ async function refreshData() {
             const confidenceCanvas = document.getElementById('confidenceChart');
             if (!confidenceCanvas || !confidenceCanvas.chartInstance) return;
             
-            // FIXED: Align with ESP32 source structure - API returns confidenceDistribution
-            if (data.confidenceDistribution) {
-                const confidence = data.confidenceDistribution;
-                const chart = confidenceCanvas.chartInstance;
-                
-                // Update chart data - handle ESP32 structure
-                chart.data.datasets[0].data = [
-                    confidence.high || confidence.high_confidence || 0,
-                    confidence.medium || confidence.medium_confidence || 0,
-                    confidence.low || confidence.low_confidence || 0,
-                    confidence.reed_switch || 0
-                ];
+            // FIXED: Use direct confidence distribution from GetEnhancedDashboardData
+            let highConf = 0, mediumConf = 0, lowConf = 0, totalEvents = 0;
+            
+            // Check if we have direct confidence distribution data (from GetEnhancedDashboardData)
+            if (data.detectionAnalytics && data.detectionAnalytics.confidenceDistribution) {
+                const confDist = data.detectionAnalytics.confidenceDistribution;
+                highConf = confDist.high || 0;
+                mediumConf = confDist.medium || 0;
+                lowConf = confDist.low || 0;
+                totalEvents = highConf + mediumConf + lowConf;
+            }
+            // Fallback: Calculate confidence distribution from hourlyBreakdown data (GetEnhancedDoorAnalytics)
+            else if (data.hourlyBreakdown) {
+                for (const hour in data.hourlyBreakdown) {
+                    const hourData = data.hourlyBreakdown[hour];
+                    if (hourData.total && hourData.avgConfidence !== undefined) {
+                        const avgConf = hourData.avgConfidence;
+                        const events = hourData.total;
+                        
+                        if (avgConf >= 0.8) {
+                            highConf += events;
+                        } else if (avgConf >= 0.5) {
+                            mediumConf += events;
+                        } else {
+                            lowConf += events;
+                        }
+                        totalEvents += events;
+                    }
+                }
+            }
+            
+            // Update chart with calculated distribution
+            const chart = confidenceCanvas.chartInstance;
+            if (totalEvents > 0) {
+                chart.data.datasets[0].data = [highConf, mediumConf, lowConf, 0]; // Reed switch as separate category
                 chart.update();
                 
-                // Update stats with ESP32-aligned field names
-                document.getElementById('highConfidenceCount').textContent = confidence.high || confidence.high_confidence || 0;
-                document.getElementById('mediumConfidenceCount').textContent = confidence.medium || confidence.medium_confidence || 0;
-                document.getElementById('lowConfidenceCount').textContent = confidence.low || confidence.low_confidence || 0;
+                document.getElementById('highConfidenceCount').textContent = highConf;
+                document.getElementById('mediumConfidenceCount').textContent = mediumConf;
+                document.getElementById('lowConfidenceCount').textContent = lowConf;
             } else {
                 // No confidence data available - show empty state
-                const chart = confidenceCanvas.chartInstance;
                 chart.data.datasets[0].data = [0, 0, 0, 0];
                 chart.update();
                 
@@ -2463,27 +2490,35 @@ async function refreshData() {
 
         // FIXED: Update pressure analytics to align with ESP32 source structure  
         function updatePressureAnalytics(data) {
-            // ESP32 source structure: API may return recentPerformance, zoneActivity, or pressureAnalysis
-            const pressure = data.recentPerformance || data.pressureAnalysis || data.pressure_analysis;
+            // Check for actual pressure change data from ESP32 enhanced telemetry
+            const pressure = data.pressureAnalysis || data.pressure_analysis;
             
-            if (pressure) {
+            if (pressure && pressure.average_pressure_change !== undefined) {
+                // Show actual pressure change values when available
                 document.getElementById('avgPressureChange').textContent = 
-                    pressure.average_pressure_change || pressure.avgPressureChange ? 
-                    `${(pressure.average_pressure_change || pressure.avgPressureChange).toFixed(3)} hPa` : '-- hPa';
+                    `${pressure.average_pressure_change.toFixed(3)} hPa`;
                 
                 document.getElementById('maxPressureChange').textContent = 
-                    pressure.max_pressure_change || pressure.maxPressureChange ? 
-                    `${(pressure.max_pressure_change || pressure.maxPressureChange).toFixed(3)} hPa` : '-- hPa';
+                    `${pressure.max_pressure_change.toFixed(3)} hPa`;
             } else {
+                // ESP32 enhanced telemetry not deployed yet - show proper empty state
                 document.getElementById('avgPressureChange').textContent = '-- hPa';
                 document.getElementById('maxPressureChange').textContent = '-- hPa';
             }
             
-            // FIXED: Zone breakdown - align with ESP32 zone field structure
+            // Zone breakdown - check for actual zone data from ESP32 enhanced telemetry
             const zones = data.zoneActivity || pressure?.zone_breakdown || {};
-            document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
-            document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
-            document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+            
+            if (Object.keys(zones).length > 0) {
+                document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
+                document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
+                document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+            } else {
+                // ESP32 zone data not available yet - show proper empty state
+                document.getElementById('garageHouseCount').textContent = '--';
+                document.getElementById('houseOutsideCount').textContent = '--';
+                document.getElementById('garageOutsideCount').textContent = '--';
+            }
             
             // Most active zone - handle ESP32 structure
             if (data.mostActiveZone) {
