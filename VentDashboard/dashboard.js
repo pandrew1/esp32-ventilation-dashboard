@@ -2336,7 +2336,8 @@ async function refreshData() {
             // FIXED: Use enhanced GetEnhancedDoorAnalytics API response with new dashboard fields
             console.log('updateDoorActivityDisplay: Processing data:', data);
             console.log('updateDoorActivityDisplay: data.eventSummary:', data.eventSummary);
-            console.log('updateDoorActivityDisplay: data.totalEvents:', data.totalEvents);
+            console.log('updateDoorActivityDisplay: data.recentPerformance:', data.recentPerformance);
+            console.log('updateDoorActivityDisplay: data.hourlyBreakdown keys:', data.hourlyBreakdown ? Object.keys(data.hourlyBreakdown) : 'none');
             
             if (data.eventSummary || data.totalEvents !== undefined) {
                 const summary = data.eventSummary || {};
@@ -2379,25 +2380,18 @@ async function refreshData() {
                 
                 document.getElementById('totalSessionsStat').textContent = `${totalEvents} events`;
                 
-                // Calculate pressure and reed counts from hourly breakdown
-                let pressureCount = 0;
-                let reedCount = 0;
-                
-                if (data.hourlyBreakdown && typeof data.hourlyBreakdown === 'object') {
-                    Object.keys(data.hourlyBreakdown).forEach(hour => {
-                        const hourData = data.hourlyBreakdown[hour];
-                        pressureCount += hourData.pressure || 0;
-                        reedCount += hourData.reedSwitch || 0;
-                    });
-                }
+                // Use direct pressure and reed counts from recentPerformance
+                const recentPerformance = data.recentPerformance?.last24Hours || {};
+                const pressureCount = recentPerformance.pressureEvents || 0;
+                const reedCount = recentPerformance.reedSwitchEvents || 0;
                 
                 document.getElementById('detectionMethodStat').textContent = `Pressure: ${pressureCount}, Reed: ${reedCount}`;
                 
-                // Calculate and display peak hour from hourly breakdown
-                if (data.hourlyBreakdown && typeof data.hourlyBreakdown === 'object') {
-                    let peakHour = null;
-                    let maxEvents = 0;
-                    
+                // Find peak hour from hourly breakdown
+                let peakHour = null;
+                let maxEvents = 0;
+                
+                if (data.hourlyBreakdown) {
                     Object.keys(data.hourlyBreakdown).forEach(hour => {
                         const hourData = data.hourlyBreakdown[hour];
                         const eventCount = hourData.total || 0;
@@ -2406,31 +2400,29 @@ async function refreshData() {
                             peakHour = hour;
                         }
                     });
-                    
-                    if (peakHour && maxEvents > 0) {
-                        // Format hour for display (e.g., "8:00 PM (416 events)")
-                        const hourDate = new Date(peakHour);
-                        const timeStr = hourDate.toLocaleTimeString([], {hour: 'numeric', hour12: true});
-                        document.getElementById('peakHourStat').textContent = `Peak: ${timeStr} (${maxEvents} events)`;
-                    } else {
-                        document.getElementById('peakHourStat').textContent = 'Peak: No activity';
-                    }
+                }
+                
+                if (peakHour && maxEvents > 0) {
+                    // Format hour for display (e.g., "8:00 PM (416 events)")
+                    const hourDate = new Date(peakHour);
+                    const timeStr = hourDate.toLocaleTimeString([], {hour: 'numeric', hour12: true});
+                    document.getElementById('peakHourStat').textContent = `Peak: ${timeStr} (${maxEvents} events)`;
                 } else {
-                    document.getElementById('peakHourStat').textContent = 'Peak: Data unavailable';
+                    document.getElementById('peakHourStat').textContent = 'Peak: No activity';
                 }
                 
                 console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'activeZones:', activeZones, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
                 
             } else {
                 console.log('updateDoorActivityDisplay: No valid data found');
-                // Handle case where no data is available
+                // Set minimal fallback values 
                 document.getElementById('activeDoorsCount').textContent = '0';
                 document.getElementById('totalSessionsCount').textContent = '0';
-                document.getElementById('lastActivityTime').textContent = 'No data available';
+                document.getElementById('lastActivityTime').textContent = 'No data';
                 document.getElementById('firstActivityStat').textContent = 'No data';
-                document.getElementById('peakHourStat').textContent = 'Peak: No data';
+                document.getElementById('peakHourStat').textContent = 'No data';
                 document.getElementById('totalSessionsStat').textContent = '0 events';
-                document.getElementById('detectionMethodStat').textContent = 'No detections';
+                document.getElementById('detectionMethodStat').textContent = 'No data';
             }
         }
 
