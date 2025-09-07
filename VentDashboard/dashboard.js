@@ -2577,17 +2577,11 @@ async function refreshData() {
                     // PHASE 3: Enhanced boot information with Unix epoch fix
                     if (lastBootInfo) {
                         // BUG FIX #18: Fix Last Boot Date Regression - Unix Epoch Display Error
-                        console.log('DEBUG: startup.bootTime =', startup.bootTime, 'type:', typeof startup.bootTime);
-                        console.log('DEBUG: parseInt(startup.bootTime) =', parseInt(startup.bootTime));
-                        console.log('DEBUG: !isNaN(parseInt(startup.bootTime)) =', !isNaN(parseInt(startup.bootTime)));
-                        
                         if (startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
                             const bootTime = parseInt(startup.bootTime);
-                            console.log('DEBUG: bootTime after parseInt =', bootTime);
                             
                             // PHASE 3: Enhanced timestamp validation to prevent Unix epoch display
                             if (bootTime > 0 && bootTime !== 0) {
-                                console.log('DEBUG: bootTime > 0 check passed');
                                 // Handle both seconds and milliseconds timestamps
                                 // Unix epoch: seconds since 1970-01-01 00:00:00 UTC
                                 // If timestamp is < 1000000000 (before Sep 2001), it's likely invalid
@@ -4729,38 +4723,18 @@ async function refreshData() {
                 }
                 
                 // PHASE 3: Enhanced Boot Information from sections.startup (BUG FIX #18)
+                // NOTE: This is handled by updateSystemHealthWidget() which gets enhanced data
+                // This updateDashboard() function receives old GetVentilationStatus data without sections
+                // So we skip bootTime handling here to avoid overriding the correct value
                 const lastBootInfoElement = document.getElementById('lastBootInfo');
                 if (lastBootInfoElement) {
-                    if (startup && startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
-                        const bootTime = parseInt(startup.bootTime);
-                        
-                        // PHASE 3: Apply same Unix epoch fix as main function
-                        if (bootTime > 0 && bootTime !== 0) {
-                            if (bootTime < 1000000000) {
-                                lastBootInfoElement.textContent = 'Boot time invalid (system clock not set)';
-                            } else {
-                                const bootDate = new Date(bootTime > 1000000000000 ? bootTime : bootTime * 1000);
-                                
-                                // Additional validation: ensure date is reasonable (after 2020)
-                                const minValidDate = new Date('2020-01-01');
-                                const maxValidDate = new Date(Date.now() + 86400000); // Tomorrow
-                                
-                                if (bootDate >= minValidDate && bootDate <= maxValidDate) {
-                                    lastBootInfoElement.textContent = `${bootDate.toLocaleDateString()} ${bootDate.toLocaleTimeString()}`;
-                                } else {
-                                    lastBootInfoElement.textContent = 'Boot time invalid (unreasonable date)';
-                                }
-                            }
-                        } else {
-                            lastBootInfoElement.textContent = 'Boot time not recorded';
-                        }
-                    } else {
-                        lastBootInfoElement.textContent = 'Boot time unavailable';
-                    }
+                    // Boottime is handled by updateSystemHealthWidget() using enhanced data
                 }
                 
                 const bootReasonInfoElement = document.getElementById('bootReasonInfo');
-                if (bootReasonInfoElement) bootReasonInfoElement.textContent = `Reason: ${startup.bootReason || 'Unknown'}`;
+                if (bootReasonInfoElement && startup && startup.bootReason) {
+                    bootReasonInfoElement.textContent = `Reason: ${startup.bootReason}`;
+                }
             } else {
                 // Fallback to system data if startup section not available
                 if (system) {
