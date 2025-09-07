@@ -2270,7 +2270,8 @@ async function refreshData() {
                 updateDoorActivityDisplay(analyticsData);
                 updateConfidenceChart(analyticsData);
                 updatePressureAnalytics(analyticsData);
-                updateDoorTimeline(analyticsData);
+                // Timeline function loads its own data, just call with current hours
+                updateDoorTimeline(hours);
 
             } catch (error) {
                 console.error('updateEnhancedDoorActivity failed:', error);
@@ -2852,10 +2853,12 @@ async function refreshData() {
                                             door: transition.doorName || `Door ${transition.doorId}`,
                                             action: transition.opened ? 'opened' : 'closed',
                                             duration: 0,
-                                            source: 'transition'
+                                            source: 'transition',
+                                            detectionMethod: transition.detectionMethod || null,
+                                            confidence: transition.confidence || null
                                         };
                                         uniqueEvents.set(eventKey, event);
-                                        console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp}`);
+                                        console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp} (${event.detectionMethod || 'unknown method'})`);
                                     }
                                 });
                             }
@@ -3087,6 +3090,15 @@ async function refreshData() {
                                     const actionText = hasParsingError ? 'Parse Error' : 
                                         (event.action ? event.action.replace(/_/g, ' ') : 'activity');
                                     
+                                    // Add detection method info if available
+                                    let detectionMethodHtml = '';
+                                    if (event.detectionMethod) {
+                                        const methodColor = event.detectionMethod === 'reed-switch' ? '#28a745' : '#17a2b8';
+                                        const methodText = event.detectionMethod === 'reed-switch' ? 'Reed Switch' : 'Pressure Analysis';
+                                        const confidenceText = event.confidence ? `(${Math.round(event.confidence * 100)}%)` : '';
+                                        detectionMethodHtml = `<span class="detection-method" style="color: ${methodColor}; font-size: 0.8em;">${methodText} ${confidenceText}</span>`;
+                                    }
+                                    
                                     return `
                                         <div class="timeline-event-compact${hasParsingError ? ' timeline-event-error' : ''}">
                                             <div class="event-time-compact">
@@ -3097,6 +3109,7 @@ async function refreshData() {
                                             <div class="event-info-compact">
                                                 <span class="event-door">${event.door || 'Unknown'}</span>
                                                 <span class="event-action">${actionText}</span>
+                                                ${detectionMethodHtml}
                                             </div>
                                         </div>
                                     `;
