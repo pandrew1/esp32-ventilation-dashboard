@@ -2250,8 +2250,9 @@ async function refreshData() {
             }
             
             try {
-                // FIXED: Use absolute URL like other API functions, not relative URL
-                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01`, {
+                // FIXED: Use absolute URL like other API functions, not relative URL with cache busting
+                const cacheBuster = Date.now();
+                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
                     method: 'GET',
                     headers: {
                         ...headers
@@ -2331,26 +2332,49 @@ async function refreshData() {
 
         // NEW: Update door activity display with enhanced data
         function updateDoorActivityDisplay(data) {
-            // FIXED: Use actual GetEnhancedDoorAnalytics API response structure
+            // FIXED: Use enhanced GetEnhancedDoorAnalytics API response with new dashboard fields
             console.log('updateDoorActivityDisplay: Processing data:', data);
+            console.log('updateDoorActivityDisplay: data.eventSummary:', data.eventSummary);
+            console.log('updateDoorActivityDisplay: data.totalEvents:', data.totalEvents);
             
             if (data.eventSummary || data.totalEvents !== undefined) {
                 const summary = data.eventSummary || {};
+                console.log('updateDoorActivityDisplay: summary object:', summary);
+                console.log('updateDoorActivityDisplay: summary.uniqueZonesActive:', summary.uniqueZonesActive);
+                console.log('updateDoorActivityDisplay: summary.latestActivity:', summary.latestActivity);
                 
                 // Use eventSummary.totalEvents for total sessions (443 in this case)
                 const totalEvents = summary.totalEvents || data.totalEvents || 0;
                 document.getElementById('totalSessionsCount').textContent = totalEvents;
                 
-                // For active doors today, estimate from zone activity
-                const zoneCount = Object.keys(data.zoneActivity || {}).length;
-                document.getElementById('activeDoorsCount').textContent = zoneCount || 0;
+                // Use new uniqueZonesActive field for active doors today
+                const activeZones = summary.uniqueZonesActive || Object.keys(data.zoneActivity || {}).length;
+                document.getElementById('activeDoorsCount').textContent = activeZones;
                 
-                // For now, show placeholder for last activity since API doesn't provide latest_activity timestamp
-                document.getElementById('lastActivityTime').textContent = 'Recent activity detected';
+                // Use new latestActivity timestamp for last activity
+                if (summary.latestActivity) {
+                    const latestTime = new Date(summary.latestActivity * 1000);
+                    document.getElementById('lastActivityTime').textContent = latestTime.toLocaleString([], {
+                        month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                } else if (totalEvents === 0) {
+                    document.getElementById('lastActivityTime').textContent = 'No recent activity';
+                } else {
+                    document.getElementById('lastActivityTime').textContent = 'Recent activity detected';
+                }
                 
-                // Use zone activity info for first activity stat
-                const mostActiveZone = data.mostActiveZone || 'None';
-                document.getElementById('firstActivityStat').textContent = `Most active: ${mostActiveZone}`;
+                // Use new earliestActivity timestamp for first activity stat
+                if (summary.earliestActivity) {
+                    const earliestTime = new Date(summary.earliestActivity * 1000);
+                    document.getElementById('firstActivityStat').textContent = `First: ${earliestTime.toLocaleString([], {
+                        month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit'
+                    })}`;
+                } else {
+                    const mostActiveZone = data.mostActiveZone || 'None';
+                    document.getElementById('firstActivityStat').textContent = `Most active: ${mostActiveZone}`;
+                }
                 
                 document.getElementById('totalSessionsStat').textContent = `${totalEvents} events`;
                 
@@ -2359,7 +2383,7 @@ async function refreshData() {
                 const reedCount = summary.reedSwitchEvents || 0;
                 document.getElementById('detectionMethodStat').textContent = `Pressure: ${pressureCount}, Reed: ${reedCount}`;
                 
-                console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
+                console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'activeZones:', activeZones, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
                 
             } else {
                 console.log('updateDoorActivityDisplay: No valid data found');
