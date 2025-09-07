@@ -1082,6 +1082,25 @@ async function refreshData() {
             return DashboardUtils.formatDetailedTimestamp(date);
         }
 
+        // Utility function to get time ago string
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffMinutes < 1) {
+                return 'Just now';
+            } else if (diffMinutes < 60) {
+                return `${diffMinutes}m ago`;
+            } else if (diffHours < 24) {
+                return `${diffHours}h ago`;
+            } else {
+                return `${diffDays}d ago`;
+            }
+        }
+
         // Initialize dashboard
         /**
          * Initializes the entire dashboard system
@@ -2562,6 +2581,36 @@ async function refreshData() {
                 document.getElementById('mostActiveZone').textContent = zoneActivity[mostActive] > 0 ? mostActive : '--';
             } else {
                 document.getElementById('mostActiveZone').textContent = '--';
+            }
+            
+            // Pressure Detection Confirmation Analytics - NEW FEATURE
+            const confirmationData = detectionAnalytics?.confirmationAnalytics;
+            
+            if (confirmationData) {
+                // Show confirmation statistics
+                const confirmedCount = confirmationData.confirmedDetections || 0;
+                const totalDetections = confirmationData.totalDetections || 1;
+                const confirmationRate = ((confirmedCount / totalDetections) * 100).toFixed(1);
+                
+                document.getElementById('confirmedDetections').textContent = `${confirmedCount}/${totalDetections}`;
+                document.getElementById('confirmationRate').textContent = `${confirmationRate}%`;
+                
+                // Show latest confirmation timestamp
+                const latestConfirmation = confirmationData.latestConfirmation;
+                if (latestConfirmation) {
+                    const confirmationTime = new Date(latestConfirmation);
+                    const timeAgo = getTimeAgo(confirmationTime);
+                    document.getElementById('latestConfirmation').textContent = timeAgo;
+                } else {
+                    document.getElementById('latestConfirmation').textContent = 'None';
+                }
+                
+                console.log('🔍 CONFIRMATION ANALYTICS:', confirmationData);
+            } else {
+                // No confirmation data available
+                document.getElementById('confirmedDetections').textContent = '--';
+                document.getElementById('confirmationRate').textContent = '--%';
+                document.getElementById('latestConfirmation').textContent = '--';
             }
         }
 
