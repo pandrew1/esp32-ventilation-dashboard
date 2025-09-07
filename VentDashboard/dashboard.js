@@ -2577,11 +2577,17 @@ async function refreshData() {
                     // PHASE 3: Enhanced boot information with Unix epoch fix
                     if (lastBootInfo) {
                         // BUG FIX #18: Fix Last Boot Date Regression - Unix Epoch Display Error
+                        console.log('DEBUG: startup.bootTime =', startup.bootTime, 'type:', typeof startup.bootTime);
+                        console.log('DEBUG: parseInt(startup.bootTime) =', parseInt(startup.bootTime));
+                        console.log('DEBUG: !isNaN(parseInt(startup.bootTime)) =', !isNaN(parseInt(startup.bootTime)));
+                        
                         if (startup.bootTime && !isNaN(parseInt(startup.bootTime))) {
                             const bootTime = parseInt(startup.bootTime);
+                            console.log('DEBUG: bootTime after parseInt =', bootTime);
                             
                             // PHASE 3: Enhanced timestamp validation to prevent Unix epoch display
                             if (bootTime > 0 && bootTime !== 0) {
+                                console.log('DEBUG: bootTime > 0 check passed');
                                 // Handle both seconds and milliseconds timestamps
                                 // Unix epoch: seconds since 1970-01-01 00:00:00 UTC
                                 // If timestamp is < 1000000000 (before Sep 2001), it's likely invalid
