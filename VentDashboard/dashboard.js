@@ -2277,7 +2277,17 @@ async function refreshData() {
                 // Process and display the enhanced data
                 updateDoorActivityDisplay(analyticsData);
                 updateConfidenceChart(analyticsData);
-                updatePressureAnalytics(analyticsData);
+                
+                // Only update pressure analytics if current data is missing (avoid overwriting good data from GetEnhancedDashboardData)
+                const currentAvgPressure = document.getElementById('avgPressureChange').textContent;
+                const currentMaxPressure = document.getElementById('maxPressureChange').textContent;
+                if (currentAvgPressure === '-- hPa' || currentMaxPressure === '-- hPa') {
+                    console.log('🔧 PRESSURE: Current data missing, updating from GetEnhancedDoorAnalytics');
+                    updatePressureAnalytics(analyticsData);
+                } else {
+                    console.log('🛡️ PRESSURE: Preserving existing pressure data, not overwriting with GetEnhancedDoorAnalytics');
+                }
+                
                 // Timeline function loads its own data, just call with current hours
                 updateDoorTimeline(hours);
 
