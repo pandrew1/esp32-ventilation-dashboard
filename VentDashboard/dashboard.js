@@ -2582,36 +2582,6 @@ async function refreshData() {
             } else {
                 document.getElementById('mostActiveZone').textContent = '--';
             }
-            
-            // Pressure Detection Confirmation Analytics - NEW FEATURE
-            const confirmationData = detectionAnalytics?.confirmationAnalytics;
-            
-            if (confirmationData) {
-                // Show confirmation statistics
-                const confirmedCount = confirmationData.confirmedDetections || 0;
-                const totalDetections = confirmationData.totalDetections || 1;
-                const confirmationRate = ((confirmedCount / totalDetections) * 100).toFixed(1);
-                
-                document.getElementById('confirmedDetections').textContent = `${confirmedCount}/${totalDetections}`;
-                document.getElementById('confirmationRate').textContent = `${confirmationRate}%`;
-                
-                // Show latest confirmation timestamp
-                const latestConfirmation = confirmationData.latestConfirmation;
-                if (latestConfirmation) {
-                    const confirmationTime = new Date(latestConfirmation);
-                    const timeAgo = getTimeAgo(confirmationTime);
-                    document.getElementById('latestConfirmation').textContent = timeAgo;
-                } else {
-                    document.getElementById('latestConfirmation').textContent = 'None';
-                }
-                
-                console.log('🔍 CONFIRMATION ANALYTICS:', confirmationData);
-            } else {
-                // No confirmation data available
-                document.getElementById('confirmedDetections').textContent = '--';
-                document.getElementById('confirmationRate').textContent = '--%';
-                document.getElementById('latestConfirmation').textContent = '--';
-            }
         }
 
         // FIXED: Update door timeline with ESP32-aligned data structure
