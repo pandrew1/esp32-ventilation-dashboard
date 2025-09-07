@@ -2250,9 +2250,8 @@ async function refreshData() {
             }
             
             try {
-                // FIXED: Changed from POST to GET method with query parameters
-                // ESP32 Source Alignment: Use 'analysis' and 'timeRange' parameters as defined by Azure Function
-                const response = await fetch(`/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01`, {
+                // FIXED: Use absolute URL like other API functions, not relative URL
+                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01`, {
                     method: 'GET',
                     headers: {
                         ...headers
