@@ -2031,6 +2031,8 @@ async function refreshData() {
                 if (data.sections && data.sections.doors) {
                     console.log('🎯 CONFIDENCE: Updating confidence chart with dashboard door data');
                     updateConfidenceChart(data.sections.doors);
+                    console.log('🎯 PRESSURE: Updating pressure analytics with dashboard door data');
+                    updatePressureAnalytics(data.sections.doors);
                 }
                 
                 if (doorData && doorData.totalEvents !== undefined) {
@@ -2490,42 +2492,66 @@ async function refreshData() {
 
         // FIXED: Update pressure analytics to align with ESP32 source structure  
         function updatePressureAnalytics(data) {
-            // Check for actual pressure change data from ESP32 enhanced telemetry
-            const pressure = data.pressureAnalysis || data.pressure_analysis;
+            // Check for enhanced dashboard data structure first (GetEnhancedDashboardData)
+            const detectionAnalytics = data.sections?.doors?.detectionAnalytics || data.detectionAnalytics;
             
-            if (pressure && pressure.average_pressure_change !== undefined) {
-                // Show actual pressure change values when available
+            if (detectionAnalytics && detectionAnalytics.averagePressureChange !== undefined) {
+                // Show actual pressure change values from enhanced door detection
                 document.getElementById('avgPressureChange').textContent = 
-                    `${pressure.average_pressure_change.toFixed(3)} hPa`;
+                    `${detectionAnalytics.averagePressureChange.toFixed(3)} hPa`;
                 
                 document.getElementById('maxPressureChange').textContent = 
-                    `${pressure.max_pressure_change.toFixed(3)} hPa`;
+                    `${detectionAnalytics.maxPressureChange.toFixed(3)} hPa`;
             } else {
-                // ESP32 enhanced telemetry not deployed yet - show proper empty state
-                document.getElementById('avgPressureChange').textContent = '-- hPa';
-                document.getElementById('maxPressureChange').textContent = '-- hPa';
+                // Fallback: Check for legacy pressure analysis structure
+                const pressure = data.pressureAnalysis || data.pressure_analysis;
+                
+                if (pressure && pressure.average_pressure_change !== undefined) {
+                    document.getElementById('avgPressureChange').textContent = 
+                        `${pressure.average_pressure_change.toFixed(3)} hPa`;
+                    
+                    document.getElementById('maxPressureChange').textContent = 
+                        `${pressure.max_pressure_change.toFixed(3)} hPa`;
+                } else {
+                    // No pressure data available
+                    document.getElementById('avgPressureChange').textContent = '-- hPa';
+                    document.getElementById('maxPressureChange').textContent = '-- hPa';
+                }
             }
             
-            // Zone breakdown - check for actual zone data from ESP32 enhanced telemetry
-            const zones = data.zoneActivity || pressure?.zone_breakdown || {};
+            // Zone breakdown - check enhanced dashboard data structure first
+            const zoneActivity = data.sections?.doors?.zoneActivity || data.zoneActivity;
             
-            if (Object.keys(zones).length > 0) {
-                document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
-                document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
-                document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+            if (zoneActivity && Object.keys(zoneActivity).length > 0) {
+                document.getElementById('garageHouseCount').textContent = zoneActivity['garage-house'] || 0;
+                document.getElementById('houseOutsideCount').textContent = zoneActivity['house-outside'] || 0;
+                document.getElementById('garageOutsideCount').textContent = zoneActivity['garage-outside'] || 0;
             } else {
-                // ESP32 zone data not available yet - show proper empty state
-                document.getElementById('garageHouseCount').textContent = '--';
-                document.getElementById('houseOutsideCount').textContent = '--';
-                document.getElementById('garageOutsideCount').textContent = '--';
+                // Fallback: Check legacy zone data structure
+                const zones = data.zoneActivity || data.pressureAnalysis?.zone_breakdown || {};
+                
+                if (Object.keys(zones).length > 0) {
+                    document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
+                    document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
+                    document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+                } else {
+                    // No zone data available
+                    document.getElementById('garageHouseCount').textContent = '--';
+                    document.getElementById('houseOutsideCount').textContent = '--';
+                    document.getElementById('garageOutsideCount').textContent = '--';
+                }
             }
             
-            // Most active zone - handle ESP32 structure
-            if (data.mostActiveZone) {
-                document.getElementById('mostActiveZone').textContent = data.mostActiveZone === 'None' ? '--' : data.mostActiveZone;
+            // Most active zone - check enhanced dashboard data first
+            const mostActiveZone = data.sections?.doors?.mostActiveZone || data.mostActiveZone;
+            
+            if (mostActiveZone && mostActiveZone !== 'None') {
+                document.getElementById('mostActiveZone').textContent = mostActiveZone;
+            } else if (zoneActivity && Object.keys(zoneActivity).length > 0) {
+                const mostActive = Object.keys(zoneActivity).reduce((a, b) => zoneActivity[a] > zoneActivity[b] ? a : b, 'unknown');
+                document.getElementById('mostActiveZone').textContent = zoneActivity[mostActive] > 0 ? mostActive : '--';
             } else {
-                const mostActive = Object.keys(zones).reduce((a, b) => zones[a] > zones[b] ? a : b, 'unknown');
-                document.getElementById('mostActiveZone').textContent = zones[mostActive] > 0 ? mostActive : '--';
+                document.getElementById('mostActiveZone').textContent = '--';
             }
         }
 
