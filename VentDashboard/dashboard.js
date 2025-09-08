@@ -9376,29 +9376,33 @@ function convertTransitionsToCSV(transitions) {
         'System_Uptime_Seconds',
         'Entry_Timestamp',
         
-        // Environmental Context (6 fields)
-        'Indoor_Temp_F',
-        'Outdoor_Temp_F',
-        'Garage_Temp_F',
-        'Indoor_Humidity_Pct',
-        'Outdoor_Humidity_Pct',
-        'Garage_Humidity_Pct',
+        // Raw Pressure Context (3 fields)
+        'Indoor_Pressure_hPa',
+        'Garage_Pressure_hPa',
+        'Outdoor_Pressure_hPa',
         
-        // Pressure Analysis Context (6 fields)
+        // Pressure Differentials (3 fields)
+        'Indoor_Garage_Diff_hPa',
+        'Indoor_Outdoor_Diff_hPa',
+        'Garage_Outdoor_Diff_hPa',
+        
+        // Pressure Changes (4 fields)
         'Indoor_Change_hPa',
         'Garage_Change_hPa',
         'Outdoor_Change_hPa',
-        'Indoor_Outdoor_Diff_hPa',
-        'Indoor_Garage_Diff_hPa',
-        'Garage_Outdoor_Diff_hPa',
+        'Pressure_Change_Window_hPa',
         
-        // Detection Method Analysis (6 fields)
+        // Detection Analysis (6 fields)
         'Detection_Triggered_By',
         'Event_Validated_By_Reed',
         'Detection_Window_Size',
         'Sensor_Noise_Level_hPa',
         'Adaptive_Threshold_hPa',
-        'Pressure_Analysis_Score'
+        'Sensor_Sample_Rate_Hz',
+        
+        // Environmental Context (2 fields)
+        'Ambient_Temperature_C',
+        'Ambient_Humidity_Pct'
     ];
     
     const csvLines = [csvHeaders.join(',')];
@@ -9461,29 +9465,33 @@ function convertTransitionsToCSV(transitions) {
                 transition.systemUptime || 0,
                 transition.entryTimestamp || 'None',
                 
-                // Environmental Context (6 fields)
-                transition.indoorTemp_F ? Math.round(transition.indoorTemp_F * 100) / 100 : 0,
-                transition.outdoorTemp_F ? Math.round(transition.outdoorTemp_F * 100) / 100 : 0,
-                transition.garageTemp_F ? Math.round(transition.garageTemp_F * 100) / 100 : 0,
-                transition.indoorHum_pct ? Math.round(transition.indoorHum_pct * 100) / 100 : 0,
-                transition.outdoorHum_pct ? Math.round(transition.outdoorHum_pct * 100) / 100 : 0,
-                transition.garageHum_pct ? Math.round(transition.garageHum_pct * 100) / 100 : 0,
+                // Raw Pressure Context (3 fields)
+                transition.indoorPressure_hPa ? Math.round(transition.indoorPressure_hPa * 100) / 100 : 0,
+                transition.garagePressure_hPa ? Math.round(transition.garagePressure_hPa * 100) / 100 : 0,
+                transition.outdoorPressure_hPa ? Math.round(transition.outdoorPressure_hPa * 100) / 100 : 0,
                 
-                // Pressure Analysis Context (6 fields)
+                // Pressure Differentials (3 fields)
+                transition.indoorGarageDiff_hPa ? Math.round(transition.indoorGarageDiff_hPa * 10000) / 10000 : 0,
+                transition.indoorOutdoorDiff_hPa ? Math.round(transition.indoorOutdoorDiff_hPa * 10000) / 10000 : 0,
+                transition.garageOutdoorDiff_hPa ? Math.round(transition.garageOutdoorDiff_hPa * 10000) / 10000 : 0,
+                
+                // Pressure Changes (4 fields)
                 transition.indoorChange_hPa ? Math.round(transition.indoorChange_hPa * 10000) / 10000 : 0,
                 transition.garageChange_hPa ? Math.round(transition.garageChange_hPa * 10000) / 10000 : 0,
                 transition.outdoorChange_hPa ? Math.round(transition.outdoorChange_hPa * 10000) / 10000 : 0,
-                transition.indoorOutdoorDiff_hPa ? Math.round(transition.indoorOutdoorDiff_hPa * 10000) / 10000 : 0,
-                transition.indoorGarageDiff_hPa ? Math.round(transition.indoorGarageDiff_hPa * 10000) / 10000 : 0,
-                transition.garageOutdoorDiff_hPa ? Math.round(transition.garageOutdoorDiff_hPa * 10000) / 10000 : 0,
+                transition.pressureChangeWindow_hPa ? Math.round(transition.pressureChangeWindow_hPa * 10000) / 10000 : 0,
                 
-                // Detection Method Analysis (6 fields)
+                // Detection Analysis (6 fields)
                 transition.detectionTriggeredBy || 'unknown',
                 transition.eventValidatedByReed ? 'YES' : 'NO',
                 transition.detectionWindowSize || 1,
                 transition.sensorNoiseLevel_hPa ? Math.round(transition.sensorNoiseLevel_hPa * 10000) / 10000 : 0,
                 transition.adaptiveThreshold_hPa ? Math.round(transition.adaptiveThreshold_hPa * 10000) / 10000 : 0,
-                transition.pressureAnalysisScore ? Math.round(transition.pressureAnalysisScore * 10000) / 10000 : 0
+                transition.sensorSampleRate_Hz ? Math.round(transition.sensorSampleRate_Hz * 100) / 100 : 0,
+                
+                // Environmental Context (2 fields)
+                transition.ambientTemperature_C ? Math.round(transition.ambientTemperature_C * 100) / 100 : 0,
+                transition.ambientHumidity_pct ? Math.round(transition.ambientHumidity_pct * 100) / 100 : 0
             ];
             
             // Escape any commas in the data
