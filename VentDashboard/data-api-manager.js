@@ -130,8 +130,8 @@ export class DataManager {
             return this.activeRequests.get(requestKey);
         }
 
-        // Use global getAuthHeaders function from main dashboard
-        const headers = getAuthHeaders();
+        // Use the dashboard's authentication system
+        const headers = DashboardUtils.getAuthHeaders();
         
         const request = fetch(endpoint, {
             method: 'GET',
