@@ -9381,15 +9381,32 @@ function convertTransitionsToCSV(transitions) {
     
     sortedTransitions.forEach(transition => {
         try {
-            // Convert Unix timestamp to PST
+            // Convert Unix timestamp to Pacific Time (handles PST/PDT automatically)
             const unixTimestamp = parseInt(transition.timestamp);
-            const epoch = new Date(1970, 0, 1);
-            const utcTime = new Date(epoch.getTime() + unixTimestamp * 1000);
-            const pstTime = new Date(utcTime.getTime() - (8 * 60 * 60 * 1000)); // PST is UTC-8
-            const pstTimestamp = pstTime.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' PST');
+            const utcTime = new Date(unixTimestamp * 1000);
+            
+            // Use Intl.DateTimeFormat for proper Pacific timezone conversion
+            const pacificFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Los_Angeles',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            
+            const pacificParts = pacificFormatter.formatToParts(utcTime);
+            const pacificTimestamp = `${pacificParts.find(p => p.type === 'year').value}-${pacificParts.find(p => p.type === 'month').value}-${pacificParts.find(p => p.type === 'day').value} ${pacificParts.find(p => p.type === 'hour').value}:${pacificParts.find(p => p.type === 'minute').value}:${pacificParts.find(p => p.type === 'second').value} PST`;
+            
+            // Debug logging for first few entries to verify timezone conversion
+            if (csvLines.length <= 3) {
+                console.log(`Timezone conversion debug: Unix ${unixTimestamp} -> UTC ${utcTime.toISOString()} -> Pacific ${pacificTimestamp}`);
+            }
             
             const csvRow = [
-                pstTimestamp,
+                pacificTimestamp,
                 unixTimestamp,
                 transition.opened ? 'OPEN' : 'CLOSE',
                 transition.zone || 'unknown',
