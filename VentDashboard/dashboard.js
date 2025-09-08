@@ -9359,6 +9359,7 @@ async function exportPressureAnalysisCSV() {
 // Convert JSON transitions data to CSV format
 function convertTransitionsToCSV(transitions) {
     const csvHeaders = [
+        // Basic Event Information
         'Timestamp_PST',
         'Timestamp_Unix', 
         'Action',
@@ -9366,12 +9367,38 @@ function convertTransitionsToCSV(transitions) {
         'Detection_Method',
         'Confidence',
         'Pressure_Change_mbar',
+        
+        // Legacy System Fields
         'Reed_Door_Name',
         'Loop_Delay_Ms',
         'Power_Outage_Detected',
         'Power_Outage_Duration_Minutes',
         'System_Uptime_Seconds',
-        'Entry_Timestamp'
+        'Entry_Timestamp',
+        
+        // Environmental Context (6 fields)
+        'Indoor_Temp_F',
+        'Outdoor_Temp_F',
+        'Garage_Temp_F',
+        'Indoor_Humidity_Pct',
+        'Outdoor_Humidity_Pct',
+        'Garage_Humidity_Pct',
+        
+        // Pressure Analysis Context (6 fields)
+        'Indoor_Change_hPa',
+        'Garage_Change_hPa',
+        'Outdoor_Change_hPa',
+        'Indoor_Outdoor_Diff_hPa',
+        'Indoor_Garage_Diff_hPa',
+        'Garage_Outdoor_Diff_hPa',
+        
+        // Detection Method Analysis (6 fields)
+        'Detection_Triggered_By',
+        'Event_Validated_By_Reed',
+        'Detection_Window_Size',
+        'Sensor_Noise_Level_hPa',
+        'Adaptive_Threshold_hPa',
+        'Pressure_Analysis_Score'
     ];
     
     const csvLines = [csvHeaders.join(',')];
@@ -9417,6 +9444,7 @@ function convertTransitionsToCSV(transitions) {
             }
             
             const csvRow = [
+                // Basic Event Information
                 pacificTimestamp,
                 unixTimestamp,
                 action,
@@ -9424,12 +9452,38 @@ function convertTransitionsToCSV(transitions) {
                 detectionMethod,
                 transition.confidence ? Math.round(transition.confidence * 1000) / 1000 : 0,
                 transition.pressureChange ? Math.round(transition.pressureChange * 10000) / 10000 : 0,
+                
+                // Legacy System Fields
                 transition.reedDoorName || 'unknown',
                 transition.loopDelayMs || 0,
                 transition.powerOutageDetected ? 'YES' : 'NO',
                 transition.wifiOutageMinutes || 0,
                 transition.systemUptime || 0,
-                transition.entryTimestamp || 'None'
+                transition.entryTimestamp || 'None',
+                
+                // Environmental Context (6 fields)
+                transition.indoorTemp_F ? Math.round(transition.indoorTemp_F * 100) / 100 : 0,
+                transition.outdoorTemp_F ? Math.round(transition.outdoorTemp_F * 100) / 100 : 0,
+                transition.garageTemp_F ? Math.round(transition.garageTemp_F * 100) / 100 : 0,
+                transition.indoorHum_pct ? Math.round(transition.indoorHum_pct * 100) / 100 : 0,
+                transition.outdoorHum_pct ? Math.round(transition.outdoorHum_pct * 100) / 100 : 0,
+                transition.garageHum_pct ? Math.round(transition.garageHum_pct * 100) / 100 : 0,
+                
+                // Pressure Analysis Context (6 fields)
+                transition.indoorChange_hPa ? Math.round(transition.indoorChange_hPa * 10000) / 10000 : 0,
+                transition.garageChange_hPa ? Math.round(transition.garageChange_hPa * 10000) / 10000 : 0,
+                transition.outdoorChange_hPa ? Math.round(transition.outdoorChange_hPa * 10000) / 10000 : 0,
+                transition.indoorOutdoorDiff_hPa ? Math.round(transition.indoorOutdoorDiff_hPa * 10000) / 10000 : 0,
+                transition.indoorGarageDiff_hPa ? Math.round(transition.indoorGarageDiff_hPa * 10000) / 10000 : 0,
+                transition.garageOutdoorDiff_hPa ? Math.round(transition.garageOutdoorDiff_hPa * 10000) / 10000 : 0,
+                
+                // Detection Method Analysis (6 fields)
+                transition.detectionTriggeredBy || 'unknown',
+                transition.eventValidatedByReed ? 'YES' : 'NO',
+                transition.detectionWindowSize || 1,
+                transition.sensorNoiseLevel_hPa ? Math.round(transition.sensorNoiseLevel_hPa * 10000) / 10000 : 0,
+                transition.adaptiveThreshold_hPa ? Math.round(transition.adaptiveThreshold_hPa * 10000) / 10000 : 0,
+                transition.pressureAnalysisScore ? Math.round(transition.pressureAnalysisScore * 10000) / 10000 : 0
             ];
             
             // Escape any commas in the data
