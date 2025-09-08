@@ -894,6 +894,76 @@
             font-size: 1em;
         }
 
+        /* CSV Export Section Styles */
+        .csv-export-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+
+        .csv-export-section h5 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 1em;
+        }
+
+        .export-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .export-controls select {
+            padding: 6px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background: white;
+        }
+
+        #exportCsvBtn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        #exportCsvBtn:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        #exportCsvBtn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .data-quality-indicator {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.green { background: #28a745; }
+        .status-dot.yellow { background: #ffc107; }  
+        .status-dot.red { background: #dc3545; }
+
+        .status-text {
+            font-size: 0.9em;
+            color: #495057;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -1567,6 +1637,33 @@
                                         <span class="zone-name">Garage-Outside:</span>
                                         <span class="zone-count" id="garageOutsideCount">--</span>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- NEW: CSV Export Section for Mathematical Analysis -->
+                            <div class="csv-export-section" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                                <h5>📊 Pressure Analysis CSV Export</h5>
+                                <div class="export-controls" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin: 10px 0;">
+                                    <div>
+                                        <label for="csvTimeRange" style="font-weight: 500; color: #495057;">Time Range:</label>
+                                        <select id="csvTimeRange" style="padding: 6px 12px; border: 1px solid #ced4da; border-radius: 4px; background: white; margin-left: 5px;">
+                                            <option value="24h">Last 24 Hours</option>
+                                            <option value="48h">Last 48 Hours</option>
+                                            <option value="7d">Last 7 Days</option>
+                                            <option value="30d">Last 30 Days</option>
+                                        </select>
+                                    </div>
+                                    <button id="exportCsvBtn" onclick="exportPressureAnalysisCSV()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background 0.2s;">
+                                        📥 Export CSV Data
+                                    </button>
+                                    <div class="data-quality-indicator" style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+                                        <div class="status-dot" id="csvDataQualityDot" style="width: 8px; height: 8px; border-radius: 50%; background: #28a745;"></div>
+                                        <span class="status-text" id="csvDataQualityText" style="font-size: 0.9em; color: #495057;">Data Ready</span>
+                                    </div>
+                                </div>
+                                <div style="font-size: 0.85em; color: #666; margin-top: 8px;">
+                                    <strong>CSV includes:</strong> All door transitions, pressure readings, detection methods, confidence scores, 
+                                    system performance data, and Phase 1 enhanced fields (reed correlation, power outages, timing data) in PST timezone.
                                 </div>
                             </div>
                         </div>

@@ -9270,6 +9270,140 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// CSV Export function for pressure analysis
+async function exportPressureAnalysisCSV() {
+    const timeRange = document.getElementById('csvTimeRange').value;
+    const exportButton = document.getElementById('exportCsvBtn');
+    const qualityDot = document.getElementById('csvDataQualityDot');
+    const qualityText = document.getElementById('csvDataQualityText');
+    
+    try {
+        // Update button state
+        exportButton.disabled = true;
+        exportButton.textContent = '⏳ Generating CSV...';
+        
+        // Update quality indicator
+        qualityDot.className = 'status-dot yellow';
+        qualityText.textContent = 'Processing...';
+        
+        // Use DataManager to get data
+        let dataManager;
+        if (window.GlobalDataManager) {
+            dataManager = window.GlobalDataManager;
+        } else {
+            // Fallback: create a temporary DataManager instance
+            const { DataManager } = await import('./data-api-manager.js');
+            dataManager = new DataManager();
+        }
+        
+        // Get the raw transitions data
+        const jsonData = await dataManager.getDoorAnalyticsData(timeRange, 'raw-transitions');
+        
+        if (!jsonData.transitions || jsonData.transitions.length === 0) {
+            throw new Error('No door transition data found for the selected time range');
+        }
+        
+        // Convert JSON to CSV client-side
+        const csvContent = convertTransitionsToCSV(jsonData.transitions);
+        
+        // Create and download the CSV file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        
+        const timestamp = new Date().toISOString().split('T')[0];
+        link.href = url;
+        link.download = `pressure_analysis_${timeRange}_${timestamp}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        // Update quality indicator - success
+        qualityDot.className = 'status-dot green';
+        qualityText.textContent = `Exported ${jsonData.transitions.length} records`;
+        
+        console.log(`CSV Export successful: ${jsonData.transitions.length} transitions exported for ${timeRange}`);
+        
+    } catch (error) {
+        console.error('CSV Export Error:', error);
+        
+        // Update quality indicator - error
+        qualityDot.className = 'status-dot red';
+        qualityText.textContent = 'Export failed';
+        
+        // Show user-friendly error
+        alert(`CSV Export failed: ${error.message}`);
+    } finally {
+        // Reset button state
+        exportButton.disabled = false;
+        exportButton.textContent = '📥 Export CSV Data';
+    }
+}
+
+// Convert JSON transitions data to CSV format
+function convertTransitionsToCSV(transitions) {
+    const csvHeaders = [
+        'Timestamp_PST',
+        'Timestamp_Unix', 
+        'Action',
+        'Zone',
+        'Detection_Method',
+        'Confidence',
+        'Pressure_Change_mbar',
+        'Reed_Door_Name',
+        'Loop_Delay_Ms',
+        'Power_Outage_Detected',
+        'WiFi_Outage_Minutes',
+        'System_Uptime_Seconds',
+        'Entry_Timestamp'
+    ];
+    
+    const csvLines = [csvHeaders.join(',')];
+    
+    // Sort transitions by timestamp
+    const sortedTransitions = transitions.sort((a, b) => a.timestamp - b.timestamp);
+    
+    sortedTransitions.forEach(transition => {
+        try {
+            // Convert Unix timestamp to PST
+            const unixTimestamp = parseInt(transition.timestamp);
+            const epoch = new Date(1970, 0, 1);
+            const utcTime = new Date(epoch.getTime() + unixTimestamp * 1000);
+            const pstTime = new Date(utcTime.getTime() - (8 * 60 * 60 * 1000)); // PST is UTC-8
+            const pstTimestamp = pstTime.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' PST');
+            
+            const csvRow = [
+                pstTimestamp,
+                unixTimestamp,
+                transition.opened ? 'OPEN' : 'CLOSE',
+                transition.zone || 'unknown',
+                transition.detectionMethod || 'unknown',
+                transition.confidence ? Math.round(transition.confidence * 1000) / 1000 : 0,
+                transition.pressureChange ? Math.round(transition.pressureChange * 10000) / 10000 : 0,
+                transition.reedDoorName || 'unknown',
+                transition.loopDelayMs || 0,
+                transition.powerOutageDetected ? 'YES' : 'NO',
+                transition.wifiOutageMinutes || 0,
+                transition.systemUptime || 0,
+                transition.entryTimestamp || 'None'
+            ];
+            
+            // Escape any commas in the data
+            const escapedRow = csvRow.map(field => {
+                const str = String(field);
+                return str.includes(',') ? `"${str}"` : str;
+            });
+            
+            csvLines.push(escapedRow.join(','));
+        } catch (error) {
+            console.warn('Error processing transition:', error, transition);
+        }
+    });
+    
+    return csvLines.join('\n');
+}
+
 // Export functions for global access (ensure they're available)
 if (typeof showAnalyticsTab === 'function') {
     window.showAnalyticsTab = showAnalyticsTab;
@@ -9284,3 +9418,8 @@ if (typeof loadClimateAnalysis === 'function') {
 } else {
     console.error('loadClimateAnalysis function not found');
 }
+
+// Export CSV export function
+window.exportPressureAnalysisCSV = exportPressureAnalysisCSV;
+window.getAuthHeaders = getAuthHeaders;
+console.log('CSV export functions exported to window');

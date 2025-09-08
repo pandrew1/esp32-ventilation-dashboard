@@ -11,7 +11,8 @@ const getApiConfig = () => {
     return {
         statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
         historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
-        enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
+        enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
+        doorAnalyticsApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics'
     };
 };
 
@@ -89,6 +90,21 @@ export class DataManager {
         
         this._notifySubscribers('enhanced', data);
         return data;
+    }
+
+    // Get door analytics data for CSV export
+    async getDoorAnalyticsData(timeRange = '24h', analysis = 'raw-transitions') {
+        console.log(`DataManager: Fetching door analytics data for ${timeRange}`);
+        const endpoint = `${this.config.doorAnalyticsApiUrl}?timeRange=${timeRange}&analysis=${analysis}&deviceId=ESP32-Ventilation-01`;
+        
+        try {
+            const data = await this._deduplicatedFetch(endpoint, `door-analytics-${timeRange}-${analysis}`);
+            console.log(`DataManager: Door analytics data received - ${data.totalTransitions || 0} transitions`);
+            return data;
+        } catch (error) {
+            console.error('DataManager: Error fetching door analytics data:', error);
+            throw error;
+        }
     }
 
     // Subscription system for data updates
