@@ -843,6 +843,30 @@ const DataManager = {
             }
             throw error;
         }
+    },
+
+    // Get door analytics data for CSV export
+    async getDoorAnalyticsData(timeRange = '24h', analysis = 'raw-transitions') {
+        console.log(`DataManager: Fetching door analytics data for ${timeRange}`);
+        
+        try {
+            const url = `https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?timeRange=${timeRange}&analysis=${analysis}&deviceId=${CONFIG.deviceId}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: DashboardUtils.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log(`DataManager: Door analytics data received - ${data.totalTransitions || 0} transitions`);
+            return data;
+        } catch (error) {
+            console.error('DataManager: Error fetching door analytics data:', error);
+            throw error;
+        }
     }
 };
 
@@ -9270,6 +9294,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+
 // CSV Export function for pressure analysis
 async function exportPressureAnalysisCSV() {
     const timeRange = document.getElementById('csvTimeRange').value;
@@ -9286,18 +9311,8 @@ async function exportPressureAnalysisCSV() {
         qualityDot.className = 'status-dot yellow';
         qualityText.textContent = 'Processing...';
         
-        // Use DataManager to get data
-        let dataManager;
-        if (window.GlobalDataManager) {
-            dataManager = window.GlobalDataManager;
-        } else {
-            // Fallback: create a temporary DataManager instance
-            const { DataManager } = await import('./data-api-manager.js');
-            dataManager = new DataManager();
-        }
-        
-        // Get the raw transitions data
-        const jsonData = await dataManager.getDoorAnalyticsData(timeRange, 'raw-transitions');
+        // Use the existing DataManager directly (no module import needed)
+        const jsonData = await DataManager.getDoorAnalyticsData(timeRange, 'raw-transitions');
         
         if (!jsonData.transitions || jsonData.transitions.length === 0) {
             throw new Error('No door transition data found for the selected time range');
