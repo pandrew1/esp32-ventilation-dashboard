@@ -9369,7 +9369,7 @@ function convertTransitionsToCSV(transitions) {
         'Reed_Door_Name',
         'Loop_Delay_Ms',
         'Power_Outage_Detected',
-        'WiFi_Outage_Minutes',
+        'Power_Outage_Duration_Minutes',
         'System_Uptime_Seconds',
         'Entry_Timestamp'
     ];
@@ -9405,12 +9405,23 @@ function convertTransitionsToCSV(transitions) {
                 console.log(`Timezone conversion debug: Unix ${unixTimestamp} -> UTC ${utcTime.toISOString()} -> Pacific ${pacificTimestamp}`);
             }
             
+            // Determine action - handle system events specially
+            let action;
+            const detectionMethod = transition.detectionMethod || 'unknown';
+            if (['power-outage', 'reboot', 'loop-delay'].includes(detectionMethod)) {
+                // System events use detection method as action
+                action = detectionMethod.toUpperCase();
+            } else {
+                // Door events use opened/closed status
+                action = transition.opened ? 'OPEN' : 'CLOSE';
+            }
+            
             const csvRow = [
                 pacificTimestamp,
                 unixTimestamp,
-                transition.opened ? 'OPEN' : 'CLOSE',
+                action,
                 transition.zone || 'unknown',
-                transition.detectionMethod || 'unknown',
+                detectionMethod,
                 transition.confidence ? Math.round(transition.confidence * 1000) / 1000 : 0,
                 transition.pressureChange ? Math.round(transition.pressureChange * 10000) / 10000 : 0,
                 transition.reedDoorName || 'unknown',
