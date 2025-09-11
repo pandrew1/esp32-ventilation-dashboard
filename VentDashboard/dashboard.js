@@ -2319,7 +2319,7 @@ async function refreshData() {
 
                 // Process and display the enhanced data
                 updateDoorActivityDisplay(analyticsData);
-                updateConfidenceChart(analyticsData);
+                // REMOVED: updateConfidenceChart(analyticsData); - use GetEnhancedDashboardData only to avoid dual loading
                 
                 // Only update pressure analytics if current data is missing (avoid overwriting good data from GetEnhancedDashboardData)
                 const currentAvgPressure = document.getElementById('avgPressureChange').textContent;
