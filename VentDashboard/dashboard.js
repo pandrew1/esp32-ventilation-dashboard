@@ -2376,7 +2376,7 @@ async function refreshData() {
                 confidenceCanvas.chartInstance = new Chart(confidenceCanvas, {
                     type: 'doughnut',
                     data: {
-                        labels: ['High (≥0.8)', 'Medium (0.5-0.8)', 'Low (<0.5)', 'Reed Switch (1.0)'],
+                        labels: ['High (≥0.9)', 'Medium (0.5-0.9)', 'Low (<0.5)', 'Reed Switch (1.0)'],
                         datasets: [{
                             data: [0, 0, 0, 0],
                             backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8']
@@ -2511,7 +2511,7 @@ async function refreshData() {
                         const avgConf = hourData.avgConfidence;
                         const events = hourData.total;
                         
-                        if (avgConf >= 0.8) {
+                        if (avgConf >= 0.9) {
                             highConf += events;
                         } else if (avgConf >= 0.5) {
                             mediumConf += events;
@@ -2988,6 +2988,22 @@ async function refreshData() {
                             // Process explicit door transitions first (most accurate)
                             if (record.doorTransitions && Array.isArray(record.doorTransitions)) {
                                 record.doorTransitions.forEach(transition => {
+                                    // Filter out system events (power-outage, reboot, loop-delay)
+                                    const detectionMethod = transition.detectionMethod || '';
+                                    if (['power-outage', 'reboot', 'loop-delay'].includes(detectionMethod)) {
+                                        return; // Skip system events
+                                    }
+                                    
+                                    // For pressure events, only include high confidence (>90%)
+                                    if (detectionMethod === 'pressure-analysis' || detectionMethod === 'pressure') {
+                                        const confidence = parseFloat(transition.confidence) || 0;
+                                        if (confidence <= 0.9) {
+                                            return; // Skip low confidence pressure events
+                                        }
+                                    }
+                                    
+                                    // Include all reed switch events (they're always high confidence)
+                                    // Include high confidence pressure events (>90%)
                                     const eventKey = `${transition.timestamp}-door-${transition.doorId}-${transition.opened ? 'open' : 'close'}`;
                                     if (!uniqueEvents.has(eventKey)) {
                                         const event = {
