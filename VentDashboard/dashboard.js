@@ -3014,9 +3014,49 @@ async function refreshData() {
                                     // Include high confidence pressure events (>90%)
                                     const eventKey = `${transition.timestamp}-door-${transition.doorId}-${transition.opened ? 'open' : 'close'}`;
                                     if (!uniqueEvents.has(eventKey)) {
+                                        // Enhanced door name logic
+                                        const getDoorDisplayName = (transition) => {
+                                            const detectionMethod = transition.detectionMethod || '';
+                                            const zone = transition.zone || '';
+                                            const doorId = transition.doorId || -1;
+                                            const doorName = transition.doorName || '';
+                                            
+                                            // If we have an explicit door name from ESP32, use it
+                                            if (doorName) {
+                                                return doorName;
+                                            }
+                                            
+                                            // Handle specific doorId values
+                                            if (doorId === 4) {
+                                                return 'House-Outside Door'; // doorId 4 is always house-outside
+                                            }
+                                            
+                                            // Handle pressure-only detections with better naming
+                                            if (detectionMethod === 'pressure-analysis' || detectionMethod === 'pressure') {
+                                                if (zone === 'house-outside') {
+                                                    return 'House-Outside Door';
+                                                } else if (zone === 'garage-house') {
+                                                    return 'House Door (Pressure)'; // D2 area
+                                                } else if (zone === 'garage-outside') {
+                                                    return 'Garage Door (Pressure)'; // D1, D3, or D4 area
+                                                }
+                                            }
+                                            
+                                            // Reed switch detections (doorId 0-3)
+                                            if (detectionMethod === 'reed-switch' || detectionMethod === 'reed') {
+                                                const reedNames = ['D1 Main Garage', 'D2 House Door', 'D3 Single Roller', 'D4 Double Roller'];
+                                                if (doorId >= 0 && doorId < 4) {
+                                                    return reedNames[doorId];
+                                                }
+                                            }
+                                            
+                                            // Final fallback
+                                            return doorName || `Door ${doorId + 1}`;
+                                        };
+                                        
                                         const event = {
                                             timestamp: transition.timestamp,
-                                            door: transition.doorName || `Door ${transition.doorId}`,
+                                            door: getDoorDisplayName(transition),
                                             action: transition.opened ? 'opened' : 'closed',
                                             duration: 0,
                                             source: 'transition',
