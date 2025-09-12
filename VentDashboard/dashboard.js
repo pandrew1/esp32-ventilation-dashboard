@@ -2988,9 +2988,17 @@ async function refreshData() {
                             // Process explicit door transitions first (most accurate)
                             if (record.doorTransitions && Array.isArray(record.doorTransitions)) {
                                 record.doorTransitions.forEach(transition => {
-                                    // Filter out system events (power-outage, reboot, loop-delay)
+                                    // Filter out system events by detection method OR door name
                                     const detectionMethod = transition.detectionMethod || '';
+                                    const doorName = transition.doorName || '';
+                                    
+                                    // Skip system events by detection method
                                     if (['power-outage', 'reboot', 'loop-delay'].includes(detectionMethod)) {
+                                        return; // Skip system events
+                                    }
+                                    
+                                    // Skip system events by door name
+                                    if (doorName.toLowerCase().includes('system') || doorName === 'system-event') {
                                         return; // Skip system events
                                     }
                                     
