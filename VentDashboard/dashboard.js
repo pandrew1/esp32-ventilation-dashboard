@@ -2487,60 +2487,68 @@ async function refreshData() {
             }
         }
 
-        // NEW: Update confidence distribution chart
+        // FIXED: Update confidence distribution chart using verified API structure
         function updateConfidenceChart(data) {
             const confidenceCanvas = document.getElementById('confidenceChart');
-            if (!confidenceCanvas || !confidenceCanvas.chartInstance) return;
-            
-            // FIXED: Use direct confidence distribution from GetEnhancedDashboardData
-            let highConf = 0, mediumConf = 0, lowConf = 0, totalEvents = 0;
-            
-            // Check if we have direct confidence distribution data (from GetEnhancedDashboardData)
-            if (data.detectionAnalytics && data.detectionAnalytics.confidenceDistribution) {
-                const confDist = data.detectionAnalytics.confidenceDistribution;
-                highConf = confDist.high || 0;
-                mediumConf = confDist.medium || 0;
-                lowConf = confDist.low || 0;
-                totalEvents = highConf + mediumConf + lowConf;
-            }
-            // Fallback: Calculate confidence distribution from hourlyBreakdown data (GetEnhancedDoorAnalytics)
-            else if (data.hourlyBreakdown) {
-                for (const hour in data.hourlyBreakdown) {
-                    const hourData = data.hourlyBreakdown[hour];
-                    if (hourData.total && hourData.avgConfidence !== undefined) {
-                        const avgConf = hourData.avgConfidence;
-                        const events = hourData.total;
-                        
-                        if (avgConf >= 0.9) {
-                            highConf += events;
-                        } else if (avgConf >= 0.5) {
-                            mediumConf += events;
-                        } else {
-                            lowConf += events;
-                        }
-                        totalEvents += events;
-                    }
-                }
+            if (!confidenceCanvas || !confidenceCanvas.chartInstance) {
+                console.error('updateConfidenceChart: Chart canvas or instance not found');
+                return;
             }
             
-            // Update chart with calculated distribution
+            console.log('updateConfidenceChart: Processing data structure:', {
+                hasDetectionAnalytics: !!data.detectionAnalytics,
+                hasConfidenceDistribution: !!(data.detectionAnalytics?.confidenceDistribution),
+                hasReedSwitchEvents: data.detectionAnalytics?.reedSwitchEvents !== undefined,
+                dataKeys: Object.keys(data)
+            });
+            
+            // VERIFIED: Use the established data contract from GetEnhancedDashboardData
+            const analytics = data.detectionAnalytics;
+            if (!analytics) {
+                console.error('updateConfidenceChart: Missing detectionAnalytics in data structure');
+                console.error('Available data keys:', Object.keys(data));
+                throw new Error('Invalid data structure: detectionAnalytics is required but missing');
+            }
+            
+            const confidenceDistribution = analytics.confidenceDistribution;
+            if (!confidenceDistribution) {
+                console.error('updateConfidenceChart: Missing confidenceDistribution in detectionAnalytics');
+                console.error('Available analytics keys:', Object.keys(analytics));
+                throw new Error('Invalid data structure: confidenceDistribution is required but missing');
+            }
+            
+            // Extract data using the verified API contract
+            const highConf = confidenceDistribution.high || 0;
+            const mediumConf = confidenceDistribution.medium || 0;
+            const lowConf = confidenceDistribution.low || 0;
+            const reedSwitchEvents = analytics.reedSwitchEvents || 0;
+            
+            console.log('updateConfidenceChart: Chart data calculated:', {
+                high: highConf,
+                medium: mediumConf,
+                low: lowConf,
+                reedSwitch: reedSwitchEvents
+            });
+            
+            // Update chart with the verified data structure: [high, medium, low, reedSwitch]
             const chart = confidenceCanvas.chartInstance;
-            if (totalEvents > 0) {
-                chart.data.datasets[0].data = [highConf, mediumConf, lowConf, 0]; // Reed switch as separate category
-                chart.update();
-                
-                document.getElementById('highConfidenceCount').textContent = highConf;
-                document.getElementById('mediumConfidenceCount').textContent = mediumConf;
-                document.getElementById('lowConfidenceCount').textContent = lowConf;
+            chart.data.datasets[0].data = [highConf, mediumConf, lowConf, reedSwitchEvents];
+            chart.update();
+            
+            // Update display counters
+            document.getElementById('highConfidenceCount').textContent = highConf;
+            document.getElementById('mediumConfidenceCount').textContent = mediumConf;
+            document.getElementById('lowConfidenceCount').textContent = lowConf;
+            
+            // Update reed switch counter (add this element to HTML if it doesn't exist)
+            const reedSwitchElement = document.getElementById('reedSwitchCount');
+            if (reedSwitchElement) {
+                reedSwitchElement.textContent = reedSwitchEvents;
             } else {
-                // No confidence data available - show empty state
-                chart.data.datasets[0].data = [0, 0, 0, 0];
-                chart.update();
-                
-                document.getElementById('highConfidenceCount').textContent = '--';
-                document.getElementById('mediumConfidenceCount').textContent = '--';
-                document.getElementById('lowConfidenceCount').textContent = '--';
+                console.warn('updateConfidenceChart: reedSwitchCount element not found in HTML');
             }
+            
+            console.log('updateConfidenceChart: Chart successfully updated with verified data');
         }
 
         // FIXED: Update pressure analytics to align with ESP32 source structure  
