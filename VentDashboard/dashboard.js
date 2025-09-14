@@ -3010,10 +3010,10 @@ async function refreshData() {
                                         return; // Skip system events
                                     }
                                     
-                                    // For pressure events, only include high confidence (>90%)
+                                    // For pressure events, only include valid confidence (>45% to match ESP32 threshold)
                                     if (detectionMethod === 'pressure-analysis' || detectionMethod === 'pressure') {
                                         const confidence = parseFloat(transition.confidence) || 0;
-                                        if (confidence <= 0.9) {
+                                        if (confidence <= 0.45) {
                                             return; // Skip low confidence pressure events
                                         }
                                     }
