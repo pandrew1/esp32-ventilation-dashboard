@@ -1457,12 +1457,34 @@
                                 <span>Rain Chance</span>
                                 <span class="sensor-value" id="forecastPrecipitation">-%</span>
                             </div>
-                            <div class="sensor-reading">
-                                <span>Storm Risk</span>
-                                <span class="sensor-value" id="stormRisk">-</span>
-                            </div>
-                            <div id="stormRiskExplanation" style="font-size: 12px; color: #666; margin-top: 8px; font-style: italic;">
-                                Storm risk status will be explained here.
+                            
+                            <!-- Enhanced Storm Detection Section -->
+                            <div style="margin: 15px 0; padding: 12px; border: 2px solid #ff6b35; border-radius: 8px; background: linear-gradient(135deg, #fff8f0 0%, #ffeaa7 100%);">
+                                <h4 style="margin: 0 0 10px 0; color: #d63031;">⛈️ Enhanced Storm Detection</h4>
+                                
+                                <div class="sensor-reading" style="margin: 8px 0;">
+                                    <span><strong>Risk Level</strong></span>
+                                    <span class="sensor-value" id="stormRisk" style="color: #d63031;">-</span>
+                                </div>
+                                
+                                <div class="sensor-reading" style="margin: 8px 0;">
+                                    <span><strong>Storm Type</strong></span>
+                                    <span class="sensor-value" id="stormType" style="color: #2d3436;">-</span>
+                                </div>
+                                
+                                <div class="sensor-reading" style="margin: 8px 0;">
+                                    <span><strong>Confidence</strong></span>
+                                    <span class="sensor-value" id="stormConfidence" style="color: #00b894;">--%</span>
+                                </div>
+                                
+                                <div class="sensor-reading" style="margin: 8px 0;">
+                                    <span><strong>Estimated Arrival</strong></span>
+                                    <span class="sensor-value" id="stormArrival" style="color: #e17055;">-</span>
+                                </div>
+                                
+                                <div id="stormDescription" style="font-size: 12px; color: #636e72; margin-top: 8px; font-style: italic; padding: 6px; background: rgba(255,255,255,0.7); border-radius: 4px;">
+                                    Enhanced storm detection analyzes pressure patterns across multiple timescales to provide advance warning for Pacific Northwest weather events.
+                                </div>
                             </div>
                         </div>
                     </div>    

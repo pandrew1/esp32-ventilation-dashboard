@@ -4305,6 +4305,24 @@ async function refreshData() {
             document.getElementById('stormRisk').textContent = 'No data';
             document.getElementById('stormRiskExplanation').textContent = 'Storm risk status will be explained here.';
             
+            // Set enhanced storm detection to no data
+            const stormTypeElement = document.getElementById('stormType');
+            if (stormTypeElement) stormTypeElement.textContent = 'Clear';
+            const stormConfidenceElement = document.getElementById('stormConfidence');
+            if (stormConfidenceElement) {
+                stormConfidenceElement.textContent = '0%';
+                stormConfidenceElement.style.color = '#00b894'; // Green for clear
+            }
+            const stormArrivalElement = document.getElementById('stormArrival');
+            if (stormArrivalElement) {
+                stormArrivalElement.textContent = 'Clear';
+                stormArrivalElement.style.color = '#00b894'; // Green for clear
+            }
+            const stormDescriptionElement = document.getElementById('stormDescription');
+            if (stormDescriptionElement) {
+                stormDescriptionElement.textContent = 'Enhanced storm detection analyzes pressure patterns across multiple timescales to provide advance warning for Pacific Northwest weather events.';
+            }
+            
             // Set enhanced forecast to no data
             const forecastHumidityElement = document.getElementById('forecastHumidity');
             if (forecastHumidityElement) forecastHumidityElement.textContent = 'No data';
@@ -4462,6 +4480,9 @@ async function refreshData() {
                     stormRiskExplanation.textContent = 'Storm risk status will be explained here.';
                 }
             }
+            
+            // Update enhanced storm detection display
+            updateEnhancedStormDisplay(data);
             
             // PHASE 2: Pacific NW Comfort Intelligence Display
             const comfortIntelligence = weather.comfortIntelligence;
@@ -9598,5 +9619,120 @@ if (typeof loadClimateAnalysis === 'function') {
 
 // Export CSV export function
 window.exportPressureAnalysisCSV = exportPressureAnalysisCSV;
+
+// ===================================================================
+// ENHANCED STORM DETECTION DISPLAY FUNCTIONS
+// ===================================================================
+
+// Function to update enhanced storm detection display
+function updateEnhancedStormDisplay(data) {
+    try {
+        // Basic storm risk (existing field)
+        const stormRiskElement = document.getElementById('stormRisk');
+        if (stormRiskElement && data.weather && data.weather.stormRisk) {
+            stormRiskElement.textContent = data.weather.stormRisk;
+        }
+        
+        // Enhanced storm detection data
+        if (data.weather && data.weather.enhancedStorm) {
+            const enhanced = data.weather.enhancedStorm;
+            
+            // Storm Type
+            const stormTypeElement = document.getElementById('stormType');
+            if (stormTypeElement) {
+                stormTypeElement.textContent = enhanced.type || 'Clear';
+            }
+            
+            // Storm Confidence
+            const stormConfidenceElement = document.getElementById('stormConfidence');
+            if (stormConfidenceElement) {
+                const confidence = enhanced.confidence || 0;
+                stormConfidenceElement.textContent = `${Math.round(confidence * 100)}%`;
+                
+                // Color code confidence
+                if (confidence >= 0.8) {
+                    stormConfidenceElement.style.color = '#d63031'; // High confidence - red
+                } else if (confidence >= 0.6) {
+                    stormConfidenceElement.style.color = '#e17055'; // Medium confidence - orange
+                } else if (confidence >= 0.4) {
+                    stormConfidenceElement.style.color = '#fdcb6e'; // Low confidence - yellow
+                } else {
+                    stormConfidenceElement.style.color = '#00b894'; // Very low - green
+                }
+            }
+            
+            // Storm Arrival Time
+            const stormArrivalElement = document.getElementById('stormArrival');
+            if (stormArrivalElement) {
+                const minutes = enhanced.estimatedMinutes || 0;
+                if (minutes === 0) {
+                    stormArrivalElement.textContent = 'Clear';
+                } else if (minutes < 60) {
+                    stormArrivalElement.textContent = `${minutes} min`;
+                } else if (minutes < 1440) {
+                    const hours = Math.round(minutes / 60);
+                    stormArrivalElement.textContent = `${hours} hr`;
+                } else {
+                    const days = Math.round(minutes / 1440);
+                    stormArrivalElement.textContent = `${days} day`;
+                }
+                
+                // Color code urgency
+                if (minutes > 0 && minutes <= 60) {
+                    stormArrivalElement.style.color = '#d63031'; // Imminent - red
+                } else if (minutes <= 360) {
+                    stormArrivalElement.style.color = '#e17055'; // Soon - orange
+                } else if (minutes <= 1440) {
+                    stormArrivalElement.style.color = '#fdcb6e'; // Later today - yellow
+                } else {
+                    stormArrivalElement.style.color = '#00b894'; // Future - green
+                }
+            }
+            
+            // Storm Description
+            const stormDescriptionElement = document.getElementById('stormDescription');
+            if (stormDescriptionElement) {
+                const description = enhanced.description || 'Clear';
+                if (description === 'Clear') {
+                    stormDescriptionElement.textContent = 'Enhanced storm detection analyzes pressure patterns across multiple timescales to provide advance warning for Pacific Northwest weather events.';
+                } else {
+                    // Create detailed description based on storm type and timing
+                    let detailedDesc = `${enhanced.type} detected with ${Math.round((enhanced.confidence || 0) * 100)}% confidence. `;
+                    
+                    // Add timing context
+                    const minutes = enhanced.estimatedMinutes || 0;
+                    if (minutes <= 30) {
+                        detailedDesc += 'Immediate preparation recommended.';
+                    } else if (minutes <= 120) {
+                        detailedDesc += 'Storm approaching within 2 hours.';
+                    } else if (minutes <= 720) {
+                        detailedDesc += 'Storm expected later today.';
+                    } else {
+                        detailedDesc += 'Long-range storm system detected.';
+                    }
+                    
+                    stormDescriptionElement.textContent = detailedDesc;
+                }
+            }
+        } else {
+            // Clear enhanced storm display if no data
+            const elements = ['stormType', 'stormConfidence', 'stormArrival'];
+            elements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = '-';
+            });
+        }
+        
+        console.log('Enhanced storm display updated successfully');
+        
+    } catch (error) {
+        console.error('Error updating enhanced storm display:', error);
+    }
+}
+
+// Export the enhanced storm display function globally
+window.updateEnhancedStormDisplay = updateEnhancedStormDisplay;
+
+console.log('Enhanced storm detection display functions loaded successfully');
 window.getAuthHeaders = getAuthHeaders;
 console.log('CSV export functions exported to window');
