@@ -4369,45 +4369,7 @@ function startAutoRefresh() {
                 await updateDashboard(data);
                 updateConnectionStatus('connected');
                 
-                // Force update main sensor widgets with current data
-                console.log('🔍 DEBUG: Force updating main sensor widgets');
-                if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental) {
-                    const env = data.sections.yesterday.environmental;
-                    
-                    // Update Indoor Environment
-                    const safeUpdateWidget = (elementId, value, unit = '') => {
-                        const element = document.getElementById(elementId);
-                        if (element) {
-                            if (value !== null && value !== undefined) {
-                                element.textContent = typeof value === 'number' ? `${value.toFixed(1)}${unit}` : value;
-                                element.style.color = '#333';
-                            } else {
-                                element.textContent = 'No data';
-                                element.style.color = '#dc3545';
-                            }
-                        }
-                    };
-                    
-                    // Indoor widgets
-                    safeUpdateWidget('indoorTemp', env.temperature?.indoor?.current, '°F');
-                    safeUpdateWidget('indoorHumidity', env.humidity?.indoor?.current, '%');
-                    safeUpdateWidget('indoorPressure', env.pressure?.indoor?.current, ' inHg');
-                    
-                    // Outdoor widgets
-                    safeUpdateWidget('outdoorTemp', env.temperature?.outdoor?.current, '°F');
-                    safeUpdateWidget('outdoorHumidity', env.humidity?.outdoor?.current, '%');
-                    safeUpdateWidget('outdoorPressure', env.pressure?.outdoor?.current, ' inHg');
-                    
-                    // Garage widgets
-                    safeUpdateWidget('garageTemp', env.temperature?.garage?.current, '°F');
-                    safeUpdateWidget('garageHumidity', env.humidity?.garage?.current, '%');
-                    safeUpdateWidget('garagePressure', env.pressure?.garage?.current, ' inHg');
-                    
-                    // Weather forecast
-                    safeUpdateWidget('forecastHigh', env.pressure?.weather?.forecastHigh, '°F');
-                    
-                    console.log('🔍 DEBUG: Main sensor widgets force-updated');
-                }
+                // Main sensor widgets are updated with current readings from GetVentilationHistory API below
 
                 // Monthly Data Aggregation moved to Yesterday's Report detailed view - function calls removed
                 // console.log('RefreshData: About to call loadAggregationStatus()');
@@ -4428,7 +4390,9 @@ function startAutoRefresh() {
                 }
                 
             } catch (error) {
-                console.error('Error refreshing dashboard data:', error);
+                console.error('🚨 CRITICAL ERROR in refreshData:', error);
+                console.error('🚨 Error stack:', error.stack);
+                console.error('🚨 Error at line:', error.lineNumber || 'unknown');
                 showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
                 showNoDataState();
                 updateConnectionStatus('disconnected');
@@ -4599,28 +4563,10 @@ function startAutoRefresh() {
                 console.log('🔍 DEBUG: Could not fetch current readings, falling back to yesterday data');
             }
             
-            // Fallback to yesterday's data if current readings unavailable
-            if (!sensors.indoor && data.sections && data.sections.yesterday && data.sections.yesterday.environmental) {
-                console.log('🔍 DEBUG: Using fallback yesterday environmental data');
-                const env = data.sections.yesterday.environmental;
-                sensors = {
-                    indoor: {
-                        temp: env.temperature?.indoor?.current,
-                        humidity: env.humidity?.indoor?.current,
-                        pressure: env.pressure?.indoor?.current
-                    },
-                    outdoor: {
-                        temp: env.temperature?.outdoor?.current,
-                        humidity: env.humidity?.outdoor?.current,
-                        pressure: env.pressure?.outdoor?.current
-                    },
-                    garage: {
-                        temp: env.temperature?.garage?.current,
-                        humidity: env.humidity?.garage?.current,
-                        pressure: env.pressure?.garage?.current
-                    }
-                };
-                console.log('🔍 DEBUG: Mapped environmental data from yesterday:', sensors);
+            // Always use current sensor readings - yesterday's data has sensor gaps
+            if (!sensors || Object.keys(sensors).length === 0) {
+                console.log('🔍 DEBUG: No current sensor readings available, showing no data');
+                sensors = { indoor: {}, outdoor: {}, garage: {} };
             }
             
             const indoor = sensors.indoor || {};
