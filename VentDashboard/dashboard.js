@@ -262,7 +262,7 @@ function getApiKeyFromUrl() {
 
 // Configuration - Replace with your actual Azure Function URLs
 const CONFIG = {
-    statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
+    statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
     historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 30000, // 30 seconds - check for new telemetry data
@@ -5009,7 +5009,7 @@ async function refreshData() {
                 
                 // PHASE 3: Enhanced Boot Information from sections.startup (BUG FIX #18)
                 // NOTE: This is handled by updateSystemHealthWidget() which gets enhanced data
-                // This updateDashboard() function receives old GetVentilationStatus data without sections
+                // This updateDashboard() function receives GetEnhancedDashboardData with analytics sections
                 // So we skip bootTime handling here to avoid overriding the correct value
                 const lastBootInfoElement = document.getElementById('lastBootInfo');
                 if (lastBootInfoElement) {
