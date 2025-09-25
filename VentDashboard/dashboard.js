@@ -2642,14 +2642,29 @@ function startAutoRefresh() {
                     if (element) {
                         element.textContent = value;
                     } else {
-                        console.warn('🚨 DEBUG: Element', id, 'not found in HTML');
+                        console.log('� DEBUG: Element', id, 'not found in HTML (this may be normal)');
                     }
                 };
                 
                 safeUpdateElement('highConfidenceCount', highConf);
                 safeUpdateElement('mediumConfidenceCount', mediumConf);
                 safeUpdateElement('lowConfidenceCount', lowConf);
-                safeUpdateElement('reedSwitchCount', reedSwitchEvents);
+                
+                // Reed switch count - create element if it doesn't exist
+                const reedSwitchElement = document.getElementById('reedSwitchCount');
+                if (reedSwitchElement) {
+                    safeUpdateElement('reedSwitchCount', reedSwitchEvents);
+                } else {
+                    console.log('🔍 DEBUG: reedSwitchCount element not found - this is normal if not in current HTML');
+                    // Try alternative element names
+                    const altElements = ['reedSwitchEvents', 'reedEvents', 'totalReedSwitchEvents'];
+                    for (const altId of altElements) {
+                        if (document.getElementById(altId)) {
+                            safeUpdateElement(altId, reedSwitchEvents);
+                            break;
+                        }
+                    }
+                }
                 
                 console.log('🔍 DEBUG: Chart successfully updated with data:', { highConf, mediumConf, lowConf, reedSwitchEvents });
                 
@@ -4353,6 +4368,46 @@ function startAutoRefresh() {
                 // Update dashboard with new data
                 updateDashboard(data);
                 updateConnectionStatus('connected');
+                
+                // Force update main sensor widgets with current data
+                console.log('🔍 DEBUG: Force updating main sensor widgets');
+                if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental) {
+                    const env = data.sections.yesterday.environmental;
+                    
+                    // Update Indoor Environment
+                    const safeUpdateWidget = (elementId, value, unit = '') => {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            if (value !== null && value !== undefined && value !== 0) {
+                                element.textContent = typeof value === 'number' ? `${value.toFixed(1)}${unit}` : value;
+                                element.style.color = '#333';
+                            } else {
+                                element.textContent = 'No data';
+                                element.style.color = '#dc3545';
+                            }
+                        }
+                    };
+                    
+                    // Indoor widgets
+                    safeUpdateWidget('indoorTemp', env.temperature?.indoor?.current, '°F');
+                    safeUpdateWidget('indoorHumidity', env.humidity?.indoor?.current, '%');
+                    safeUpdateWidget('indoorPressure', env.pressure?.indoor?.current, ' inHg');
+                    
+                    // Outdoor widgets
+                    safeUpdateWidget('outdoorTemp', env.temperature?.outdoor?.current, '°F');
+                    safeUpdateWidget('outdoorHumidity', env.humidity?.outdoor?.current, '%');
+                    safeUpdateWidget('outdoorPressure', env.pressure?.outdoor?.current, ' inHg');
+                    
+                    // Garage widgets
+                    safeUpdateWidget('garageTemp', env.temperature?.garage?.current, '°F');
+                    safeUpdateWidget('garageHumidity', env.humidity?.garage?.current, '%');
+                    safeUpdateWidget('garagePressure', env.pressure?.garage?.current, ' inHg');
+                    
+                    // Weather forecast
+                    safeUpdateWidget('forecastHigh', env.pressure?.weather?.forecastHigh, '°F');
+                    
+                    console.log('🔍 DEBUG: Main sensor widgets force-updated');
+                }
 
                 // Monthly Data Aggregation moved to Yesterday's Report detailed view - function calls removed
                 // console.log('RefreshData: About to call loadAggregationStatus()');
@@ -4497,8 +4552,35 @@ function startAutoRefresh() {
             document.getElementById('errorSection').style.display = 'none';
             document.getElementById('dashboardContent').style.display = 'block';
 
-            // Update sensors with proper null/undefined handling
-            const sensors = data.sensors || {};
+            // 🎯 FIXED: Handle new API structure with sections.yesterday.environmental
+            let sensors = {};
+            if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental) {
+                console.log('🔍 DEBUG: Using new API structure with sections.yesterday.environmental');
+                const env = data.sections.yesterday.environmental;
+                sensors = {
+                    indoor: {
+                        temp: env.temperature?.indoor?.current,
+                        humidity: env.humidity?.indoor?.current,
+                        pressure: env.pressure?.indoor?.current
+                    },
+                    outdoor: {
+                        temp: env.temperature?.outdoor?.current,
+                        humidity: env.humidity?.outdoor?.current,
+                        pressure: env.pressure?.outdoor?.current
+                    },
+                    garage: {
+                        temp: env.temperature?.garage?.current,
+                        humidity: env.humidity?.garage?.current,
+                        pressure: env.pressure?.garage?.current
+                    }
+                };
+                console.log('🔍 DEBUG: Mapped environmental data:', sensors);
+            } else {
+                // Fallback to legacy structure
+                sensors = data.sensors || {};
+                console.log('🔍 DEBUG: Using legacy sensors structure:', sensors);
+            }
+            
             const indoor = sensors.indoor || {};
             const outdoor = sensors.outdoor || {};
             const garage = sensors.garage || {};
@@ -4515,9 +4597,26 @@ function startAutoRefresh() {
             document.getElementById('garageHumidity').textContent = garage.humidity != null ? `${garage.humidity.toFixed(0)}%` : 'No data';
             document.getElementById('garagePressure').textContent = garage.pressure != null ? `${garage.pressure.toFixed(1)} hPa` : 'No data';
 
-            // Update system status with proper null/undefined handling
-            const system = data.system || {};
-            const fanOn = system.fanOn;
+            // 🎯 FIXED: Update system status using new API structure
+            let systemData = {};
+            if (data.sections && data.sections.yesterday && data.sections.yesterday.ventilation) {
+                console.log('🔍 DEBUG: Using new API structure for system status');
+                const vent = data.sections.yesterday.ventilation;
+                systemData = {
+                    fanOn: vent.fanOn,
+                    ventilationMode: vent.mode,
+                    fanMinutesToday: vent.fanMinutesToday,
+                    freshAirActive: vent.freshAirActive,
+                    operatingHours: Math.round((vent.fanMinutesToday || 0) / 60 * 10) / 10
+                };
+                console.log('🔍 DEBUG: Mapped ventilation data:', systemData);
+            } else {
+                // Fallback to legacy structure
+                systemData = data.system || {};
+                console.log('🔍 DEBUG: Using legacy system structure:', systemData);
+            }
+            
+            const fanOn = systemData.fanOn;
             
             if (fanOn != null) {
                 document.getElementById('fanStatus').textContent = fanOn ? '🌀' : '⏸️';
@@ -4529,22 +4628,36 @@ function startAutoRefresh() {
                 document.getElementById('fanStatusText').textContent = 'No data';
             }
             
-            document.getElementById('ventilationMode').textContent = system.ventilationMode || 'No data';
-            document.getElementById('fanMinutes').textContent = system.fanMinutesToday != null ? system.fanMinutesToday : 'No data';
-            document.getElementById('freshAirStatus').textContent = system.freshAirActive != null ? (system.freshAirActive ? 'Active' : 'Inactive') : 'No data';
-            document.getElementById('ventilationHours').textContent = system.operatingHours || 'No data';
+            document.getElementById('ventilationMode').textContent = systemData.ventilationMode || 'No data';
+            document.getElementById('fanMinutes').textContent = systemData.fanMinutesToday != null ? systemData.fanMinutesToday : 'No data';
+            document.getElementById('freshAirStatus').textContent = systemData.freshAirActive != null ? (systemData.freshAirActive ? 'Active' : 'Inactive') : 'No data';
+            document.getElementById('ventilationHours').textContent = systemData.operatingHours || 'No data';
             
-            // Calculate and display cooling effect
+            // Calculate and display cooling effect using new mapped variables
             const coolingEffect = calculateCoolingEffect(
                 indoor.temp, 
                 outdoor.temp, 
-                system.fanMinutesToday, 
+                systemData.fanMinutesToday, 
                 fanOn
             );
             document.getElementById('coolingEffect').textContent = coolingEffect;
 
-            // Update weather with proper null/undefined handling
-            const weather = data.weather || {};
+            // 🎯 FIXED: Update weather using new API structure
+            let weather = {};
+            if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental && data.sections.yesterday.environmental.pressure && data.sections.yesterday.environmental.pressure.weather) {
+                console.log('🔍 DEBUG: Using new API structure for weather data');
+                const weatherData = data.sections.yesterday.environmental.pressure.weather;
+                weather = {
+                    forecastHigh: weatherData.forecastHigh,
+                    stormRisk: weatherData.stormRisk || 'Low'
+                };
+                console.log('🔍 DEBUG: Mapped weather data:', weather);
+            } else {
+                // Fallback to legacy structure
+                weather = data.weather || {};
+                console.log('🔍 DEBUG: Using legacy weather structure:', weather);
+            }
+            
             const stormRiskValue = weather.stormRisk || 'No data';
             document.getElementById('forecastHigh').textContent = weather.forecastHigh != null ? `${weather.forecastHigh.toFixed(0)}°F` : 'No data';
             document.getElementById('stormRisk').textContent = stormRiskValue;
