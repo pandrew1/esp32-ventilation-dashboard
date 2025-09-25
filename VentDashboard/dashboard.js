@@ -4448,31 +4448,44 @@ function startAutoRefresh() {
             document.getElementById('errorSection').style.display = 'none';
             document.getElementById('dashboardContent').style.display = 'block';
 
-            // Set all sensor readings to "No data"
-            document.getElementById('indoorTemp').textContent = 'No data';
-            document.getElementById('indoorHumidity').textContent = 'No data';
-            document.getElementById('indoorPressure').textContent = 'No data';
-            document.getElementById('outdoorTemp').textContent = 'No data';
-            document.getElementById('outdoorHumidity').textContent = 'No data';
-            document.getElementById('outdoorPressure').textContent = 'No data';
-            document.getElementById('garageTemp').textContent = 'No data';
-            document.getElementById('garageHumidity').textContent = 'No data';
-            document.getElementById('garagePressure').textContent = 'No data';
+            // Helper function to safely update elements
+            const safeSetText = (elementId, text) => {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = text;
+                } else {
+                    console.log(`🔍 DEBUG: Element ${elementId} not found in showNoDataState - skipping`);
+                }
+            };
 
-            // Set system status to no data
-            document.getElementById('fanStatus').textContent = '❓';
-            document.getElementById('fanStatus').className = 'fan-status';
-            document.getElementById('fanStatusText').textContent = 'No data';
-            document.getElementById('ventilationMode').textContent = 'No data';
-            document.getElementById('fanMinutes').textContent = 'No data';
-            document.getElementById('freshAirStatus').textContent = 'No data';
-            document.getElementById('ventilationHours').textContent = 'No data';
-            document.getElementById('coolingEffect').textContent = 'No data';
+            // Set all sensor readings to "No data"
+            safeSetText('indoorTemp', 'No data');
+            safeSetText('indoorHumidity', 'No data');
+            safeSetText('indoorPressure', 'No data');
+            safeSetText('outdoorTemp', 'No data');
+            safeSetText('outdoorHumidity', 'No data');
+            safeSetText('outdoorPressure', 'No data');
+            safeSetText('garageTemp', 'No data');
+            safeSetText('garageHumidity', 'No data');
+            safeSetText('garagePressure', 'No data');
+
+            // Set system status to no data (with special handling for fan status)
+            const fanStatusElement = document.getElementById('fanStatus');
+            if (fanStatusElement) {
+                fanStatusElement.textContent = '❓';
+                fanStatusElement.className = 'fan-status';
+            }
+            safeSetText('fanStatusText', 'No data');
+            safeSetText('ventilationMode', 'No data');
+            safeSetText('fanMinutes', 'No data');
+            safeSetText('freshAirStatus', 'No data');
+            safeSetText('ventilationHours', 'No data');
+            safeSetText('coolingEffect', 'No data');
 
             // Set weather to no data
-            document.getElementById('forecastHigh').textContent = 'No data';
-            document.getElementById('stormRisk').textContent = 'No data';
-            document.getElementById('stormRiskExplanation').textContent = 'Storm risk status will be explained here.';
+            safeSetText('forecastHigh', 'No data');
+            safeSetText('stormRisk', 'No data');
+            safeSetText('stormRiskExplanation', 'Storm risk status will be explained here.');
             
             // Set enhanced storm detection to no data
             const stormTypeElement = document.getElementById('stormType');
@@ -4585,14 +4598,17 @@ function startAutoRefresh() {
             const outdoor = sensors.outdoor || {};
             const garage = sensors.garage || {};
             
+            console.log('🔍 DEBUG: Setting indoor data - temp:', indoor.temp, 'humidity:', indoor.humidity, 'pressure:', indoor.pressure);
             document.getElementById('indoorTemp').textContent = indoor.temp != null ? `${indoor.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('indoorHumidity').textContent = indoor.humidity != null ? `${indoor.humidity.toFixed(0)}%` : 'No data';
             document.getElementById('indoorPressure').textContent = indoor.pressure != null ? `${indoor.pressure.toFixed(1)} hPa` : 'No data';
             
+            console.log('🔍 DEBUG: Setting outdoor data - temp:', outdoor.temp, 'humidity:', outdoor.humidity, 'pressure:', outdoor.pressure);
             document.getElementById('outdoorTemp').textContent = outdoor.temp != null ? `${outdoor.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('outdoorHumidity').textContent = outdoor.humidity != null ? `${outdoor.humidity.toFixed(0)}%` : 'No data';
             document.getElementById('outdoorPressure').textContent = outdoor.pressure != null ? `${outdoor.pressure.toFixed(1)} hPa` : 'No data';
             
+            console.log('🔍 DEBUG: Setting garage data - temp:', garage.temp, 'humidity:', garage.humidity, 'pressure:', garage.pressure);
             document.getElementById('garageTemp').textContent = garage.temp != null ? `${garage.temp.toFixed(1)}°F` : 'No data';
             document.getElementById('garageHumidity').textContent = garage.humidity != null ? `${garage.humidity.toFixed(0)}%` : 'No data';
             document.getElementById('garagePressure').textContent = garage.pressure != null ? `${garage.pressure.toFixed(1)} hPa` : 'No data';
@@ -5058,7 +5074,7 @@ function startAutoRefresh() {
             }
             
             // Update system info with proper null/undefined handling
-            const uptimeHours = system.uptime != null ? Math.floor(system.uptime / 3600) : null;
+            const uptimeHours = systemData.uptime != null ? Math.floor(systemData.uptime / 3600) : null;
             const uptimeElement = document.getElementById('uptime');
             if (uptimeElement) uptimeElement.textContent = uptimeHours != null ? `${uptimeHours}h` : 'No data';
 
@@ -5077,7 +5093,7 @@ function startAutoRefresh() {
                 const m = mins % 60;
                 return m > 0 ? `${h}h ${m}m` : `${h}h`;
             };
-            const uptimeMinutes = reliability.uptimeMinutes != null ? reliability.uptimeMinutes : (system.uptime != null ? system.uptime : null);
+            const uptimeMinutes = reliability.uptimeMinutes != null ? reliability.uptimeMinutes : (systemData.uptime != null ? systemData.uptime : null);
             const reliabilityUptimeElement = document.getElementById('reliabilityUptime');
             if (reliabilityUptimeElement) reliabilityUptimeElement.textContent = uptimeMinutes != null ? formatMinutes(uptimeMinutes) : 'No data';
             const reliabilityRebootsElement = document.getElementById('reliabilityReboots');
