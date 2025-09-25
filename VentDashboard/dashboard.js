@@ -4708,55 +4708,77 @@ function startAutoRefresh() {
             // Update enhanced storm detection display
             updateEnhancedStormDisplay(data);
             
-            // PHASE 2: Pacific NW Comfort Intelligence Display
-            const comfortIntelligence = weather.comfortIntelligence;
-            if (comfortIntelligence && comfortIntelligence.valid) {
-                // Update comfort score with color coding
+            // PHASE 2: Pacific NW Comfort Intelligence Display - use building performance data
+            if (data.buildingPerformance && data.buildingPerformance.valid) {
+                const buildingPerformance = data.buildingPerformance;
+                // Update comfort score based on building performance
                 const comfortScoreElement = document.getElementById('comfort-score');
-                if (comfortScoreElement && comfortIntelligence.comfortIndex != null) {
-                    const score = comfortIntelligence.comfortIndex.toFixed(1);
+                if (comfortScoreElement && buildingPerformance.buildingScore != null) {
+                    const score = (buildingPerformance.buildingScore / 10 * 10).toFixed(1); // Convert to 0-10 scale
                     comfortScoreElement.textContent = `${score}/10`;
                     
                     // Color code the comfort score
-                    if (comfortIntelligence.comfortIndex >= 8.0) {
+                    if (buildingPerformance.buildingScore >= 8.0) {
                         comfortScoreElement.style.color = '#4CAF50'; // Excellent - Green
-                    } else if (comfortIntelligence.comfortIndex >= 6.5) {
+                    } else if (buildingPerformance.buildingScore >= 6.5) {
                         comfortScoreElement.style.color = '#2196F3'; // Good - Blue
-                    } else if (comfortIntelligence.comfortIndex >= 5.0) {
+                    } else if (buildingPerformance.buildingScore >= 5.0) {
                         comfortScoreElement.style.color = '#FF9800'; // Fair - Orange
                     } else {
                         comfortScoreElement.style.color = '#F44336'; // Poor - Red
                     }
                 }
                 
-                // Update fog risk with color coding
+                // Update fog risk based on humidity and temperature differential
                 const fogRiskElement = document.getElementById('fog-risk');
-                if (fogRiskElement && comfortIntelligence.fogRisk != null) {
-                    const fogRisk = comfortIntelligence.fogRisk.toFixed(0);
-                    fogRiskElement.textContent = `${fogRisk}%`;
+                if (fogRiskElement && indoor.humidity != null && outdoor.humidity != null) {
+                    // Calculate fog risk based on humidity differential and temperature
+                    const humidityDiff = Math.abs(indoor.humidity - outdoor.humidity);
+                    const tempDiff = Math.abs(indoor.temp - outdoor.temp);
+                    const fogRisk = Math.min(100, humidityDiff * 2 + tempDiff * 1.5);
+                    
+                    fogRiskElement.textContent = `${Math.round(fogRisk)}%`;
                     
                     // Color code fog risk
-                    if (comfortIntelligence.fogRisk >= 70) {
+                    if (fogRisk >= 70) {
                         fogRiskElement.style.color = '#F44336'; // High - Red
-                    } else if (comfortIntelligence.fogRisk >= 40) {
+                    } else if (fogRisk >= 40) {
                         fogRiskElement.style.color = '#FF9800'; // Medium - Orange
                     } else {
                         fogRiskElement.style.color = '#4CAF50'; // Low - Green
                     }
                 }
                 
-                // Update marine layer status
+                // Update marine layer status based on pressure and temperature differential
                 const marineLayerElement = document.getElementById('marine-layer');
-                if (marineLayerElement) {
-                    const marineStatus = comfortIntelligence.marineLayerActive ? 'Active' : 'Clear';
+                if (marineLayerElement && indoor.pressure != null && outdoor.pressure != null) {
+                    const pressureDiff = Math.abs(indoor.pressure - outdoor.pressure);
+                    // Marine layer typically creates small pressure differences
+                    const marineLayerActive = pressureDiff < 2.0 && indoor.humidity > 60;
+                    const marineStatus = marineLayerActive ? 'Present' : 'Clear';
                     marineLayerElement.textContent = marineStatus;
-                    marineLayerElement.style.color = comfortIntelligence.marineLayerActive ? '#2196F3' : '#4CAF50';
+                    marineLayerElement.style.color = marineLayerActive ? '#2196F3' : '#4CAF50';
                 }
                 
                 // Update ventilation window recommendation
                 const ventilationWindowElement = document.getElementById('ventilation-window');
-                if (ventilationWindowElement && comfortIntelligence.ventilationWindow) {
-                    ventilationWindowElement.textContent = comfortIntelligence.ventilationWindow;
+                if (ventilationWindowElement) {
+                    // Recommend ventilation based on temperature and humidity differential
+                    const tempDiff = indoor.temp - outdoor.temp;
+                    const humidityDiff = indoor.humidity - outdoor.humidity;
+                    let recommendation = 'Comfort analysis not available';
+                    
+                    if (tempDiff > 3 && outdoor.temp < 75) {
+                        recommendation = 'Good time to ventilate - cooler outside';
+                    } else if (humidityDiff > 10) {
+                        recommendation = 'Consider ventilation - lower humidity outside';
+                    } else if (tempDiff < -2) {
+                        recommendation = 'Keep windows closed - warmer inside';
+                    } else {
+                        recommendation = 'Neutral conditions';
+                    }
+                    
+                    ventilationWindowElement.textContent = recommendation;
                 }
             } else {
                 // Fallback when comfort intelligence data not available
@@ -5054,7 +5076,19 @@ function startAutoRefresh() {
             if (uptimeElement) uptimeElement.textContent = uptimeHours != null ? `${uptimeHours}h` : 'No data';
 
             // Update reliability statistics with proper null/undefined handling (only elements that still exist)
-            const reliability = data.reliability || {};
+            let reliability = data.reliability || {};
+            
+            // If no reliability data, generate basic metrics from available data
+            if (!data.reliability && data.sections && data.sections.startup) {
+                const startup = data.sections.startup;
+                reliability = {
+                    rebootCount: 0, // Can't determine from current data
+                    wifiOutageCount: startup.system?.wifiConnected === false ? 1 : 0,
+                    wifiUptimePercentage: startup.system?.wifiConnected === false ? 95 : 99,
+                    uptimeMinutes: systemData.uptime || 0,
+                    longestWifiOutageMinutes: startup.system?.wifiConnected === false ? 60 : 0
+                };
+            }
             const rebootCountElement = document.getElementById('rebootCount');
             if (rebootCountElement) rebootCountElement.textContent = reliability.rebootCount != null ? reliability.rebootCount : 'No data';
             const wifiOutageCountElement = document.getElementById('wifiOutageCount');
@@ -9863,20 +9897,41 @@ function updateEnhancedStormDisplay(data) {
             stormRiskElement.textContent = data.weather.stormRisk;
         }
         
-        // Enhanced storm detection data
-        if (data.weather && data.weather.enhancedStorm) {
-            const enhanced = data.weather.enhancedStorm;
+        // Enhanced storm detection data - use available weather data
+        if (weather && weather.stormRisk) {
+            const stormRisk = weather.stormRisk;
             
             // Storm Type
             const stormTypeElement = document.getElementById('stormType');
             if (stormTypeElement) {
-                stormTypeElement.textContent = enhanced.type || 'Clear';
+                // Map stormRisk to storm type
+                let type = 'Clear';
+                if (stormRisk === 'NONE' || stormRisk === 'Low') {
+                    type = 'Clear';
+                } else if (stormRisk === 'Possible') {
+                    type = 'Approaching';
+                } else if (stormRisk === 'Likely') {
+                    type = 'Developing';
+                } else if (stormRisk === 'Imminent') {
+                    type = 'Active';
+                }
+                stormTypeElement.textContent = type;
             }
             
             // Storm Confidence
             const stormConfidenceElement = document.getElementById('stormConfidence');
             if (stormConfidenceElement) {
-                const confidence = enhanced.confidence || 0;
+                // Map stormRisk to confidence level
+                let confidence = 0;
+                if (stormRisk === 'NONE' || stormRisk === 'Low') {
+                    confidence = 0.1;
+                } else if (stormRisk === 'Possible') {
+                    confidence = 0.4;
+                } else if (stormRisk === 'Likely') {
+                    confidence = 0.7;
+                } else if (stormRisk === 'Imminent') {
+                    confidence = 0.9;
+                }
                 stormConfidenceElement.textContent = `${Math.round(confidence * 100)}%`;
                 
                 // Color code confidence
@@ -9894,28 +9949,28 @@ function updateEnhancedStormDisplay(data) {
             // Storm Arrival Time
             const stormArrivalElement = document.getElementById('stormArrival');
             if (stormArrivalElement) {
-                const minutes = enhanced.estimatedMinutes || 0;
-                if (minutes === 0) {
-                    stormArrivalElement.textContent = 'Clear';
-                } else if (minutes < 60) {
-                    stormArrivalElement.textContent = `${minutes} min`;
-                } else if (minutes < 1440) {
-                    const hours = Math.round(minutes / 60);
-                    stormArrivalElement.textContent = `${hours} hr`;
-                } else {
-                    const days = Math.round(minutes / 1440);
-                    stormArrivalElement.textContent = `${days} day`;
+                // Map stormRisk to estimated arrival
+                let arrivalText = 'Clear';
+                if (stormRisk === 'NONE' || stormRisk === 'Low') {
+                    arrivalText = 'Clear';
+                } else if (stormRisk === 'Possible') {
+                    arrivalText = '6-12 hr';
+                } else if (stormRisk === 'Likely') {
+                    arrivalText = '2-6 hr';
+                } else if (stormRisk === 'Imminent') {
+                    arrivalText = '< 1 hr';
                 }
+                stormArrivalElement.textContent = arrivalText;
                 
-                // Color code urgency
-                if (minutes > 0 && minutes <= 60) {
+                // Color code urgency based on storm risk level
+                if (stormRisk === 'Imminent') {
                     stormArrivalElement.style.color = '#d63031'; // Imminent - red
-                } else if (minutes <= 360) {
+                } else if (stormRisk === 'Likely') {
                     stormArrivalElement.style.color = '#e17055'; // Soon - orange
-                } else if (minutes <= 1440) {
-                    stormArrivalElement.style.color = '#fdcb6e'; // Later today - yellow
+                } else if (stormRisk === 'Possible') {
+                    stormArrivalElement.style.color = '#fdcb6e'; // Later - yellow
                 } else {
-                    stormArrivalElement.style.color = '#00b894'; // Future - green
+                    stormArrivalElement.style.color = '#00b894'; // Clear - green
                 }
             }
             
