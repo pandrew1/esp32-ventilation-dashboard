@@ -4378,7 +4378,7 @@ function startAutoRefresh() {
                     const safeUpdateWidget = (elementId, value, unit = '') => {
                         const element = document.getElementById(elementId);
                         if (element) {
-                            if (value !== null && value !== undefined && value !== 0) {
+                            if (value !== null && value !== undefined) {
                                 element.textContent = typeof value === 'number' ? `${value.toFixed(1)}${unit}` : value;
                                 element.style.color = '#333';
                             } else {
@@ -4448,7 +4448,7 @@ function startAutoRefresh() {
             document.getElementById('errorSection').style.display = 'none';
             document.getElementById('dashboardContent').style.display = 'block';
 
-            // Helper function to safely update elements
+            // Helper function to safely update elements - FIXED to allow 0 values
             const safeSetText = (elementId, text) => {
                 const element = document.getElementById(elementId);
                 if (element) {
@@ -4565,10 +4565,43 @@ function startAutoRefresh() {
             document.getElementById('errorSection').style.display = 'none';
             document.getElementById('dashboardContent').style.display = 'block';
 
-            // 🎯 FIXED: Handle new API structure with sections.yesterday.environmental
+            // 🎯 FIXED: Use current sensor readings instead of yesterday's summary
             let sensors = {};
-            if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental) {
-                console.log('🔍 DEBUG: Using new API structure with sections.yesterday.environmental');
+            
+            // First try to get current sensor data from recent history
+            console.log('🔍 DEBUG: Attempting to fetch current sensor readings from GetVentilationHistory');
+            try {
+                const historyResponse = await DataManager.getHistoryData(1); // Get last 1 hour
+                if (historyResponse && historyResponse.data && historyResponse.data.length > 0) {
+                    const latestReading = historyResponse.data[historyResponse.data.length - 1];
+                    if (latestReading.sensors) {
+                        sensors = {
+                            indoor: {
+                                temp: latestReading.sensors.indoor?.temp,
+                                humidity: latestReading.sensors.indoor?.humidity,
+                                pressure: latestReading.sensors.indoor?.pressure
+                            },
+                            outdoor: {
+                                temp: latestReading.sensors.outdoor?.temp,
+                                humidity: latestReading.sensors.outdoor?.humidity,
+                                pressure: latestReading.sensors.outdoor?.pressure
+                            },
+                            garage: {
+                                temp: latestReading.sensors.garage?.temp,
+                                humidity: latestReading.sensors.garage?.humidity,
+                                pressure: latestReading.sensors.garage?.pressure
+                            }
+                        };
+                        console.log('🔍 DEBUG: Using current sensor readings from history:', sensors);
+                    }
+                }
+            } catch (error) {
+                console.log('🔍 DEBUG: Could not fetch current readings, falling back to yesterday data');
+            }
+            
+            // Fallback to yesterday's data if current readings unavailable
+            if (!sensors.indoor && data.sections && data.sections.yesterday && data.sections.yesterday.environmental) {
+                console.log('🔍 DEBUG: Using fallback yesterday environmental data');
                 const env = data.sections.yesterday.environmental;
                 sensors = {
                     indoor: {
@@ -4587,11 +4620,7 @@ function startAutoRefresh() {
                         pressure: env.pressure?.garage?.current
                     }
                 };
-                console.log('🔍 DEBUG: Mapped environmental data:', sensors);
-            } else {
-                // Fallback to legacy structure
-                sensors = data.sensors || {};
-                console.log('🔍 DEBUG: Using legacy sensors structure:', sensors);
+                console.log('🔍 DEBUG: Mapped environmental data from yesterday:', sensors);
             }
             
             const indoor = sensors.indoor || {};
@@ -4599,19 +4628,19 @@ function startAutoRefresh() {
             const garage = sensors.garage || {};
             
             console.log('🔍 DEBUG: Setting indoor data - temp:', indoor.temp, 'humidity:', indoor.humidity, 'pressure:', indoor.pressure);
-            document.getElementById('indoorTemp').textContent = indoor.temp != null ? `${indoor.temp.toFixed(1)}°F` : 'No data';
-            document.getElementById('indoorHumidity').textContent = indoor.humidity != null ? `${indoor.humidity.toFixed(0)}%` : 'No data';
-            document.getElementById('indoorPressure').textContent = indoor.pressure != null ? `${indoor.pressure.toFixed(1)} hPa` : 'No data';
+            document.getElementById('indoorTemp').textContent = indoor.temp != null && indoor.temp !== undefined ? `${indoor.temp.toFixed(1)}°F` : 'No data';
+            document.getElementById('indoorHumidity').textContent = indoor.humidity != null && indoor.humidity !== undefined ? `${indoor.humidity.toFixed(0)}%` : 'No data';
+            document.getElementById('indoorPressure').textContent = indoor.pressure != null && indoor.pressure !== undefined ? `${indoor.pressure.toFixed(1)} hPa` : 'No data';
             
             console.log('🔍 DEBUG: Setting outdoor data - temp:', outdoor.temp, 'humidity:', outdoor.humidity, 'pressure:', outdoor.pressure);
-            document.getElementById('outdoorTemp').textContent = outdoor.temp != null ? `${outdoor.temp.toFixed(1)}°F` : 'No data';
-            document.getElementById('outdoorHumidity').textContent = outdoor.humidity != null ? `${outdoor.humidity.toFixed(0)}%` : 'No data';
-            document.getElementById('outdoorPressure').textContent = outdoor.pressure != null ? `${outdoor.pressure.toFixed(1)} hPa` : 'No data';
+            document.getElementById('outdoorTemp').textContent = outdoor.temp != null && outdoor.temp !== undefined ? `${outdoor.temp.toFixed(1)}°F` : 'No data';
+            document.getElementById('outdoorHumidity').textContent = outdoor.humidity != null && outdoor.humidity !== undefined ? `${outdoor.humidity.toFixed(0)}%` : 'No data';
+            document.getElementById('outdoorPressure').textContent = outdoor.pressure != null && outdoor.pressure !== undefined ? `${outdoor.pressure.toFixed(1)} hPa` : 'No data';
             
             console.log('🔍 DEBUG: Setting garage data - temp:', garage.temp, 'humidity:', garage.humidity, 'pressure:', garage.pressure);
-            document.getElementById('garageTemp').textContent = garage.temp != null ? `${garage.temp.toFixed(1)}°F` : 'No data';
-            document.getElementById('garageHumidity').textContent = garage.humidity != null ? `${garage.humidity.toFixed(0)}%` : 'No data';
-            document.getElementById('garagePressure').textContent = garage.pressure != null ? `${garage.pressure.toFixed(1)} hPa` : 'No data';
+            document.getElementById('garageTemp').textContent = garage.temp != null && garage.temp !== undefined ? `${garage.temp.toFixed(1)}°F` : 'No data';
+            document.getElementById('garageHumidity').textContent = garage.humidity != null && garage.humidity !== undefined ? `${garage.humidity.toFixed(0)}%` : 'No data';
+            document.getElementById('garagePressure').textContent = garage.pressure != null && garage.pressure !== undefined ? `${garage.pressure.toFixed(1)} hPa` : 'No data';
 
             // 🎯 FIXED: Update system status using new API structure
             let systemData = {};
@@ -5106,7 +5135,7 @@ function startAutoRefresh() {
             if (reliabilityLongestWifiOutageElement) reliabilityLongestWifiOutageElement.textContent = reliability.longestWifiOutageMinutes != null ? formatMinutes(reliability.longestWifiOutageMinutes) : 'No data';
 
             // Update SD card status
-            const sdCard = system.sdCard || {};
+            const sdCard = systemData.sdCard || {};
             const sdCardStatusElement = document.getElementById('sdCardStatus');
             const sdCardDetailsElement = document.getElementById('sdCardDetails');
             
@@ -5213,7 +5242,7 @@ function startAutoRefresh() {
                 }
                 
                 const relayStatusElement = document.getElementById('relayStatus');
-                if (relayStatusElement) relayStatusElement.textContent = system.relayPin ? `Pin ${system.relayPin}` : 'Pin 17';
+                if (relayStatusElement) relayStatusElement.textContent = systemData.relayPin ? `Pin ${systemData.relayPin}` : 'Pin 17';
                 
                 const watchdogStatusElement = document.getElementById('watchdogStatus');
                 if (watchdogStatusElement) watchdogStatusElement.textContent = system.watchdogEnabled ? '✅ Enabled' : '⚪ Disabled';
