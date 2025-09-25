@@ -5245,7 +5245,7 @@ function startAutoRefresh() {
                 if (relayStatusElement) relayStatusElement.textContent = systemData.relayPin ? `Pin ${systemData.relayPin}` : 'Pin 17';
                 
                 const watchdogStatusElement = document.getElementById('watchdogStatus');
-                if (watchdogStatusElement) watchdogStatusElement.textContent = system.watchdogEnabled ? '✅ Enabled' : '⚪ Disabled';
+                if (watchdogStatusElement) watchdogStatusElement.textContent = startupSystem.watchdogEnabled ? '✅ Enabled' : '⚪ Disabled';
                 
                 // System Configuration (use actual config data from startup.config)
                 const systemConfigElement = document.getElementById('systemConfig');
