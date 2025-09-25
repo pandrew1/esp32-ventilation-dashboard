@@ -4470,16 +4470,20 @@ async function refreshData() {
             } else {
                 // Fallback to basic explanation when enhanced forecast not available
                 const stormRiskExplanation = document.getElementById('stormRiskExplanation');
-                if (stormRiskValue && stormRiskValue !== 'No data') {
-                    const explanations = {
-                        'Clear': 'Stable pressure - no significant changes over 3 hours.',
-                        'Possible': 'Low pressure below 1000 hPa detected.',
-                        'Likely': 'Pressure drop >3 hPa over 3 hours detected.',
-                        'Imminent': 'Rapid pressure drop >5 hPa over 3 hours detected!'
-                    };
-                    stormRiskExplanation.textContent = explanations[stormRiskValue] || `${stormRiskValue} - pressure trend indicates weather change.`;
+                if (stormRiskExplanation) {
+                    if (stormRiskValue && stormRiskValue !== 'No data') {
+                        const explanations = {
+                            'Clear': 'Stable pressure - no significant changes over 3 hours.',
+                            'Possible': 'Low pressure below 1000 hPa detected.',
+                            'Likely': 'Pressure drop >3 hPa over 3 hours detected.',
+                            'Imminent': 'Rapid pressure drop >5 hPa over 3 hours detected!'
+                        };
+                        stormRiskExplanation.textContent = explanations[stormRiskValue] || `${stormRiskValue} - pressure trend indicates weather change.`;
+                    } else {
+                        stormRiskExplanation.textContent = 'Storm risk status will be explained here.';
+                    }
                 } else {
-                    stormRiskExplanation.textContent = 'Storm risk status will be explained here.';
+                    console.warn('stormRiskExplanation element not found in DOM');
                 }
             }
             
