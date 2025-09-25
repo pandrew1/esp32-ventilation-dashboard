@@ -1253,7 +1253,7 @@ function startAutoRefresh() {
                 }
                 
                 // Subscribe to future updates
-                GlobalDataManager.subscribe('status', (data) => {
+                GlobalDataManager.subscribe('status', async (data) => {
                     console.log('STAGE 5: Status data subscription update received');
                     if (data && data.length > 0) {
                         const latestRecord = data[data.length - 1];
