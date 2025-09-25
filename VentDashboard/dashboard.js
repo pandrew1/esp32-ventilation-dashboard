@@ -3074,7 +3074,7 @@ async function refreshData() {
                                         };
                                         uniqueEvents.set(eventKey, event);
                                         const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
-                                        console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
+                                        // console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
                                     }
                                 });
                             }
@@ -4376,6 +4376,8 @@ async function refreshData() {
          * @returns {void}
          */
         function updateDashboard(data) {
+            console.log('DEBUG: updateDashboard called with data =', data);
+            console.log('DEBUG: data keys =', Object.keys(data || {}));
             // Hide loading, show content
             document.getElementById('loadingSection').style.display = 'none';
             document.getElementById('errorSection').style.display = 'none';
@@ -4562,6 +4564,9 @@ async function refreshData() {
             
             // PHASE 3: Building Performance Analysis Display
             const buildingPerformance = data.buildingPerformance;
+            console.log('DEBUG: buildingPerformance =', buildingPerformance);
+            console.log('DEBUG: buildingPerformance.valid =', buildingPerformance?.valid);
+            console.log('DEBUG: buildingPerformance.buildingScore =', buildingPerformance?.buildingScore);
             if (buildingPerformance && buildingPerformance.valid) {
                 // Update building efficiency score with color coding
                 const buildingScoreElement = document.getElementById('building-score');
@@ -4681,6 +4686,9 @@ async function refreshData() {
             
             // PHASE 4: Health Monitoring Analysis Display
             const healthMonitoring = data.healthMonitoring;
+            console.log('DEBUG: healthMonitoring =', healthMonitoring);
+            console.log('DEBUG: healthMonitoring.valid =', healthMonitoring?.valid);
+            console.log('DEBUG: healthMonitoring.migraineRisk =', healthMonitoring?.migraineRisk);
             if (healthMonitoring && healthMonitoring.valid) {
                 // Update health risk level with color coding
                 const healthRiskElement = document.getElementById('health-risk-level');
