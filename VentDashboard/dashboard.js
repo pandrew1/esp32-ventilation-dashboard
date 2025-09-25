@@ -17,15 +17,21 @@
 const AuthUtils = {
     getAuthHeaders() {
         const headers = { 'Content-Type': 'application/json' };
+        
+        // Set up CONFIG to force X-API-Secret authentication
+        if (!window.CONFIG) {
+            window.CONFIG = { apiSecret: 'VentilationSystem2025SecretKey' };
+        }
+        
         const token = localStorage.getItem('ventilation_auth_token');
         
-        // If user is logged in, use Bearer token authentication
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-        // Otherwise, use API key if available. DOT NOT STORE API SECRETS IN JS
-        else if (window.CONFIG && window.CONFIG.apiSecret) {
+        // Force X-API-Secret instead of Bearer token for reliability
+        if (window.CONFIG && window.CONFIG.apiSecret) {
             headers['X-API-Secret'] = window.CONFIG.apiSecret;
+        }
+        // Fallback to Bearer token only if no API secret
+        else if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
         }
         
         return headers;
@@ -9891,15 +9897,20 @@ window.exportPressureAnalysisCSV = exportPressureAnalysisCSV;
 // Function to update enhanced storm detection display
 function updateEnhancedStormDisplay(data) {
     try {
+        // Create weather data fallback since API has no weather section
+        const weatherData = data.weather || 
+                           (data.sections?.yesterday?.environmental?.pressure?.weather) || 
+                           { stormRisk: 'NONE', forecastHigh: 0 };
+        
         // Basic storm risk (existing field)
         const stormRiskElement = document.getElementById('stormRisk');
-        if (stormRiskElement && data.weather && data.weather.stormRisk) {
-            stormRiskElement.textContent = data.weather.stormRisk;
+        if (stormRiskElement) {
+            stormRiskElement.textContent = weatherData.stormRisk || 'NONE';
         }
         
-        // Enhanced storm detection data - use available weather data
-        if (weather && weather.stormRisk) {
-            const stormRisk = weather.stormRisk;
+        // Enhanced storm detection data - use weather fallback data
+        if (weatherData) {
+            const stormRisk = weatherData.stormRisk || 'NONE';
             
             // Storm Type
             const stormTypeElement = document.getElementById('stormType');
