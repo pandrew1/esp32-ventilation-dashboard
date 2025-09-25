@@ -1009,7 +1009,7 @@ function startAutoRefresh() {
         console.log('DataManager: Status data retrieved successfully');
         
         // Update dashboard with new data
-        updateDashboard(data);
+        await updateDashboard(data);
         updateConnectionStatus('connected');
 
         // Refresh chart data if chart is currently displayed
@@ -1248,7 +1248,7 @@ function startAutoRefresh() {
                 if (statusData && statusData.length > 0) {
                     const latestRecord = statusData[statusData.length - 1];
                     // FIX: Use correct updateDashboard() function instead of missing updateMainDisplay()
-                    updateDashboard(latestRecord);
+                    await updateDashboard(latestRecord);
                     GlobalEventSystem.emit('data:updated', { type: 'status', count: statusData.length });
                 }
                 
@@ -1258,7 +1258,7 @@ function startAutoRefresh() {
                     if (data && data.length > 0) {
                         const latestRecord = data[data.length - 1];
                         // FIX: Use correct updateDashboard() function instead of missing updateMainDisplay()
-                        updateDashboard(latestRecord);
+                        await updateDashboard(latestRecord);
                     }
                 });
                 
@@ -4366,7 +4366,7 @@ function startAutoRefresh() {
                 console.log('Dashboard data received successfully');
                 
                 // Update dashboard with new data
-                updateDashboard(data);
+                await updateDashboard(data);
                 updateConnectionStatus('connected');
                 
                 // Force update main sensor widgets with current data
@@ -4557,7 +4557,7 @@ function startAutoRefresh() {
          * @param {Object} data - The complete sensor and system data from the ESP32
          * @returns {void}
          */
-        function updateDashboard(data) {
+        async function updateDashboard(data) {
             console.log('DEBUG: updateDashboard called with data =', data);
             console.log('DEBUG: data keys =', Object.keys(data || {}));
             // Hide loading, show content
