@@ -4477,11 +4477,8 @@ function startAutoRefresh() {
                 stormDescriptionElement.textContent = 'Enhanced storm detection analyzes pressure patterns across multiple timescales to provide advance warning for Pacific Northwest weather events.';
             }
             
-            // Set enhanced forecast to no data
-            const forecastHumidityElement = document.getElementById('forecastHumidity');
-            if (forecastHumidityElement) forecastHumidityElement.textContent = 'No data';
-            const forecastPrecipitationElement = document.getElementById('forecastPrecipitation');
-            if (forecastPrecipitationElement) forecastPrecipitationElement.textContent = 'No data';
+            // Enhanced forecast elements will be populated by weather data processing
+            // (removed "No data" initialization - proper forecast data should be available)
 
             // Set system info to no data with null checks
             const uptimeElement = document.getElementById('uptime');
@@ -4641,16 +4638,26 @@ function startAutoRefresh() {
             );
             document.getElementById('coolingEffect').textContent = coolingEffect;
 
-            // 🎯 FIXED: Update weather using new API structure
+            // 🎯 FIXED: Update weather using new API structure with proper forecast data
             let weather = {};
             if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental && data.sections.yesterday.environmental.pressure && data.sections.yesterday.environmental.pressure.weather) {
                 console.log('🔍 DEBUG: Using new API structure for weather data');
                 const weatherData = data.sections.yesterday.environmental.pressure.weather;
+                
+                // Build enhanced forecast from ESP32 forecast data retrieved by Azure
+                const enhancedForecast = {
+                    valid: true,
+                    humidity: weatherData.forecastHumidity || 50,
+                    precipitationProb: weatherData.forecastPrecip || 0,
+                    windSpeed: weatherData.forecastWind || 5
+                };
+                
                 weather = {
                     forecastHigh: weatherData.forecastHigh,
-                    stormRisk: weatherData.stormRisk || 'Low'
+                    stormRisk: weatherData.stormRisk || 'Low',
+                    enhancedForecast: enhancedForecast
                 };
-                console.log('🔍 DEBUG: Mapped weather data:', weather);
+                console.log('🔍 DEBUG: Weather data with forecast:', weather);
             } else {
                 // Fallback to legacy structure
                 weather = data.weather || {};
