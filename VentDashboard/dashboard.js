@@ -270,7 +270,8 @@ function getApiKeyFromUrl() {
 
 // Configuration - Replace with your actual Azure Function URLs
 const CONFIG = {
-    statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
+    statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData', // For analytics and aggregated data
+    currentStatusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus', // For current system specs and reliability
     historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 30000, // 30 seconds - check for new telemetry data
@@ -895,6 +896,56 @@ const DataManager = {
             return data;
         } catch (error) {
             console.error('DataManager: Error fetching door analytics data:', error);
+            throw error;
+        }
+    },
+
+    // Get current system status from GetVentilationStatus API
+    async getCurrentSystemStatus(forceRefresh = false) {
+        const cache = DashboardState.cache.currentStatus || { data: null, timestamp: null, ttl: 30000 }; // 30 second cache
+        const now = Date.now();
+
+        // Initialize cache if not exists
+        if (!DashboardState.cache.currentStatus) {
+            DashboardState.cache.currentStatus = cache;
+        }
+
+        // Return cached data if still valid
+        if (!forceRefresh && cache.data && cache.timestamp && (now - cache.timestamp < cache.ttl)) {
+            console.log('DataManager: Using cached current system status');
+            return cache.data;
+        }
+
+        console.log('DataManager: Fetching fresh current system status');
+        
+        try {
+            const url = `${CONFIG.currentStatusApiUrl}?deviceId=${CONFIG.deviceId}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: DashboardUtils.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Cache the response
+            cache.data = data;
+            cache.timestamp = now;
+            DashboardState.cache.currentStatus = cache;
+
+            console.log('DataManager: Current system status fetched and cached successfully');
+            return data;
+
+        } catch (error) {
+            console.error('DataManager: Error fetching current system status:', error);
+            // Return cached data if available, even if expired
+            if (cache.data) {
+                console.log('DataManager: Returning expired cached system status due to error');
+                return cache.data;
+            }
             throw error;
         }
     }
@@ -4529,6 +4580,34 @@ function startAutoRefresh() {
         async function updateDashboard(data) {
             console.log('DEBUG: updateDashboard called with data =', data);
             console.log('DEBUG: data keys =', Object.keys(data || {}));
+            
+            // Fetch current system status for hardware specs and reliability data
+            try {
+                console.log('🔍 DEBUG: Fetching current system status from GetVentilationStatus');
+                const currentStatus = await DataManager.getCurrentSystemStatus();
+                
+                // Merge current system status into the main data structure
+                if (currentStatus && currentStatus.sections) {
+                    // Ensure data.sections exists
+                    if (!data.sections) {
+                        data.sections = {};
+                    }
+                    
+                    // Add/update startup section with current system data
+                    data.sections.startup = currentStatus.sections.startup;
+                    console.log('🔍 DEBUG: Merged current startup data:', data.sections.startup);
+                }
+                
+                // Merge reliability data
+                if (currentStatus && currentStatus.reliability) {
+                    data.reliability = currentStatus.reliability;
+                    console.log('🔍 DEBUG: Merged current reliability data:', data.reliability);
+                }
+                
+            } catch (error) {
+                console.log('🔍 DEBUG: Could not fetch current system status, using GetEnhancedDashboardData only:', error);
+            }
+            
             // Hide loading, show content
             document.getElementById('loadingSection').style.display = 'none';
             document.getElementById('errorSection').style.display = 'none';
