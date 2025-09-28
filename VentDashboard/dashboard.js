@@ -2973,50 +2973,10 @@ function startAutoRefresh() {
                         bootReasonInfo.textContent = `Reason: ${startup.bootReason || 'Unknown'}`;
                     }
                     
-                    // Update System Specifications elements
-                    const chipModel = document.getElementById('chipModel');
-                    const cpuFreq = document.getElementById('cpuFreq');
-                    const flashSize = document.getElementById('flashSize');
-                    const freeHeap = document.getElementById('freeHeap');
-                    const wifiIP = document.getElementById('wifiIP');
-                    const macAddress = document.getElementById('macAddress');
-                    
-                    if (chipModel) chipModel.textContent = startup.system?.chipModel || startup.systemStatus?.chipModel || 'Unknown';
-                    if (cpuFreq) cpuFreq.textContent = (startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency) ? `${startup.system?.cpuFreq || startup.systemStatus?.cpuFrequency} MHz` : 'Unknown';
-                    if (flashSize) {
-                        // Try multiple data paths for Flash size - some APIs store in bytes, others in MB
-                        const flashFromSystem = startup.system?.flashSize;
-                        const flashFromStatus = startup.systemStatus?.flashSize;
-                        
-                        let flashMB = null;
-                        if (flashFromSystem) {
-                            // If > 100, likely in bytes, convert to MB
-                            flashMB = flashFromSystem > 100 ? Math.round(flashFromSystem / (1024 * 1024)) : flashFromSystem;
-                        } else if (flashFromStatus) {
-                            // systemStatus.flashSize is typically already in MB
-                            flashMB = flashFromStatus;
-                        }
-                        
-                        flashSize.textContent = flashMB ? `${flashMB} MB` : 'Unknown';
-                    }
-                    if (freeHeap) freeHeap.textContent = startup.system?.freeHeap ? `${Math.round(startup.system.freeHeap / 1024)} KB` : 'Unknown';
-                    if (wifiIP) wifiIP.textContent = startup.system?.wifiIP || 'Unknown';
-                    if (macAddress) macAddress.textContent = startup.system?.macAddress || 'Unknown';
-                    
-                    // Update Hardware Status elements
-                    const displayStatus = document.getElementById('displayStatus');
-                    const sensorStatus = document.getElementById('sensorStatus');
-                    
-                    if (displayStatus) displayStatus.textContent = startup.hardware?.display ? 'OK' : 'Error';
-                    if (sensorStatus) {
-                        // Count working sensors
-                        const workingSensors = [
-                            startup.hardware?.indoorBME,
-                            startup.hardware?.outdoorBME,
-                            startup.hardware?.garageBME
-                        ].filter(Boolean).length;
-                        sensorStatus.textContent = `${workingSensors}/3 OK`;
-                    }
+                    // NOTE: System Specifications and Hardware Status updates REMOVED
+                    // These are now handled in the main updateDashboard() function using GetVentilationStatus
+                    // which provides accurate current system data instead of stale/empty startup data
+                    // from GetEnhancedDashboardData. This prevents overwriting good data with blanks.
                     
                     // Calculate health percentage based on available metrics
                     const gaugeContainer = document.querySelector('.gauge-container');
