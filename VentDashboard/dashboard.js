@@ -4638,30 +4638,41 @@ function startAutoRefresh() {
             );
             document.getElementById('coolingEffect').textContent = coolingEffect;
 
-            // 🎯 FIXED: Update weather using new API structure with proper forecast data
+            // 🎯 FIXED: Update weather using new API structure - NO FALLBACK DATA
             let weather = {};
             if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental && data.sections.yesterday.environmental.pressure && data.sections.yesterday.environmental.pressure.weather) {
                 console.log('🔍 DEBUG: Using new API structure for weather data');
                 const weatherData = data.sections.yesterday.environmental.pressure.weather;
                 
-                // Build enhanced forecast from ESP32 forecast data retrieved by Azure
-                const enhancedForecast = {
-                    valid: true,
-                    humidity: weatherData.forecastHumidity || 50,
-                    precipitationProb: weatherData.forecastPrecip || 0,
-                    windSpeed: weatherData.forecastWind || 5
-                };
+                // Check if we have REAL ESP32 forecast data (no fallbacks)
+                const hasRealForecast = weatherData.hasOwnProperty('forecastHumidity') || 
+                                       weatherData.hasOwnProperty('forecastPrecip') || 
+                                       weatherData.hasOwnProperty('forecastWind');
+                
+                let enhancedForecast = null;
+                if (hasRealForecast) {
+                    enhancedForecast = {
+                        valid: true,
+                        humidity: weatherData.forecastHumidity,
+                        precipitationProb: weatherData.forecastPrecip,
+                        windSpeed: weatherData.forecastWind
+                    };
+                    console.log('✅ REAL forecast data available:', enhancedForecast);
+                } else {
+                    console.warn('❌ NO ESP32 FORECAST DATA - forecast elements will show errors');
+                    enhancedForecast = { valid: false };
+                }
                 
                 weather = {
                     forecastHigh: weatherData.forecastHigh,
                     stormRisk: weatherData.stormRisk || 'Low',
                     enhancedForecast: enhancedForecast
                 };
-                console.log('🔍 DEBUG: Weather data with forecast:', weather);
             } else {
                 // Fallback to legacy structure
                 weather = data.weather || {};
-                console.log('🔍 DEBUG: Using legacy weather structure:', weather);
+                weather.enhancedForecast = { valid: false };
+                console.log('🔍 DEBUG: Using legacy weather structure (no forecast):', weather);
             }
             
             const stormRiskValue = weather.stormRisk || 'NONE';
@@ -4670,25 +4681,45 @@ function startAutoRefresh() {
             document.getElementById('forecastHigh').textContent = forecastHigh != null ? `${Math.round(forecastHigh)}°F` : '72°F';
             document.getElementById('stormRisk').textContent = stormRiskValue;
             
-            // Enhanced forecast data display (PHASE 1)
+            // Enhanced forecast data display - NO FALLBACK DATA
             const enhancedForecast = weather.enhancedForecast;
             if (enhancedForecast && enhancedForecast.valid) {
-                // Update humidity forecast (could add new dashboard element)
+                console.log('✅ Displaying REAL forecast data');
+                // Update humidity forecast
                 const humidityElement = document.getElementById('forecastHumidity');
                 if (humidityElement) {
-                    humidityElement.textContent = `${enhancedForecast.humidity.toFixed(0)}% (Forecast)`;
+                    humidityElement.textContent = enhancedForecast.humidity !== undefined ? 
+                        `${enhancedForecast.humidity.toFixed(0)}% (Forecast)` : 
+                        'ESP32 Data Missing';
                 }
                 
-                // Update precipitation forecast (could add new dashboard element) 
+                // Update precipitation forecast
                 const precipElement = document.getElementById('forecastPrecipitation');
                 if (precipElement) {
-                    precipElement.textContent = `${enhancedForecast.precipitationProb.toFixed(0)}% (Forecast)`;
+                    precipElement.textContent = enhancedForecast.precipitationProb !== undefined ? 
+                        `${enhancedForecast.precipitationProb.toFixed(0)}% (Forecast)` : 
+                        'ESP32 Data Missing';
+                }
+            } else {
+                console.warn('❌ NO VALID FORECAST DATA - showing error messages');
+                // Show error messages when ESP32 forecast data is missing
+                const humidityElement = document.getElementById('forecastHumidity');
+                if (humidityElement) {
+                    humidityElement.textContent = 'ESP32 Forecast Missing';
                 }
                 
-                // Enhanced storm risk explanation with more detailed forecast data
-                const stormRiskExplanation = document.getElementById('stormRiskExplanation');
-                if (stormRiskExplanation) {
-                    let explanation = '';
+                const precipElement = document.getElementById('forecastPrecipitation');
+                if (precipElement) {
+                    precipElement.textContent = 'ESP32 Forecast Missing';
+                }
+            }
+            
+            // Enhanced storm risk explanation - handle missing forecast data properly
+            const stormRiskExplanation = document.getElementById('stormRiskExplanation');
+            if (stormRiskExplanation) {
+                let explanation = '';
+                if (enhancedForecast && enhancedForecast.valid && enhancedForecast.precipitationProb !== undefined && enhancedForecast.windSpeed !== undefined) {
+                    // Use REAL forecast data
                     if (stormRiskValue === 'Clear') {
                         explanation = `Stable pressure - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
                     } else if (stormRiskValue === 'Possible') {
@@ -4700,9 +4731,25 @@ function startAutoRefresh() {
                     } else {
                         explanation = `${stormRiskValue} - ${enhancedForecast.precipitationProb.toFixed(0)}% rain, ${enhancedForecast.windSpeed.toFixed(1)} m/s wind (Forecast).`;
                     }
-                    stormRiskExplanation.textContent = explanation;
+                } else {
+                    // No forecast data available - show pressure-only explanation
+                    if (stormRiskValue === 'Clear') {
+                        explanation = 'Stable pressure - no significant changes over 3 hours.';
+                    } else if (stormRiskValue === 'Possible') {
+                        explanation = 'Low pressure below 1000 hPa detected.';
+                    } else if (stormRiskValue === 'Likely') {
+                        explanation = 'Pressure drop >3 hPa over 3 hours detected.';
+                    } else if (stormRiskValue === 'Imminent') {
+                        explanation = 'Rapid pressure drop >5 hPa over 3 hours detected!';
+                    } else {
+                        explanation = `${stormRiskValue} - pressure trend indicates weather change. (ESP32 forecast data missing)`;
+                    }
                 }
-            } else {
+                stormRiskExplanation.textContent = explanation;
+            }
+            
+            // Fallback section when no enhanced forecast is available
+            if (!enhancedForecast || !enhancedForecast.valid) {
                 // Fallback to basic explanation when enhanced forecast not available
                 const stormRiskExplanation = document.getElementById('stormRiskExplanation');
                 if (stormRiskExplanation) {
