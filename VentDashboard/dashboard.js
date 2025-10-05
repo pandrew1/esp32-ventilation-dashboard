@@ -9897,11 +9897,13 @@ function convertTransitionsToCSV(transitions) {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
-                hour12: false
+                hour12: false,
+                timeZoneName: 'short'
             });
             
             const pacificParts = pacificFormatter.formatToParts(utcTime);
-            const pacificTimestamp = `${pacificParts.find(p => p.type === 'year').value}-${pacificParts.find(p => p.type === 'month').value}-${pacificParts.find(p => p.type === 'day').value} ${pacificParts.find(p => p.type === 'hour').value}:${pacificParts.find(p => p.type === 'minute').value}:${pacificParts.find(p => p.type === 'second').value} PST`;
+            const tzName = pacificParts.find(p => p.type === 'timeZoneName').value; // Gets "PDT" or "PST"
+            const pacificTimestamp = `${pacificParts.find(p => p.type === 'year').value}-${pacificParts.find(p => p.type === 'month').value}-${pacificParts.find(p => p.type === 'day').value} ${pacificParts.find(p => p.type === 'hour').value}:${pacificParts.find(p => p.type === 'minute').value}:${pacificParts.find(p => p.type === 'second').value} ${tzName}`;
             
             // Debug logging for first few entries to verify timezone conversion
             if (csvLines.length <= 3) {
