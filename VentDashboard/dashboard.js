@@ -9832,7 +9832,7 @@ async function exportPressureAnalysisCSV() {
 function convertTransitionsToCSV(transitions) {
     const csvHeaders = [
         // Basic Event Information
-        'Timestamp_PST',
+        'Timestamp_Pacific',  // Auto-detects PST/PDT based on date
         'Timestamp_Unix', 
         'Action',
         'Zone',
@@ -9889,6 +9889,7 @@ function convertTransitionsToCSV(transitions) {
             const utcTime = new Date(unixTimestamp * 1000);
             
             // Use Intl.DateTimeFormat for proper Pacific timezone conversion
+            // Format the timestamp in Pacific timezone with explicit PST/PDT detection
             const pacificFormatter = new Intl.DateTimeFormat('en-US', {
                 timeZone: 'America/Los_Angeles',
                 year: 'numeric',
@@ -9897,13 +9898,28 @@ function convertTransitionsToCSV(transitions) {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
-                hour12: false,
-                timeZoneName: 'short'
+                hour12: false
             });
             
+            // Get the formatted parts
             const pacificParts = pacificFormatter.formatToParts(utcTime);
-            const tzName = pacificParts.find(p => p.type === 'timeZoneName').value; // Gets "PDT" or "PST"
-            const pacificTimestamp = `${pacificParts.find(p => p.type === 'year').value}-${pacificParts.find(p => p.type === 'month').value}-${pacificParts.find(p => p.type === 'day').value} ${pacificParts.find(p => p.type === 'hour').value}:${pacificParts.find(p => p.type === 'minute').value}:${pacificParts.find(p => p.type === 'second').value} ${tzName}`;
+            const year = pacificParts.find(p => p.type === 'year').value;
+            const month = pacificParts.find(p => p.type === 'month').value;
+            const day = pacificParts.find(p => p.type === 'day').value;
+            const hour = pacificParts.find(p => p.type === 'hour').value;
+            const minute = pacificParts.find(p => p.type === 'minute').value;
+            const second = pacificParts.find(p => p.type === 'second').value;
+            
+            // Determine PDT vs PST based on the EVENT'S date (not current date)
+            // This ensures historical events get the correct timezone for when they occurred
+            const tzFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Los_Angeles',
+                timeZoneName: 'short'
+            });
+            const tzParts = tzFormatter.formatToParts(utcTime);  // Use utcTime (the event's time)
+            const tzName = tzParts.find(p => p.type === 'timeZoneName')?.value || 'PST';
+            
+            const pacificTimestamp = `${year}-${month}-${day} ${hour}:${minute}:${second} ${tzName}`;
             
             // Debug logging for first few entries to verify timezone conversion
             if (csvLines.length <= 3) {
