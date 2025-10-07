@@ -4855,9 +4855,9 @@ function startAutoRefresh() {
                     } else if (stormRiskValue === 'Likely') {
                         explanation = `Pressure dropping rapidly - ${weather.enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${weather.enhancedForecast.windSpeed.toFixed(1)} m/s winds expected (Forecast).`;
                     } else if (stormRiskValue === 'Imminent') {
-                        explanation = `Rapid pressure drop! ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
+                        explanation = `Rapid pressure drop! ${weather.enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${weather.enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
                     } else {
-                        explanation = `${stormRiskValue} - ${enhancedForecast.precipitationProb.toFixed(0)}% rain, ${enhancedForecast.windSpeed.toFixed(1)} m/s wind (Forecast).`;
+                        explanation = `${stormRiskValue} - ${weather.enhancedForecast.precipitationProb.toFixed(0)}% rain, ${weather.enhancedForecast.windSpeed.toFixed(1)} m/s wind (Forecast).`;
                     }
                 } else {
                     // No forecast data available - show pressure-only explanation
@@ -4877,7 +4877,7 @@ function startAutoRefresh() {
             }
             
             // Fallback section when no enhanced forecast is available
-            if (!enhancedForecast || !enhancedForecast.valid) {
+            if (!weather.enhancedForecast || !weather.enhancedForecast.valid) {
                 // Fallback to basic explanation when enhanced forecast not available
                 const stormRiskExplanation = document.getElementById('stormRiskExplanation');
                 if (stormRiskExplanation) {
