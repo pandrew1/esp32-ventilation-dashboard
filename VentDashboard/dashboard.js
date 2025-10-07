@@ -4777,10 +4777,10 @@ function startAutoRefresh() {
             // Get forecast temperature from enhanced forecast data (ESP32 v4 format)
             // ESP32 stores in Celsius, dashboard displays in Fahrenheit (matching serial debug format)
             let forecastHigh;
-            if (enhancedForecast && enhancedForecast.valid && enhancedForecast.temperature !== undefined) {
+            if (weather.enhancedForecast && weather.enhancedForecast.valid && weather.enhancedForecast.temperature !== undefined) {
                 // Convert from Celsius to Fahrenheit (ESP32 sends in Celsius, stores as 23.3°C for example)
-                forecastHigh = (enhancedForecast.temperature * 9/5) + 32;
-                console.log(`✅ Using REAL forecast temp: ${forecastHigh.toFixed(1)}°F (from ${enhancedForecast.temperature.toFixed(1)}°C)`);
+                forecastHigh = (weather.enhancedForecast.temperature * 9/5) + 32;
+                console.log(`✅ Using REAL forecast temp: ${forecastHigh.toFixed(1)}°F (from ${weather.enhancedForecast.temperature.toFixed(1)}°C)`);
             } else if (weather.forecastHigh !== undefined && weather.forecastHigh !== null) {
                 // Legacy fallback: forecastHigh in Celsius
                 forecastHigh = (weather.forecastHigh * 9/5) + 32;
@@ -4798,22 +4798,29 @@ function startAutoRefresh() {
             document.getElementById('stormRisk').textContent = stormRiskValue;
             
             // Enhanced forecast data display - NO FALLBACK DATA
-            const enhancedForecast = weather.enhancedForecast;
-            if (enhancedForecast && enhancedForecast.valid) {
+            if (weather.enhancedForecast && weather.enhancedForecast.valid) {
                 console.log('✅ Displaying REAL forecast data');
                 // Update humidity forecast
                 const humidityElement = document.getElementById('forecastHumidity');
                 if (humidityElement) {
-                    humidityElement.textContent = enhancedForecast.humidity !== undefined ? 
-                        `${enhancedForecast.humidity.toFixed(0)}% (Forecast)` : 
+                    humidityElement.textContent = weather.enhancedForecast.humidity !== undefined ? 
+                        `${weather.enhancedForecast.humidity.toFixed(0)}% (Forecast)` : 
                         'ESP32 Data Missing';
                 }
                 
                 // Update precipitation forecast
                 const precipElement = document.getElementById('forecastPrecipitation');
                 if (precipElement) {
-                    precipElement.textContent = enhancedForecast.precipitationProb !== undefined ? 
-                        `${enhancedForecast.precipitationProb.toFixed(0)}% (Forecast)` : 
+                    precipElement.textContent = weather.enhancedForecast.precipitationProb !== undefined ? 
+                        `${weather.enhancedForecast.precipitationProb.toFixed(0)}% (Forecast)` : 
+                        'ESP32 Data Missing';
+                }
+                
+                // Update wind speed forecast
+                const windElement = document.getElementById('forecastWind');
+                if (windElement) {
+                    windElement.textContent = weather.enhancedForecast.windSpeed !== undefined ? 
+                        `${weather.enhancedForecast.windSpeed.toFixed(1)} m/s (Forecast)` : 
                         'ESP32 Data Missing';
                 }
             } else {
@@ -4828,20 +4835,25 @@ function startAutoRefresh() {
                 if (precipElement) {
                     precipElement.textContent = 'ESP32 Forecast Missing';
                 }
+                
+                const windElement = document.getElementById('forecastWind');
+                if (windElement) {
+                    windElement.textContent = 'ESP32 Forecast Missing';
+                }
             }
             
             // Enhanced storm risk explanation - handle missing forecast data properly
             const stormRiskExplanation = document.getElementById('stormRiskExplanation');
             if (stormRiskExplanation) {
                 let explanation = '';
-                if (enhancedForecast && enhancedForecast.valid && enhancedForecast.precipitationProb !== undefined && enhancedForecast.windSpeed !== undefined) {
+                if (weather.enhancedForecast && weather.enhancedForecast.valid && weather.enhancedForecast.precipitationProb !== undefined && weather.enhancedForecast.windSpeed !== undefined) {
                     // Use REAL forecast data
                     if (stormRiskValue === 'Clear') {
-                        explanation = `Stable pressure - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
+                        explanation = `Stable pressure - ${weather.enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${weather.enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
                     } else if (stormRiskValue === 'Possible') {
-                        explanation = `Low pressure detected - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, wind increasing to ${enhancedForecast.windSpeed.toFixed(1)} m/s (Forecast).`;
+                        explanation = `Low pressure detected - ${weather.enhancedForecast.precipitationProb.toFixed(0)}% rain chance, wind increasing to ${weather.enhancedForecast.windSpeed.toFixed(1)} m/s (Forecast).`;
                     } else if (stormRiskValue === 'Likely') {
-                        explanation = `Pressure dropping rapidly - ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds expected (Forecast).`;
+                        explanation = `Pressure dropping rapidly - ${weather.enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${weather.enhancedForecast.windSpeed.toFixed(1)} m/s winds expected (Forecast).`;
                     } else if (stormRiskValue === 'Imminent') {
                         explanation = `Rapid pressure drop! ${enhancedForecast.precipitationProb.toFixed(0)}% rain chance, ${enhancedForecast.windSpeed.toFixed(1)} m/s winds (Forecast).`;
                     } else {
