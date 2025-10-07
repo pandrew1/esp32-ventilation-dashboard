@@ -4384,7 +4384,65 @@ function startAutoRefresh() {
                 const data = await response.json();
                 console.log('Dashboard data received successfully');
                 
-                // Update dashboard with new data
+                // FETCH ADDITIONAL DATA FROM GetVentilationStatus API
+                // GetEnhancedDashboardData provides analytics but is missing:
+                // - incidents (system reliability data)
+                // - current sensor readings (for alerts)
+                // - current weather data (for storm alerts)
+                // - current door status (for door alerts)
+                try {
+                    console.log('Fetching current status data (incidents, sensors, weather, doors) from GetVentilationStatus...');
+                    const statusResponse = await fetch(`${CONFIG.currentStatusApiUrl}?deviceId=${CONFIG.deviceId}`, {
+                        method: 'GET',
+                        headers: headers
+                    });
+                    
+                    if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+                        
+                        // Merge incidents
+                        if (statusData.incidents && Array.isArray(statusData.incidents)) {
+                            data.incidents = statusData.incidents;
+                            console.log(`✓ Merged ${statusData.incidents.length} incidents from GetVentilationStatus`);
+                        } else {
+                            console.warn('⚠ GetVentilationStatus did not return incidents array');
+                        }
+                        
+                        // Merge current sensor data for alerts
+                        if (statusData.sensors) {
+                            data.sensors = statusData.sensors;
+                            console.log('✓ Merged current sensor data from GetVentilationStatus');
+                        }
+                        
+                        // Merge weather data
+                        if (statusData.weather) {
+                            data.weather = statusData.weather;
+                            console.log('✓ Merged weather data from GetVentilationStatus');
+                        }
+                        
+                        // Merge doors data
+                        if (statusData.doors) {
+                            data.doors = statusData.doors;
+                            console.log('✓ Merged doors data from GetVentilationStatus');
+                        }
+                        
+                        // Merge system data if not already present (GetEnhancedDashboardData has sections.startup.system)
+                        if (!data.system && statusData.system) {
+                            data.system = statusData.system;
+                            console.log('✓ Merged system data from GetVentilationStatus');
+                        } else if (statusData.system) {
+                            // Merge missing system fields
+                            data.system = {...statusData.system, ...data.system};
+                        }
+                    } else {
+                        console.warn(`⚠ GetVentilationStatus returned ${statusResponse.status}, incidents and alerts may not be available`);
+                    }
+                } catch (statusError) {
+                    console.error('❌ Error fetching current status from GetVentilationStatus:', statusError);
+                    // Continue without current status rather than failing completely
+                }
+                
+                // Update dashboard with merged data
                 await updateDashboard(data);
                 updateConnectionStatus('connected');
                 
@@ -5453,17 +5511,26 @@ function startAutoRefresh() {
             }
             // If none available, use browser time (already set above, isESP32Time remains false)
             
-            const timestamp = formatDetailedTimestamp(updateTime);
+            // Format timestamp in local time (PDT/PST auto-detected)
+            const dateOptions = { 
+                month: 'numeric', 
+                day: 'numeric', 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: true 
+            };
+            const timestamp = updateTime.toLocaleString('en-US', dateOptions);
             
             // Display time with clear indication of source
             if (isESP32Time) {
-                document.getElementById('lastUpdate').innerHTML = `${timestamp.combined}`;
+                document.getElementById('lastUpdate').innerHTML = timestamp;
                 document.getElementById('lastUpdate').style.color = '#28a745'; // Green for ESP32 time
-                document.getElementById('lastUpdate').title = 'ESP32 device time - actual transmission timestamp';
+                document.getElementById('lastUpdate').title = 'ESP32 device time - actual transmission timestamp (local time)';
             } else {
-                document.getElementById('lastUpdate').innerHTML = `${timestamp.combined}<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - No ESP32 timestamp]</small>`;
+                document.getElementById('lastUpdate').innerHTML = `${timestamp}<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - No ESP32 timestamp]</small>`;
                 document.getElementById('lastUpdate').style.color = '#dc3545'; // Red for browser fallback
-                document.getElementById('lastUpdate').title = 'Browser time fallback - ESP32 did not provide timestamp';
+                document.getElementById('lastUpdate').title = 'Browser time fallback - ESP32 did not provide timestamp (local time)';
             }
             
             // Fallback: Ensure systemConfig is never stuck on "Loading configuration..."
