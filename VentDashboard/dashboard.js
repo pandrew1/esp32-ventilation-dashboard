@@ -4720,10 +4720,18 @@ function startAutoRefresh() {
             );
             document.getElementById('coolingEffect').textContent = coolingEffect;
 
-            // 🎯 FIXED: Update weather using new API structure - NO FALLBACK DATA
+            // 🎯 FIXED: Update weather using CURRENT data from GetVentilationStatus (not yesterday's data)
             let weather = {};
-            if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental && data.sections.yesterday.environmental.pressure && data.sections.yesterday.environmental.pressure.weather) {
-                console.log('🔍 DEBUG: Using new API structure for weather data');
+            
+            // First priority: Use current weather data from GetVentilationStatus (real-time forecast from ESP32)
+            if (data.weather && data.weather.enhancedForecast) {
+                console.log('🔍 DEBUG: Using current weather data from GetVentilationStatus');
+                weather = data.weather;
+                console.log('✅ REAL forecast data available:', weather.enhancedForecast);
+            }
+            // Second priority: Check for weather in sections.yesterday (legacy fallback)
+            else if (data.sections && data.sections.yesterday && data.sections.yesterday.environmental && data.sections.yesterday.environmental.pressure && data.sections.yesterday.environmental.pressure.weather) {
+                console.log('🔍 DEBUG: Using yesterday API structure for weather data (fallback)');
                 const weatherData = data.sections.yesterday.environmental.pressure.weather;
                 
                 // Check if we have REAL ESP32 forecast data (no fallbacks)
@@ -4740,7 +4748,7 @@ function startAutoRefresh() {
                         precipitationProb: weatherData.forecastPrecip,
                         windSpeed: weatherData.forecastWind
                     };
-                    console.log('✅ REAL forecast data available:', enhancedForecast);
+                    console.log('✅ REAL forecast data available (from yesterday):', enhancedForecast);
                 } else {
                     console.warn('❌ NO ESP32 FORECAST DATA - forecast elements will show errors');
                     enhancedForecast = { valid: false };
@@ -4752,10 +4760,10 @@ function startAutoRefresh() {
                     enhancedForecast: enhancedForecast
                 };
             } else {
-                // Fallback to legacy structure
-                weather = data.weather || {};
+                // Last resort: Empty weather object
+                weather = {};
                 weather.enhancedForecast = { valid: false };
-                console.log('🔍 DEBUG: Using legacy weather structure (no forecast):', weather);
+                console.log('🔍 DEBUG: No weather data available');
             }
             
             const stormRiskValue = weather.stormRisk || 'NONE';
