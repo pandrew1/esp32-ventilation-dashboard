@@ -137,6 +137,19 @@ export class DataManager {
             method: 'GET',
             headers: headers
         }).then(response => {
+            // Check for authentication failures
+            if (response.status === 401 || response.status === 403) {
+                console.error(`DataManager: Authentication failed (${response.status}) - redirecting to login`);
+                // Clear auth data
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem('esp32-auth-token');
+                    localStorage.removeItem('esp32-auth-email');
+                }
+                // Redirect to login page
+                window.location.href = 'login.html';
+                throw new Error('Authentication expired - redirecting to login');
+            }
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }

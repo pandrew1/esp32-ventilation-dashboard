@@ -962,6 +962,34 @@ function getAuthHeaders() {
 }
 
 /**
+ * Handles authentication errors (401/403) by logging out and redirecting to login
+ * @param {Response} response - The fetch response object
+ * @param {string} context - Context description for logging (e.g., 'Enhanced Dashboard API')
+ * @returns {void}
+ */
+function handleAuthError(response, context = 'API call') {
+    if (response.status === 401 || response.status === 403) {
+        console.error(`🚨 Authentication failed in ${context} (${response.status}) - redirecting to login`);
+        // Clear auth data
+        if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('esp32-auth-token');
+            localStorage.removeItem('esp32-auth-email');
+        }
+        // Show error message briefly before redirect
+        const errorMsg = `Authentication expired. Redirecting to login...`;
+        if (typeof showNotification === 'function') {
+            showNotification(errorMsg, 'error');
+        }
+        // Redirect to login page after brief delay
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 1000);
+        return true; // Indicates auth error was handled
+    }
+    return false; // Not an auth error
+}
+
+/**
  * Logs out the current user by clearing authentication data
  * Legacy wrapper function that delegates to DashboardUtils.logout()
  * @returns {void}
@@ -4043,62 +4071,38 @@ function startAutoRefresh() {
             incidentElement.innerHTML = '<div class="loading-state">Loading yesterday incident summary...</div>';
             
             try {
-                // Get authentication headers (same as other API calls)
-                const headers = getAuthHeaders();
-                const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+                // Get yesterday's data from Enhanced Dashboard API (already loaded)
+                const enhancedData = await window.DataManager.getEnhancedData();
                 
-                if (!hasAuth) {
-                    incidentElement.innerHTML = '<div class="error-state">Authentication required for incident data</div>';
+                if (!enhancedData || !enhancedData.sections || !enhancedData.sections.yesterday) {
+                    incidentElement.innerHTML = '<div class="error-state">Yesterday\'s data not available</div>';
                     return;
                 }
                 
-                // Get incident data from Status API (has real incident data)
-                const apiUrl = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
+                const yesterdayData = enhancedData.sections.yesterday;
+                const incidentData = yesterdayData.incidents;
                 
-                const response = await fetch(apiUrl, { 
-                    method: 'GET',
-                    headers: headers
-                });
+                console.log('YESTERDAY INCIDENT SUMMARY: incidentData =', incidentData);
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                
-                if (!data.incidents || !Array.isArray(data.incidents)) {
-                    incidentElement.innerHTML = '<div class="info-state">No incident data available</div>';
+                // Check if incident data is available
+                if (!incidentData || (incidentData.totalIncidents === undefined && !incidentData.incidents)) {
+                    incidentElement.innerHTML = '<div class="info-state">No incident data available for yesterday</div>';
                     return;
                 }
                 
-                // Calculate yesterday's date range in Unix timestamps
-                const now = new Date();
-                const yesterday = new Date(now);
-                yesterday.setDate(now.getDate() - 1);
-                const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-                const yesterdayEnd = new Date(yesterdayStart);
-                yesterdayEnd.setDate(yesterdayStart.getDate() + 1);
-                yesterdayEnd.setSeconds(yesterdayEnd.getSeconds() - 1);
+                // Extract incident statistics from the structured data
+                const totalIncidents = incidentData.totalIncidents || 0;
+                const criticalIncidents = incidentData.bySeverity?.critical || 0;
+                const highIncidents = incidentData.bySeverity?.high || 0;
+                const mediumIncidents = incidentData.bySeverity?.medium || 0;
+                const incidentArray = incidentData.incidents || [];
                 
-                const yesterdayStartUnix = Math.floor(yesterdayStart.getTime() / 1000);
-                const yesterdayEndUnix = Math.floor(yesterdayEnd.getTime() / 1000);
+                // Calculate resolved incidents
+                const resolvedIncidents = incidentArray.filter(inc => inc.endTime && inc.endTime > 0).length;
                 
-                console.log(`YESTERDAY INCIDENT SUMMARY: Filtering incidents between ${yesterdayStartUnix} and ${yesterdayEndUnix}`);
+                console.log(`YESTERDAY INCIDENT SUMMARY: Total=${totalIncidents}, Critical=${criticalIncidents}, High=${highIncidents}, Resolved=${resolvedIncidents}`);
                 
-                // Filter incidents for yesterday
-                const yesterdayIncidents = data.incidents.filter(incident => 
-                    incident.startTime >= yesterdayStartUnix && incident.startTime <= yesterdayEndUnix
-                );
-                
-                console.log(`YESTERDAY INCIDENT SUMMARY: Found ${yesterdayIncidents.length} incidents for yesterday`);
-                
-                // Calculate incident statistics
-                const totalIncidents = yesterdayIncidents.length;
-                const criticalIncidents = yesterdayIncidents.filter(inc => inc.severity === 0).length; // Critical severity = 0
-                const highIncidents = yesterdayIncidents.filter(inc => inc.severity === 1).length; // High severity = 1
-                const resolvedIncidents = yesterdayIncidents.filter(inc => inc.endTime && inc.endTime > 0).length;
-                
-                // Calculate uptime percentage
+                // Calculate uptime display
                 let uptimeDisplay = '100% uptime';
                 if (totalIncidents > 0) {
                     if (resolvedIncidents > 0) {
@@ -4118,6 +4122,7 @@ function startAutoRefresh() {
                     <div class="incident-summary">
                         <p><strong>Total Incidents:</strong> ${totalIncidents}</p>
                         <p><strong>Critical:</strong> ${criticalIncidents}</p>
+                        <p><strong>High:</strong> ${highIncidents}</p>
                         <p><strong>System Health:</strong> ${uptimeDisplay}</p>
                         <p><strong>Status:</strong> ${systemStatus}</p>
                     </div>
@@ -4338,22 +4343,9 @@ function startAutoRefresh() {
                     headers: headers
                 });
                 
-                if (response.status === 401) {
-                    // Only logout if using API key authentication
-                    // For Bearer token, fall back to mock data until functions are updated
-                    const token = localStorage.getItem('ventilation_auth_token');
-                    if (!token && CONFIG.apiSecret) {
-                        // Using API key and got 401 - logout
-                        logout();
-                        return;
-                    } else if (token) {
-                        // Using Bearer token but got 401 - functions may not support it yet
-                        // Bearer token authentication failed, show no data state
-                        showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
-                        showNoDataState();
-                        updateConnectionStatus('disconnected');
-                        return;
-                    }
+                // Handle authentication errors (401/403) - redirect to login
+                if (handleAuthError(response, 'GetVentilationStatus API')) {
+                    return; // Auth error handled, function will redirect
                 }
                 
                 if (!response.ok) {
@@ -4365,15 +4357,8 @@ function startAutoRefresh() {
                     console.error('DEBUGGING: Error response:', errorText);
                     debugDiv.innerHTML += '<br>Error text: ' + (errorText.substring(0, 100) + '...');
                     
-                    // If unauthorized and no API secret, show no data
-                    if (response.status === 401 || response.status === 404) {
-                        // API call failed, show no data state
-                        debugDiv.innerHTML += '<br><strong>Showing no data state due to ' + response.status + '</strong>';
-                        showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
-                        showNoDataState();
-                        updateConnectionStatus('disconnected');
-                        return;
-                    }
+                    // API call failed, show no data state
+                    debugDiv.innerHTML += '<br><strong>Showing no data state due to ' + response.status + '</strong>';
                     showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
                     showNoDataState();
                     updateConnectionStatus('disconnected');
@@ -4750,6 +4735,7 @@ function startAutoRefresh() {
                 if (hasRealForecast) {
                     enhancedForecast = {
                         valid: true,
+                        temperature: weatherData.forecastHigh,  // Celsius from ESP32
                         humidity: weatherData.forecastHumidity,
                         precipitationProb: weatherData.forecastPrecip,
                         windSpeed: weatherData.forecastWind
@@ -5525,7 +5511,9 @@ function startAutoRefresh() {
             // Check if ESP32 provides its timestamp in the data
             if (data.timestamp && typeof data.timestamp === 'string') {
                 // API timestamp is in ISO format (e.g., "2025-09-25T23:54:35.925026")
-                updateTime = new Date(data.timestamp);
+                // Azure API returns UTC time without 'Z' suffix, so append it for correct parsing
+                const timestampString = data.timestamp.endsWith('Z') ? data.timestamp : data.timestamp + 'Z';
+                updateTime = new Date(timestampString);
                 isESP32Time = true;
             } else if (data.system && data.system.currentTime) {
                 // ESP32 timestamp is available (Unix timestamp in seconds)
