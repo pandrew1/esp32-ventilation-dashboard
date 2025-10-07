@@ -4773,9 +4773,28 @@ function startAutoRefresh() {
             }
             
             const stormRiskValue = weather.stormRisk || 'NONE';
-            // Use current outdoor temperature + seasonal variation for forecast
-            const forecastHigh = weather.forecastHigh || (outdoor.temp ? outdoor.temp + 5 : 72);
-            document.getElementById('forecastHigh').textContent = forecastHigh != null ? `${Math.round(forecastHigh)}°F` : '72°F';
+            
+            // Get forecast temperature from enhanced forecast data (ESP32 v4 format)
+            // ESP32 stores in Celsius, dashboard displays in Fahrenheit (matching serial debug format)
+            let forecastHigh;
+            if (enhancedForecast && enhancedForecast.valid && enhancedForecast.temperature !== undefined) {
+                // Convert from Celsius to Fahrenheit (ESP32 sends in Celsius, stores as 23.3°C for example)
+                forecastHigh = (enhancedForecast.temperature * 9/5) + 32;
+                console.log(`✅ Using REAL forecast temp: ${forecastHigh.toFixed(1)}°F (from ${enhancedForecast.temperature.toFixed(1)}°C)`);
+            } else if (weather.forecastHigh !== undefined && weather.forecastHigh !== null) {
+                // Legacy fallback: forecastHigh in Celsius
+                forecastHigh = (weather.forecastHigh * 9/5) + 32;
+                console.warn(`⚠️ Using legacy forecastHigh: ${forecastHigh.toFixed(1)}°F`);
+            } else {
+                // No forecast data available - show error instead of fake data
+                forecastHigh = null;
+                console.error('❌ No forecast temperature available from ESP32');
+            }
+            
+            // Display with 1 decimal place to match ESP32 serial debug format (e.g., "73.9°F")
+            document.getElementById('forecastHigh').textContent = forecastHigh !== null ? 
+                `${forecastHigh.toFixed(1)}°F` : 
+                'ESP32 Forecast Missing';
             document.getElementById('stormRisk').textContent = stormRiskValue;
             
             // Enhanced forecast data display - NO FALLBACK DATA
