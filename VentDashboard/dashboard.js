@@ -4071,6 +4071,16 @@ function startAutoRefresh() {
             incidentElement.innerHTML = '<div class="loading-state">Loading yesterday incident summary...</div>';
             
             try {
+                // Check if DataManager is available
+                if (!window.DataManager) {
+                    console.warn('YESTERDAY INCIDENT SUMMARY: DataManager not loaded yet, waiting...');
+                    incidentElement.innerHTML = '<div class="loading-state">Waiting for data manager...</div>';
+                    
+                    // Retry after DataManager loads
+                    setTimeout(() => loadYesterdayIncidentSummary(), 1000);
+                    return;
+                }
+                
                 // Get yesterday's data from Enhanced Dashboard API (already loaded)
                 const enhancedData = await window.DataManager.getEnhancedData();
                 
