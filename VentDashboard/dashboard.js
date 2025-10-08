@@ -1827,7 +1827,7 @@ function startAutoRefresh() {
                     // Load monthly aggregation status - call existing updateDashboard to get Status API data
                     loadYesterdayMonthlyAggregationFromStatusAPI();
                     
-                    // Load incident summary from Status API (Enhanced API doesn't have real incident data)
+                    // Load incident summary from Enhanced API (incident data is now included)
                     loadYesterdayIncidentSummary();
                     
                     // ENHANCED: Load individual sensor data for accurate readings
@@ -4063,7 +4063,7 @@ function startAutoRefresh() {
             
             const incidentElement = document.getElementById('yesterdayIncidentSummary');
             if (!incidentElement) {
-                console.error('yesterdayIncidentSummary element not found');
+                console.error('YESTERDAY INCIDENT SUMMARY: yesterdayIncidentSummary element not found in DOM');
                 return;
             }
             
@@ -4074,7 +4074,12 @@ function startAutoRefresh() {
                 // Get yesterday's data from Enhanced Dashboard API (already loaded)
                 const enhancedData = await window.DataManager.getEnhancedData();
                 
+                console.log('YESTERDAY INCIDENT SUMMARY: enhancedData =', enhancedData ? 'exists' : 'NULL');
+                console.log('YESTERDAY INCIDENT SUMMARY: sections =', enhancedData?.sections ? 'exists' : 'NULL');
+                console.log('YESTERDAY INCIDENT SUMMARY: yesterday =', enhancedData?.sections?.yesterday ? 'exists' : 'NULL');
+                
                 if (!enhancedData || !enhancedData.sections || !enhancedData.sections.yesterday) {
+                    console.error('YESTERDAY INCIDENT SUMMARY: Enhanced data structure invalid');
                     incidentElement.innerHTML = '<div class="error-state">Yesterday\'s data not available</div>';
                     return;
                 }
@@ -4082,10 +4087,13 @@ function startAutoRefresh() {
                 const yesterdayData = enhancedData.sections.yesterday;
                 const incidentData = yesterdayData.incidents;
                 
+                console.log('YESTERDAY INCIDENT SUMMARY: yesterdayData keys =', Object.keys(yesterdayData));
                 console.log('YESTERDAY INCIDENT SUMMARY: incidentData =', incidentData);
+                console.log('YESTERDAY INCIDENT SUMMARY: incidentData type =', typeof incidentData);
                 
                 // Check if incident data is available
                 if (!incidentData || (incidentData.totalIncidents === undefined && !incidentData.incidents)) {
+                    console.warn('YESTERDAY INCIDENT SUMMARY: No incident data - showing placeholder');
                     incidentElement.innerHTML = '<div class="info-state">No incident data available for yesterday</div>';
                     return;
                 }
