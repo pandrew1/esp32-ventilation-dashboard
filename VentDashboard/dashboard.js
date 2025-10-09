@@ -2454,25 +2454,10 @@ function startAutoRefresh() {
 
                 // Process and display the enhanced data
                 updateDoorActivityDisplay(analyticsData);
-                // FIXED: Always try to update confidence chart with available data
-                // Create detectionAnalytics if missing from the door analytics response
-                if (!analyticsData.detectionAnalytics && analyticsData.recentPerformance) {
-                    console.log('🔍 DEBUG: Creating detectionAnalytics from recentPerformance data');
-                    const recent = analyticsData.recentPerformance.last24Hours || {};
-                    analyticsData.detectionAnalytics = {
-                        confidenceDistribution: {
-                            high: Math.floor((recent.pressureEvents || 0) * 0.7),
-                            medium: Math.floor((recent.pressureEvents || 0) * 0.2),
-                            low: Math.floor((recent.pressureEvents || 0) * 0.1)
-                        },
-                        reedSwitchEvents: recent.reedSwitchEvents || 0,
-                        averagePressureChange: 0.001, // Default placeholder
-                        maxPressureChange: 0.002 // Default placeholder
-                    };
-                }
                 
-                // Update confidence chart with enhanced or fallback data
-                updateConfidenceChart(analyticsData);
+                // NOTE: Don't update confidence chart here - it's already updated by loadYesterdaySummaryMetrics()
+                // with the correct data from GetEnhancedDashboardData which has the full detectionAnalytics
+                // The GetEnhancedDoorAnalytics API doesn't return confidence distribution data
                 
                 // Always update pressure analytics with available data
                 updatePressureAnalytics(analyticsData);
