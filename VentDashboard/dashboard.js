@@ -5906,7 +5906,8 @@ function startAutoRefresh() {
                 3: { name: 'API Down', icon: '☁️' },
                 4: { name: 'Storm Event', icon: '🌩️' },
                 5: { name: 'Heat Event', icon: '🔥' },
-                6: { name: 'Freeze Event', icon: '🧊' }
+                6: { name: 'Freeze Event', icon: '🧊' },
+                7: { name: 'SD Card Failure', icon: '💾' }
             };
             
             const severityNames = ['Critical', 'High', 'Medium', 'Low'];
@@ -7262,7 +7263,8 @@ function startAutoRefresh() {
                 3: { name: 'API Down', icon: '☁️', color: '#20c997' },
                 4: { name: 'Storm Event', icon: '🌩️', color: '#0dcaf0' },
                 5: { name: 'Heat Event', icon: '🔥', color: '#dc3545' },
-                6: { name: 'Freeze Event', icon: '🧊', color: '#0d6efd' }
+                6: { name: 'Freeze Event', icon: '🧊', color: '#0d6efd' },
+                7: { name: 'SD Card Failure', icon: '💾', color: '#6c757d' }
             };
             
             const severityColors = {
@@ -7371,7 +7373,8 @@ function startAutoRefresh() {
                 3: 'API Down',
                 4: 'Storm Event',
                 5: 'Heat Event',
-                6: 'Freeze Event'
+                6: 'Freeze Event',
+                7: 'SD Card Failure'
             };
             
             // Calculate correlations
@@ -7482,7 +7485,7 @@ function startAutoRefresh() {
             const insights = [];
             const incidentTypes = {
                 0: 'Power Loss', 1: 'WiFi Down', 2: 'Internet Down',
-                3: 'API Down', 4: 'Storm Event', 5: 'Heat Event', 6: 'Freeze Event'
+                3: 'API Down', 4: 'Storm Event', 5: 'Heat Event', 6: 'Freeze Event', 7: 'SD Card Failure'
             };
             
             // Find strong correlations
@@ -7607,7 +7610,7 @@ function startAutoRefresh() {
             });
             
             if (relatedIncidents.length > 0) {
-                const typeNames = {0: 'Power Loss', 1: 'WiFi Down', 2: 'Internet Down', 3: 'API Down', 4: 'Storm Event', 5: 'Heat Event', 6: 'Freeze Event'};
+                const typeNames = {0: 'Power Loss', 1: 'WiFi Down', 2: 'Internet Down', 3: 'API Down', 4: 'Storm Event', 5: 'Heat Event', 6: 'Freeze Event', 7: 'SD Card Failure'};
                 const relatedTypes = [...new Set(relatedIncidents.map(i => typeNames[i.type]))];
                 
                 text.textContent = `${incidentType} correlates with: ${relatedTypes.join(', ')} (within 2 hours)`;
@@ -7999,7 +8002,8 @@ function startAutoRefresh() {
                 3: { name: 'API Down', icon: '☁️', criticalColor: '#4682B4', highColor: '#87CEEB', mediumColor: '#ADD8E6', lowColor: '#E0F6FF' },
                 4: { name: 'Storm Event', icon: '🌩️', criticalColor: '#483D8B', highColor: '#9370DB', mediumColor: '#BA55D3', lowColor: '#DDA0DD' },
                 5: { name: 'Heat Event', icon: '🔥', criticalColor: '#DC143C', highColor: '#FF69B4', mediumColor: '#FFB6C1', lowColor: '#FFCCCB' },
-                6: { name: 'Freeze Event', icon: '🧊', criticalColor: '#00CED1', highColor: '#20B2AA', mediumColor: '#48CAE4', lowColor: '#90E0EF' }
+                6: { name: 'Freeze Event', icon: '🧊', criticalColor: '#00CED1', highColor: '#20B2AA', mediumColor: '#48CAE4', lowColor: '#90E0EF' },
+                7: { name: 'SD Card Failure', icon: '💾', criticalColor: '#696969', highColor: '#808080', mediumColor: '#A9A9A9', lowColor: '#D3D3D3' }
             };
             
             if (!incidents || incidents.length === 0) {
