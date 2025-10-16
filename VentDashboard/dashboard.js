@@ -3423,6 +3423,17 @@ function startAutoRefresh() {
                         <div class="timeline-chart">
                             <div class="timeline-events-scrollable">
                                 ${timeline.map((event, index) => {
+                                    // DEBUG: Log timestamp issues
+                                    if (index < 5) {
+                                        console.log(`🐛 TIMELINE EVENT ${index}:`, {
+                                            door: event.door,
+                                            timestamp: event.timestamp,
+                                            timestampType: typeof event.timestamp,
+                                            action: event.action,
+                                            detectionMethod: event.detectionMethod
+                                        });
+                                    }
+                                    
                                     // Parse timestamp with debugging - don't filter out errors
                                     let timestamp;
                                     let hasParsingError = false;
