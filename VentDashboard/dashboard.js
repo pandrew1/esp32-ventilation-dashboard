@@ -4629,7 +4629,9 @@ function startAutoRefresh() {
             try {
                 const historyResponse = await DataManager.getHistoryData(1); // Get last 1 hour
                 if (historyResponse && historyResponse.data && historyResponse.data.length > 0) {
-                    const latestReading = historyResponse.data[historyResponse.data.length - 1];
+                    // 🐛 FIX: Azure returns data in reverse chronological order (newest first), so use index 0
+                    const latestReading = historyResponse.data[0]; // Get the FIRST item (most recent)
+                    console.log('🔍 DEBUG: Latest reading timestamp:', latestReading.timestamp, 'sensors:', latestReading.sensors);
                     if (latestReading.sensors) {
                         sensors = {
                             indoor: {
