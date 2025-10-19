@@ -3156,6 +3156,23 @@ function startAutoRefresh() {
                         data.data.forEach((record, recordIndex) => {
                             // Process explicit door transitions first (most accurate)
                             if (record.doorTransitions && Array.isArray(record.doorTransitions)) {
+                                // DEBUG: Log first few transitions to see timestamp format
+                                if (recordIndex === 0 && record.doorTransitions.length > 0) {
+                                    console.log('🐛 TIMELINE DEBUG: Sample doorTransitions (showing first 5):');
+                                    record.doorTransitions.slice(0, 5).forEach((t, idx) => {
+                                        console.log(`  [${idx}]:`, {
+                                            timestamp: t.timestamp,
+                                            timestampType: typeof t.timestamp,
+                                            timestampValue: t.timestamp,
+                                            doorId: t.doorId,
+                                            doorName: t.doorName,
+                                            opened: t.opened,
+                                            detectionMethod: t.detectionMethod,
+                                            confidence: t.confidence
+                                        });
+                                    });
+                                }
+                                
                                 record.doorTransitions.forEach(transition => {
                                     // Filter out system events by detection method OR door name
                                     const detectionMethod = transition.detectionMethod || '';
@@ -3223,19 +3240,56 @@ function startAutoRefresh() {
                                             return doorName || `Door ${doorId + 1}`;
                                         };
                                         
-                                        const event = {
-                                            timestamp: transition.timestamp,
-                                            door: getDoorDisplayName(transition),
-                                            action: transition.opened ? 'opened' : 'closed',
-                                            duration: 0,
-                                            source: 'transition',
-                                            detectionMethod: transition.detectionMethod || null,
-                                            confidence: transition.confidence || null,
-                                            confirmedByReed: transition.confirmedByReed || false
-                                        };
-                                        uniqueEvents.set(eventKey, event);
-                                        const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
-                                        // console.log(`    Added door transition: ${event.door} ${event.action} at ${transition.timestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
+                                        // BUGFIX OCT 19 2025: Validate timestamp before creating event
+                                        // Ensure timestamp is numeric and reasonable (after year 2020)
+                                        let validTimestamp = null;
+                                        let rejectionReason = null;
+                                        try {
+                                            if (typeof transition.timestamp === 'number') {
+                                                validTimestamp = transition.timestamp;
+                                            } else if (typeof transition.timestamp === 'string' && !isNaN(transition.timestamp)) {
+                                                validTimestamp = parseFloat(transition.timestamp);
+                                            } else {
+                                                rejectionReason = `timestamp type is ${typeof transition.timestamp}, value: ${transition.timestamp}`;
+                                            }
+                                            
+                                            // Validate timestamp is reasonable (after Jan 1, 2020)
+                                            if (validTimestamp) {
+                                                const testDate = validTimestamp > 1000000000000 ? new Date(validTimestamp) : new Date(validTimestamp * 1000);
+                                                if (isNaN(testDate.getTime())) {
+                                                    rejectionReason = `timestamp ${validTimestamp} produces invalid date`;
+                                                    validTimestamp = null;
+                                                } else if (testDate.getFullYear() < 2020) {
+                                                    rejectionReason = `timestamp ${validTimestamp} produces date before 2020: ${testDate.toISOString()}`;
+                                                    validTimestamp = null;
+                                                }
+                                            }
+                                        } catch (e) {
+                                            rejectionReason = `parse exception: ${e.message}`;
+                                            validTimestamp = null;
+                                        }
+                                        
+                                        // Log rejection reasons for debugging
+                                        if (!validTimestamp && rejectionReason) {
+                                            console.warn(`🐛 TIMELINE: Rejected timestamp - ${rejectionReason}`, transition);
+                                        }
+                                        
+                                        // Only add event if timestamp is valid
+                                        if (validTimestamp) {
+                                            const event = {
+                                                timestamp: validTimestamp,
+                                                door: getDoorDisplayName(transition),
+                                                action: transition.opened ? 'opened' : 'closed',
+                                                duration: 0,
+                                                source: 'transition',
+                                                detectionMethod: transition.detectionMethod || null,
+                                                confidence: transition.confidence || null,
+                                                confirmedByReed: transition.confirmedByReed || false
+                                            };
+                                            uniqueEvents.set(eventKey, event);
+                                            const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
+                                            // console.log(`    Added door transition: ${event.door} ${event.action} at ${validTimestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
+                                        }
                                     }
                                 });
                             }
