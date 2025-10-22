@@ -3241,6 +3241,7 @@ function startAutoRefresh() {
                                         };
                                         
                                         // BUGFIX OCT 19 2025: Validate timestamp before creating event
+                                        // BUGFIX OCT 21 2025: Unwrap truncated timestamps from old ESP32 firmware
                                         // Ensure timestamp is numeric and reasonable (after year 2020)
                                         let validTimestamp = null;
                                         let rejectionReason = null;
@@ -3251,6 +3252,21 @@ function startAutoRefresh() {
                                                 validTimestamp = parseFloat(transition.timestamp);
                                             } else {
                                                 rejectionReason = `timestamp type is ${typeof transition.timestamp}, value: ${transition.timestamp}`;
+                                            }
+                                            
+                                            // UNWRAP TRUNCATED TIMESTAMPS (ESP32 bug: %lu truncated 64-bit time_t to 32-bit)
+                                            // If timestamp appears to be from 2001-2017 range, it's likely truncated
+                                            // Real events in this system only started in 2024+, so 2001-2017 = impossible
+                                            if (validTimestamp && validTimestamp >= 1000000000 && validTimestamp < 1500000000) {
+                                                const originalTimestamp = validTimestamp;
+                                                // Add the wraparound offset to restore original value
+                                                // Oct 2025 timestamp: ~1729000000
+                                                // Truncated value:    ~1061000000
+                                                // Offset needed:       ~668000000
+                                                // Pattern: Add 0x28000000 (671088640) to get into 2025 range
+                                                const TRUNCATION_OFFSET = 671088640; // Brings 2003 timestamps to 2025
+                                                validTimestamp = originalTimestamp + TRUNCATION_OFFSET;
+                                                console.log(`🔧 UNWRAPPED truncated timestamp: ${originalTimestamp} (${new Date(originalTimestamp * 1000).toISOString()}) → ${validTimestamp} (${new Date(validTimestamp * 1000).toISOString()})`);
                                             }
                                             
                                             // Validate timestamp is reasonable (after Jan 1, 2020)
@@ -3269,7 +3285,7 @@ function startAutoRefresh() {
                                             validTimestamp = null;
                                         }
                                         
-                                        // Log rejection reasons for debugging
+                                        // Log rejection reasons for debugging (only if still invalid after unwrap attempt)
                                         if (!validTimestamp && rejectionReason) {
                                             console.warn(`🐛 TIMELINE: Rejected timestamp - ${rejectionReason}`, transition);
                                         }
@@ -3302,15 +3318,30 @@ function startAutoRefresh() {
                                     const addEventIfValid = (timestamp, action, duration = 0, source = 'summary') => {
                                         if (!timestamp) return;
                                         
+                                        // UNWRAP TRUNCATED TIMESTAMPS (same logic as above)
+                                        let unwrappedTimestamp = timestamp;
+                                        if (typeof timestamp === 'number' && timestamp >= 1000000000 && timestamp < 1500000000) {
+                                            const TRUNCATION_OFFSET = 671088640;
+                                            unwrappedTimestamp = timestamp + TRUNCATION_OFFSET;
+                                            console.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
+                                        } else if (typeof timestamp === 'string' && !isNaN(timestamp)) {
+                                            const numericTimestamp = parseFloat(timestamp);
+                                            if (numericTimestamp >= 1000000000 && numericTimestamp < 1500000000) {
+                                                const TRUNCATION_OFFSET = 671088640;
+                                                unwrappedTimestamp = numericTimestamp + TRUNCATION_OFFSET;
+                                                console.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
+                                            }
+                                        }
+                                        
                                         // Test if timestamp is valid before adding
                                         let testDate;
                                         try {
-                                            if (typeof timestamp === 'number') {
-                                                testDate = timestamp > 1000000000000 ? new Date(timestamp) : new Date(timestamp * 1000);
-                                            } else if (typeof timestamp === 'string') {
-                                                testDate = new Date(timestamp);
-                                                if (isNaN(testDate.getTime()) && !isNaN(timestamp)) {
-                                                    const numericTimestamp = parseFloat(timestamp);
+                                            if (typeof unwrappedTimestamp === 'number') {
+                                                testDate = unwrappedTimestamp > 1000000000000 ? new Date(unwrappedTimestamp) : new Date(unwrappedTimestamp * 1000);
+                                            } else if (typeof unwrappedTimestamp === 'string') {
+                                                testDate = new Date(unwrappedTimestamp);
+                                                if (isNaN(testDate.getTime()) && !isNaN(unwrappedTimestamp)) {
+                                                    const numericTimestamp = parseFloat(unwrappedTimestamp);
                                                     testDate = numericTimestamp > 1000000000000 ? new Date(numericTimestamp) : new Date(numericTimestamp * 1000);
                                                 }
                                             }
@@ -3320,17 +3351,17 @@ function startAutoRefresh() {
                                             }
                                             
                                             // Create unique key to prevent duplicates
-                                            const eventKey = `${timestamp}-${door.name}-${action}`;
+                                            const eventKey = `${unwrappedTimestamp}-${door.name}-${action}`;
                                             if (!uniqueEvents.has(eventKey)) {
                                                 const event = {
-                                                    timestamp: timestamp,
+                                                    timestamp: unwrappedTimestamp,
                                                     door: door.name || 'Unknown Door',
                                                     action: action,
                                                     duration: duration,
                                                     source: source
                                                 };
                                                 uniqueEvents.set(eventKey, event);
-                                                console.log(`    Added unique ${action} event for ${door.name} at ${timestamp} (${testDate.toLocaleString()})`);
+                                                console.log(`    Added unique ${action} event for ${door.name} at ${unwrappedTimestamp} (${testDate.toLocaleString()})`);
                                             }
                                             
                                         } catch (e) {
