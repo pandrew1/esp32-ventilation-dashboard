@@ -10214,52 +10214,24 @@ window.exportPressureAnalysisCSV = exportPressureAnalysisCSV;
 // Function to update enhanced storm detection display
 function updateEnhancedStormDisplay(data) {
     try {
-        // Create weather data fallback since API has no weather section
-        const weatherData = data.weather || 
-                           (data.sections?.yesterday?.environmental?.pressure?.weather) || 
-                           { stormRisk: 'NONE', forecastHigh: 0 };
+        // Priority 1: Check for enhanced storm data directly from ESP32
+        // It can be in multiple locations depending on the telemetry type (Regular, Startup, or Daily Summary)
+        const enhanced = data.enhancedStorm || 
+                        (data.weather && data.weather.enhancedStorm) ||
+                        (data.weatherVentilation && data.weatherVentilation.enhancedStorm) ||
+                        (data.assessments && data.assessments.enhancedStorm);
         
-        // Basic storm risk (existing field)
-        const stormRiskElement = document.getElementById('stormRisk');
-        if (stormRiskElement) {
-            stormRiskElement.textContent = weatherData.stormRisk || 'NONE';
-        }
-        
-        // Enhanced storm detection data - use weather fallback data
-        if (weatherData) {
-            const stormRisk = weatherData.stormRisk || 'NONE';
-            
+        if (enhanced) {
             // Storm Type
             const stormTypeElement = document.getElementById('stormType');
             if (stormTypeElement) {
-                // Map stormRisk to storm type
-                let type = 'Clear';
-                if (stormRisk === 'NONE' || stormRisk === 'Low') {
-                    type = 'Clear';
-                } else if (stormRisk === 'Possible') {
-                    type = 'Approaching';
-                } else if (stormRisk === 'Likely') {
-                    type = 'Developing';
-                } else if (stormRisk === 'Imminent') {
-                    type = 'Active';
-                }
-                stormTypeElement.textContent = type;
+                stormTypeElement.textContent = enhanced.type || 'Clear';
             }
             
             // Storm Confidence
             const stormConfidenceElement = document.getElementById('stormConfidence');
             if (stormConfidenceElement) {
-                // Map stormRisk to confidence level
-                let confidence = 0;
-                if (stormRisk === 'NONE' || stormRisk === 'Low') {
-                    confidence = 0.1;
-                } else if (stormRisk === 'Possible') {
-                    confidence = 0.4;
-                } else if (stormRisk === 'Likely') {
-                    confidence = 0.7;
-                } else if (stormRisk === 'Imminent') {
-                    confidence = 0.9;
-                }
+                const confidence = enhanced.confidence || 0;
                 stormConfidenceElement.textContent = `${Math.round(confidence * 100)}%`;
                 
                 // Color code confidence
@@ -10277,73 +10249,55 @@ function updateEnhancedStormDisplay(data) {
             // Storm Arrival Time
             const stormArrivalElement = document.getElementById('stormArrival');
             if (stormArrivalElement) {
-                // Map stormRisk to estimated arrival
+                const minutes = enhanced.estimatedMinutes || 0;
                 let arrivalText = 'Clear';
-                if (stormRisk === 'NONE' || stormRisk === 'Low') {
+                
+                if (enhanced.type === 'Clear' || enhanced.type === 'None') {
                     arrivalText = 'Clear';
-                } else if (stormRisk === 'Possible') {
-                    arrivalText = '6-12 hr';
-                } else if (stormRisk === 'Likely') {
-                    arrivalText = '2-6 hr';
-                } else if (stormRisk === 'Imminent') {
-                    arrivalText = '< 1 hr';
+                    stormArrivalElement.style.color = '#00b894';
+                } else {
+                    if (minutes <= 60) {
+                        arrivalText = `< ${minutes} min`;
+                        stormArrivalElement.style.color = '#d63031'; // Imminent
+                    } else if (minutes <= 180) {
+                        arrivalText = `${Math.round(minutes/60)} hr`;
+                        stormArrivalElement.style.color = '#e17055'; // Soon
+                    } else {
+                        arrivalText = `${Math.round(minutes/60)} hr`;
+                        stormArrivalElement.style.color = '#fdcb6e'; // Later
+                    }
                 }
                 stormArrivalElement.textContent = arrivalText;
-                
-                // Color code urgency based on storm risk level
-                if (stormRisk === 'Imminent') {
-                    stormArrivalElement.style.color = '#d63031'; // Imminent - red
-                } else if (stormRisk === 'Likely') {
-                    stormArrivalElement.style.color = '#e17055'; // Soon - orange
-                } else if (stormRisk === 'Possible') {
-                    stormArrivalElement.style.color = '#fdcb6e'; // Later - yellow
-                } else {
-                    stormArrivalElement.style.color = '#00b894'; // Clear - green
-                }
             }
             
-            // Storm Description - create enhanced object from available data
-            const enhanced = {
-                description: stormRisk === 'NONE' ? 'Clear' : 'Storm Detected',
-                type: stormRisk === 'NONE' ? 'Clear' : 'Weather Event',
-                confidence: stormRisk === 'NONE' ? 0 : 0.85,
-                estimatedMinutes: stormRisk === 'NONE' ? 0 : 120
-            };
-            
+            // Storm Description
             const stormDescriptionElement = document.getElementById('stormDescription');
             if (stormDescriptionElement) {
-                const description = enhanced.description || 'Clear';
-                if (description === 'Clear') {
+                if (enhanced.type === 'Clear' || enhanced.type === 'None') {
                     stormDescriptionElement.textContent = 'Enhanced storm detection analyzes pressure patterns across multiple timescales to provide advance warning for Pacific Northwest weather events.';
                 } else {
-                    // Create detailed description based on storm type and timing
-                    let detailedDesc = `${enhanced.type} detected with ${Math.round((enhanced.confidence || 0) * 100)}% confidence. `;
-                    
-                    // Add timing context
-                    const minutes = enhanced.estimatedMinutes || 0;
-                    if (minutes <= 30) {
-                        detailedDesc += 'Immediate preparation recommended.';
-                    } else if (minutes <= 120) {
-                        detailedDesc += 'Storm approaching within 2 hours.';
-                    } else if (minutes <= 720) {
-                        detailedDesc += 'Storm expected later today.';
-                    } else {
-                        detailedDesc += 'Long-range storm system detected.';
-                    }
-                    
-                    stormDescriptionElement.textContent = detailedDesc;
+                    stormDescriptionElement.textContent = enhanced.description || `${enhanced.type} detected.`;
                 }
             }
-        } else {
-            // Clear enhanced storm display if no data
-            const elements = ['stormType', 'stormConfidence', 'stormArrival'];
-            elements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) element.textContent = '-';
-            });
+            
+            console.log('Enhanced storm display updated from ESP32 data');
+            return; // Exit if successful
         }
+
+        // If we get here, enhanced data is missing.
+        console.warn('Enhanced storm data missing from API response');
         
-        console.log('Enhanced storm display updated successfully');
+        // Clear enhanced storm display if no data
+        const elements = ['stormType', 'stormConfidence', 'stormArrival'];
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = 'No Data';
+        });
+        
+        const stormDescriptionElement = document.getElementById('stormDescription');
+        if (stormDescriptionElement) {
+            stormDescriptionElement.textContent = 'Enhanced storm data unavailable from API.';
+        }
         
     } catch (error) {
         console.error('Error updating enhanced storm display:', error);
