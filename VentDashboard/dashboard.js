@@ -3313,8 +3313,8 @@ function startAutoRefresh() {
                                                 detectionMethod: transition.detectionMethod || null,
                                                 confidence: transition.confidence || null,
                                                 confirmedByReed: transition.confirmedByReed || false,
-                                                s7RejectReason: transition.s7_reject_reason || null,
-                                                mlProbability: transition.ml_probability || null
+                                                s7RejectReason: transition.s7RejectReason || null,
+                                                mlProbability: transition.mlProbability || null
                                             };
                                             uniqueEvents.set(eventKey, event);
                                             const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
