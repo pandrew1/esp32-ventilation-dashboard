@@ -1566,17 +1566,32 @@
                             <div class="door-timeline-chart">
                                 <div class="timeline-header">
                                     <h5>📊 Enhanced Activity Timeline (10Hz Detection)</h5>
-                                    <div class="timeline-controls">
-                                        <button class="time-filter active" data-hours="24">24h</button>
-                                        <button class="time-filter" data-hours="168">7d</button>
+                                    <div class="timeline-controls-wrapper" style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
+                                        <div class="timeline-controls">
+                                            <button class="time-filter active" data-hours="24">24h</button>
+                                            <button class="time-filter" data-hours="168">7d</button>
+                                        </div>
+                                        <div class="timeline-filters" style="font-size: 0.8em; display: flex; gap: 10px;">
+                                            <label style="cursor: pointer;"><input type="checkbox" id="filterClassified" checked> Classified</label>
+                                            <label style="cursor: pointer;"><input type="checkbox" id="filterS7Pass" checked> S7 PASS</label>
+                                            <label style="cursor: pointer;"><input type="checkbox" id="filterReedConfirmed" checked> Reed Confirmed</label>
+                                        </div>
                                     </div>
                                 </div>
-                                
+
                                 <!-- Enhanced Visualization Canvas -->
                                 <div class="timeline-visualization" id="doorTimelineViz">
                                     <canvas id="doorTimelineChart" width="800" height="300"></canvas>
                                 </div>
                                 
+                                <!-- Recent Events List (New Goal 2) -->
+                                <div class="recent-events-list" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+                                    <h6 style="margin-bottom: 10px; color: #495057;">Recent Door Events (Live Log)</h6>
+                                    <div id="recentDoorEventsList" style="max-height: 300px; overflow-y: auto; font-size: 0.9em;">
+                                        <div style="text-align: center; color: #999; padding: 10px;">Waiting for data...</div>
+                                    </div>
+                                </div>
+
                                 <!-- Detection Method Legend -->
                                 <div class="detection-legend">
                                     <div class="legend-item">

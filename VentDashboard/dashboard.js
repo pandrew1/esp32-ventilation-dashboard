@@ -3312,7 +3312,9 @@ function startAutoRefresh() {
                                                 source: 'transition',
                                                 detectionMethod: transition.detectionMethod || null,
                                                 confidence: transition.confidence || null,
-                                                confirmedByReed: transition.confirmedByReed || false
+                                                confirmedByReed: transition.confirmedByReed || false,
+                                                s7RejectReason: transition.s7_reject_reason || null,
+                                                mlProbability: transition.ml_probability || null
                                             };
                                             uniqueEvents.set(eventKey, event);
                                             const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
@@ -3438,6 +3440,10 @@ function startAutoRefresh() {
                         message: doorEvents.length === 0 ? 'No recent door activity data available - using placeholder' : null
                     };
                     
+                    // Store for re-rendering when filters change
+                    window.lastDoorsData = doorsData;
+                    window.lastDoorsHours = hours;
+
                     console.log('TIMELINE: Processed door events:', doorsData);
                     console.log('TIMELINE: Calling renderActivityTimeline with processed data');
                     renderActivityTimeline(doorsData, hours);
@@ -3457,9 +3463,34 @@ function startAutoRefresh() {
             console.log('renderActivityTimeline: Processing doors data:', doorsData);
             
             const timelineViz = document.getElementById('doorTimelineViz');
-            const timeline = doorsData.timeline || [];
+            let timeline = doorsData.timeline || [];
             const count = doorsData.count || 0;
             const doorActivity = doorsData.doorActivity || {};
+
+            // --- FILTER LOGIC ---
+            const filterClassified = document.getElementById('filterClassified')?.checked;
+            const filterS7Pass = document.getElementById('filterS7Pass')?.checked;
+            const filterReedConfirmed = document.getElementById('filterReedConfirmed')?.checked;
+
+            if (filterClassified || filterS7Pass || filterReedConfirmed) {
+                timeline = timeline.filter(event => {
+                    let keep = true;
+                    if (filterClassified) {
+                        // Keep if it has a detection method (implies classification attempt)
+                        if (!event.detectionMethod) keep = false;
+                    }
+                    if (filterS7Pass) {
+                        // Keep if S7 did NOT reject it (and it went through S7)
+                        // If s7RejectReason is present, it failed.
+                        if (event.s7RejectReason) keep = false;
+                    }
+                    if (filterReedConfirmed) {
+                        if (!event.confirmedByReed) keep = false;
+                    }
+                    return keep;
+                });
+            }
+            // --------------------
             
             // Create timeline visualization HTML
             let timelineHtml = '';
@@ -3488,7 +3519,7 @@ function startAutoRefresh() {
                                 <div style="text-align: center; padding: 20px; color: #6c757d;">
                                     <div style="font-size: 2em; margin-bottom: 10px;">📊</div>
                                     <div style="font-weight: bold; margin-bottom: 5px;">${hours}h Timeline</div>
-                                    <div style="font-size: 0.9em;">${doorsData.message || 'Loading door activity data...'}</div>
+                                    <div style="font-size: 0.9em;">${doorsData.message || 'No events match current filters'}</div>
                                 </div>
                             </div>
                         </div>
@@ -3519,6 +3550,18 @@ function startAutoRefresh() {
                         
                         <div class="timeline-chart">
                             <div class="timeline-events-scrollable">
+                                <table class="timeline-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Door</th>
+                                            <th>Action</th>
+                                            <th>Method</th>
+                                            <th>S7 Status</th>
+                                            <th>ML Prob</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                 ${timeline.map((event, index) => {
                                     // DEBUG: Log timestamp issues
                                     if (index < 5) {
@@ -3590,22 +3633,44 @@ function startAutoRefresh() {
                                         
                                         detectionMethodHtml = `<span class="detection-method" style="color: ${methodColor}; font-size: 0.8em;">${methodText} ${confidenceText}${confirmationIcon}</span>`;
                                     }
+
+                                    // --- NEW COLUMNS ---
+                                    let s7StatusHtml = '';
+                                    if (event.s7RejectReason) {
+                                        s7StatusHtml = `<span style="color: #dc3545; font-size: 0.8em;">S7 Fail: ${event.s7RejectReason}</span>`;
+                                    } else if (event.detectionMethod === 'pressure' || event.detectionMethod === 'pressure-analysis') {
+                                         s7StatusHtml = `<span style="color: #28a745; font-size: 0.8em;">S7 Pass</span>`;
+                                    }
+
+                                    let mlProbHtml = '';
+                                    if (event.mlProbability !== null && event.mlProbability !== undefined) {
+                                        mlProbHtml = `<span style="color: #6c757d; font-size: 0.8em;">${(event.mlProbability * 100).toFixed(1)}%</span>`;
+                                    }
+                                    // -------------------
                                     
                                     return `
-                                        <div class="timeline-event-compact${hasParsingError ? ' timeline-event-error' : ''}">
-                                            <div class="event-time-compact">
-                                                <span class="time">${timeStr}</span>
-                                                <span class="date">${dateStr}</span>
-                                            </div>
-                                            <div class="event-icon">${actionIcon}</div>
-                                            <div class="event-info-compact">
-                                                <span class="event-door">${event.door || 'Unknown'}</span>
-                                                <span class="event-action">${actionText}</span>
-                                                ${detectionMethodHtml}
-                                            </div>
-                                        </div>
+                                        <tr class="${hasParsingError ? 'row-error' : ''}">
+                                            <td>
+                                                <div class="time-cell">
+                                                    <span class="time">${timeStr}</span>
+                                                    <span class="date">${dateStr}</span>
+                                                </div>
+                                            </td>
+                                            <td><span class="door-name">${event.door || 'Unknown'}</span></td>
+                                            <td>
+                                                <div class="action-cell">
+                                                    <span class="action-icon">${actionIcon}</span>
+                                                    <span class="action-text">${actionText}</span>
+                                                </div>
+                                            </td>
+                                            <td>${detectionMethodHtml}</td>
+                                            <td>${s7StatusHtml}</td>
+                                            <td>${mlProbHtml}</td>
+                                        </tr>
                                     `;
                                 }).join('')}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -3818,6 +3883,60 @@ function startAutoRefresh() {
                         font-size: 0.8em;
                         color: #28a745;
                         font-weight: 500;
+                    }
+                    /* Table Styles */
+                    .timeline-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 0.85em;
+                    }
+                    .timeline-table th {
+                        text-align: left;
+                        padding: 8px;
+                        background: #e9ecef;
+                        color: #495057;
+                        font-weight: 600;
+                        position: sticky;
+                        top: 0;
+                        z-index: 10;
+                    }
+                    .timeline-table td {
+                        padding: 8px;
+                        border-bottom: 1px solid #e9ecef;
+                        vertical-align: middle;
+                    }
+                    .timeline-table tr:hover {
+                        background-color: #f1f3f4;
+                    }
+                    .time-cell {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .time-cell .time {
+                        font-weight: bold;
+                        color: #2c3e50;
+                    }
+                    .time-cell .date {
+                        font-size: 0.85em;
+                        color: #6c757d;
+                    }
+                    .door-name {
+                        font-weight: 600;
+                        color: #2c3e50;
+                    }
+                    .action-cell {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    .action-icon {
+                        font-size: 1.2em;
+                    }
+                    .action-text {
+                        text-transform: capitalize;
+                    }
+                    .row-error {
+                        background-color: #fff5f5;
                     }
                 </style>
             `;
@@ -5612,6 +5731,11 @@ function startAutoRefresh() {
                 const confirmationAnalytics = data.sections?.doors?.detectionAnalytics?.confirmationAnalytics || data.detectionAnalytics?.confirmationAnalytics;
                 updateDoorStatus(data.doors, confirmationAnalytics);
             }
+            
+            // GOAL 2: Update Recent Door Events List
+            if (data.doorTransitions && Array.isArray(data.doorTransitions)) {
+                updateRecentDoorEvents(data.doorTransitions);
+            }
 
             // Check for alerts
             checkAlerts(data);
@@ -6216,6 +6340,27 @@ function startAutoRefresh() {
             table += `<div class='summary'><strong>Incident Summary:</strong><br>${incidentSummary}</div>`;
             return table;
         }
+
+// ===================================================================
+// TIMELINE FILTER EVENT LISTENERS
+// ===================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const filterIds = ['filterClassified', 'filterS7Pass', 'filterReedConfirmed'];
+    
+    filterIds.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) {
+            checkbox.addEventListener('change', () => {
+                console.log(`Filter ${id} changed to ${checkbox.checked}`);
+                if (window.lastDoorsData && window.lastDoorsHours) {
+                    renderActivityTimeline(window.lastDoorsData, window.lastDoorsHours);
+                } else {
+                    console.warn('No door data available to re-render timeline');
+                }
+            });
+        }
+    });
+});
 
 // ===================================================================
 // CHART & VISUALIZATION FUNCTIONS
@@ -10322,3 +10467,24 @@ window.updateEnhancedStormDisplay = updateEnhancedStormDisplay;
 console.log('Enhanced storm detection display functions loaded successfully');
 window.getAuthHeaders = getAuthHeaders;
 console.log('CSV export functions exported to window');
+
+// ===================================================================
+// TIMELINE FILTER EVENT LISTENERS
+// ===================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const filterIds = ['filterClassified', 'filterS7Pass', 'filterReedConfirmed'];
+    
+    filterIds.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) {
+            checkbox.addEventListener('change', () => {
+                console.log(`Filter ${id} changed to ${checkbox.checked}`);
+                if (window.lastDoorsData && window.lastDoorsHours) {
+                    renderActivityTimeline(window.lastDoorsData, window.lastDoorsHours);
+                } else {
+                    console.warn('No door data available to re-render timeline');
+                }
+            });
+        }
+    });
+});
