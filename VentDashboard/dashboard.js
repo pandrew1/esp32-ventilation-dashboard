@@ -1967,7 +1967,7 @@ function startAutoRefresh() {
                 
                 const efficiency = efficiencyValues.length > 0 ? 
                     ((efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length) * 100).toFixed(1) : 'N/A';
-                const runtime = totalFanMinutes > 0 ? (totalFanMinutes / 60).toFixed(2) : 'N/A';
+                const runtime = totalFanMinutes >= 0 ? (totalFanMinutes / 60).toFixed(2) : 'N/A';
                 
                 // Helper function to safely update DOM elements
                 const safeUpdate = (id, text, className = null) => {
@@ -2164,11 +2164,23 @@ function startAutoRefresh() {
                         efficiency = efficiency.replace('%', '');
                     }
                     
+                    // FIX: Handle N/A efficiency gracefully
+                    if (efficiency === 'N/A' || efficiency === undefined || efficiency === null) {
+                        efficiency = 'N/A';
+                    }
+                    
                     // Calculate runtime in hours from fanMinutesToday
                     let runtimeHours = 'N/A';
-                    if (ventData.fanMinutesToday) {
-                        runtimeHours = Math.round(ventData.fanMinutesToday / 60 * 10) / 10;
-                    } else if (perfData && perfData.runtime) {
+                    // FIX: Allow 0 minutes to be displayed (don't treat as false) and check for fresh air
+                    const fanMinutes = ventData.fanMinutesToday !== undefined ? ventData.fanMinutesToday : 0;
+                    const freshAirMinutes = ventData.freshAirMinutes !== undefined ? ventData.freshAirMinutes : 0;
+                    const totalMinutes = fanMinutes + freshAirMinutes;
+                    
+                    if (ventData.fanMinutesToday !== undefined || ventData.freshAirMinutes !== undefined) {
+                        // If we have explicit minutes data, use it
+                        runtimeHours = Math.round(totalMinutes / 60 * 10) / 10;
+                    } else if (perfData && perfData.runtime !== undefined) {
+                        // Fallback to performance data runtime
                         runtimeHours = perfData.runtime;
                     }
                     
