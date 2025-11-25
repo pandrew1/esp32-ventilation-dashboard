@@ -274,7 +274,7 @@ const CONFIG = {
     currentStatusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus', // For current system specs and reliability
     historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
-    refreshInterval: 30000, // 30 seconds - check for new telemetry data
+    refreshInterval: 10000, // 10 seconds - check for new telemetry data
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
     enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
 };
@@ -1097,6 +1097,14 @@ function startAutoRefresh() {
         
         // Update dashboard with new data
         await updateDashboard(data);
+        
+        // Update Door Command Center (6-panel grid)
+        try {
+            await updateDoorCommandCenter(24);
+        } catch (e) {
+            console.error('Error updating Door Command Center:', e);
+        }
+
         updateConnectionStatus('connected');
 
         // Refresh chart data if chart is currently displayed
@@ -1302,6 +1310,14 @@ function startAutoRefresh() {
             // FIX: Await async functions to prevent race conditions
             await loadYesterdaySummaryMetrics();
             await updateEnhancedDoorActivity();
+            
+            // Initialize Door Command Center (6-panel grid)
+            try {
+                await updateDoorCommandCenter(24);
+            } catch (e) {
+                console.error('Error initializing Door Command Center:', e);
+            }
+
             await updateSystemHealthWidget();
             
             // ENHANCED: Load individual sensor data for accurate temperature readings

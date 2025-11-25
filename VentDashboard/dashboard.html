@@ -894,6 +894,192 @@
             font-size: 1em;
         }
 
+        /* Enhanced Door Command Center Styles */
+        .door-command-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .door-command-panel {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            height: 320px; /* Fixed height for consistency */
+            transition: all 0.3s ease;
+        }
+
+        .door-command-panel:hover {
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            transform: translateY(-2px);
+        }
+
+        .door-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .door-identity {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .door-icon {
+            font-size: 1.4em;
+        }
+
+        .door-name {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.95em;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-badge.open { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .status-badge.closed { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .status-badge.unknown { background: #f5f5f5; color: #616161; border: 1px solid #e0e0e0; }
+
+        .door-panel-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px;
+            margin-bottom: 10px;
+            background: #fff;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.7em;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .door-panel-history {
+            flex: 1;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 5px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f3f5;
+            font-size: 0.85em;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-time {
+            color: #495057;
+            font-family: monospace;
+        }
+
+        .history-action {
+            font-weight: 600;
+        }
+        .history-action.opened { color: #d63031; }
+        .history-action.closed { color: #27ae60; }
+
+        .history-badges {
+            display: flex;
+            gap: 3px;
+        }
+
+        .source-badge {
+            font-size: 0.7em;
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: white;
+        }
+        .source-badge.reed { background-color: #28a745; }
+        .source-badge.algo { background-color: #17a2b8; }
+        .source-badge.ml { background-color: #6f42c1; }
+
+        /* Analytics Panel Specifics */
+        .analytics-panel {
+            justify-content: space-between;
+        }
+        
+        .analytics-chart-container {
+            flex: 1;
+            position: relative;
+            min-height: 120px;
+        }
+
+        .analytics-actions {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .analytics-btn {
+            width: 100%;
+            padding: 6px;
+            font-size: 0.85em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            transition: background 0.2s;
+        }
+        .analytics-btn:hover { background: #0056b3; }
+
+        @media (max-width: 1200px) {
+            .door-command-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .door-command-grid {
+                grid-template-columns: 1fr;
+            }
+            .door-command-panel {
+                height: auto;
+                min-height: 250px;
+            }
+        }
+
         /* CSV Export Section Styles */
         .csv-export-section {
             background: #f8f9fa;
@@ -1541,23 +1727,169 @@
                         <!-- Enhanced Door Activity Section -->
                         <div class="door-activity-section">
                             <h4>🚪 Door Activity Center</h4>
-                            <div class="door-activity-grid">
-                                <div class="door-status-card">
-                                    <div class="door-count">
-                                        <span class="count-value" id="activeDoorsCount">-</span>
-                                        <span class="count-label">Active Today</span>
+                            
+                            <!-- NEW: 6-Panel Command Grid -->
+                            <div class="door-command-grid">
+                                <!-- Row 1 -->
+                                <!-- Panel 1: D2 House Door -->
+                                <div class="door-command-panel" id="panel-d2">
+                                    <div class="door-panel-header">
+                                        <div class="door-identity">
+                                            <span class="door-icon">🚪</span>
+                                            <span class="door-name">D2 House Door</span>
+                                        </div>
+                                        <span class="status-badge unknown" id="status-d2">UNKNOWN</span>
+                                    </div>
+                                    <div class="door-panel-stats">
+                                        <div class="stat-box">
+                                            <span class="stat-label">First</span>
+                                            <span class="stat-value" id="first-d2">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Last</span>
+                                            <span class="stat-value" id="last-d2">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Total</span>
+                                            <span class="stat-value" id="total-d2">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="door-panel-history" id="history-d2">
+                                        <div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">Loading...</div>
                                     </div>
                                 </div>
-                                <div class="door-status-card">
-                                    <div class="door-count">
-                                        <span class="count-value" id="totalSessionsCount">-</span>
-                                        <span class="count-label">Total Sessions</span>
+
+                                <!-- Panel 2: D1 Main Garage -->
+                                <div class="door-command-panel" id="panel-d1">
+                                    <div class="door-panel-header">
+                                        <div class="door-identity">
+                                            <span class="door-icon">🚗</span>
+                                            <span class="door-name">D1 Main Garage</span>
+                                        </div>
+                                        <span class="status-badge unknown" id="status-d1">UNKNOWN</span>
+                                    </div>
+                                    <div class="door-panel-stats">
+                                        <div class="stat-box">
+                                            <span class="stat-label">First</span>
+                                            <span class="stat-value" id="first-d1">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Last</span>
+                                            <span class="stat-value" id="last-d1">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Total</span>
+                                            <span class="stat-value" id="total-d1">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="door-panel-history" id="history-d1">
+                                        <div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">Loading...</div>
                                     </div>
                                 </div>
-                                <div class="door-status-card">
-                                    <div class="door-count">
-                                        <span class="count-value" id="lastActivityTime">--:--</span>
-                                        <span class="count-label">Last Activity</span>
+
+                                <!-- Panel 3: D3 Single Roller -->
+                                <div class="door-command-panel" id="panel-d3">
+                                    <div class="door-panel-header">
+                                        <div class="door-identity">
+                                            <span class="door-icon">🚜</span>
+                                            <span class="door-name">D3 Single Roller</span>
+                                        </div>
+                                        <span class="status-badge unknown" id="status-d3">UNKNOWN</span>
+                                    </div>
+                                    <div class="door-panel-stats">
+                                        <div class="stat-box">
+                                            <span class="stat-label">First</span>
+                                            <span class="stat-value" id="first-d3">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Last</span>
+                                            <span class="stat-value" id="last-d3">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Total</span>
+                                            <span class="stat-value" id="total-d3">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="door-panel-history" id="history-d3">
+                                        <div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">Loading...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Row 2 -->
+                                <!-- Panel 4: D4 Double Roller -->
+                                <div class="door-command-panel" id="panel-d4">
+                                    <div class="door-panel-header">
+                                        <div class="door-identity">
+                                            <span class="door-icon">🚛</span>
+                                            <span class="door-name">D4 Double Roller</span>
+                                        </div>
+                                        <span class="status-badge unknown" id="status-d4">UNKNOWN</span>
+                                    </div>
+                                    <div class="door-panel-stats">
+                                        <div class="stat-box">
+                                            <span class="stat-label">First</span>
+                                            <span class="stat-value" id="first-d4">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Last</span>
+                                            <span class="stat-value" id="last-d4">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Total</span>
+                                            <span class="stat-value" id="total-d4">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="door-panel-history" id="history-d4">
+                                        <div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">Loading...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Panel 5: House-Outside Door -->
+                                <div class="door-command-panel" id="panel-house-outside">
+                                    <div class="door-panel-header">
+                                        <div class="door-identity">
+                                            <span class="door-icon">🏠</span>
+                                            <span class="door-name">House-Outside</span>
+                                        </div>
+                                        <span class="status-badge unknown" id="status-house-outside">N/A</span>
+                                    </div>
+                                    <div class="door-panel-stats">
+                                        <div class="stat-box">
+                                            <span class="stat-label">First</span>
+                                            <span class="stat-value" id="first-house-outside">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Last</span>
+                                            <span class="stat-value" id="last-house-outside">--:--</span>
+                                        </div>
+                                        <div class="stat-box">
+                                            <span class="stat-label">Total</span>
+                                            <span class="stat-value" id="total-house-outside">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="door-panel-history" id="history-house-outside">
+                                        <div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">Loading...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Panel 6: Analytics & Tools -->
+                                <div class="door-command-panel analytics-panel">
+                                    <div class="door-panel-header">
+                                        <div class="door-identity">
+                                            <span class="door-icon">📊</span>
+                                            <span class="door-name">Analytics & Tools</span>
+                                        </div>
+                                    </div>
+                                    <div class="analytics-chart-container">
+                                        <canvas id="confidencePieChart"></canvas>
+                                    </div>
+                                    <div class="analytics-actions">
+                                        <div style="font-size:0.8em; color:#666; text-align:center; margin-bottom:5px;">
+                                            ML Confidence: <strong id="ml-confidence-avg">--%</strong>
+                                        </div>
+                                        <button class="analytics-btn" onclick="exportPressureAnalysisCSV()">
+                                            📥 Export CSV Data
+                                        </button>
                                     </div>
                                 </div>
                             </div>
