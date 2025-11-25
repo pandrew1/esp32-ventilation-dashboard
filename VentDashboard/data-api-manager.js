@@ -68,12 +68,35 @@ export class DataManager {
             return cached.data;
         }
         
-        console.log(`DataManager: Fetching fresh history data for ${hours}h via snapshot`);
-        // Use snapshot instead of direct call
-        const snapshot = await this.getDashboardSnapshot(forceRefresh, hours);
-        const data = snapshot.history;
+        let data;
         
-        if (!data) throw new Error('History data missing from snapshot');
+        // DECISION: Use GetVentilationHistory for long-term data (>24h)
+        // Use GetDashboardSnapshot for short-term data (<=24h) which includes status/etc
+        if (hours > 24) {
+            console.log(`DataManager: Fetching long-term history data for ${hours}h via GetVentilationHistory`);
+            const historyUrl = this.config.historyApiUrl || 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory';
+            const endpoint = `${historyUrl}?deviceId=ESP32-Ventilation-01&hours=${hours}`;
+            
+            try {
+                const response = await this._deduplicatedFetch(endpoint, `history-${hours}`);
+                if (response && response.data && Array.isArray(response.data)) {
+                    data = response.data;
+                    console.log(`DataManager: Successfully fetched ${data.length} history items`);
+                } else {
+                    throw new Error('Invalid response format from GetVentilationHistory');
+                }
+            } catch (error) {
+                console.error(`DataManager: Failed to fetch long-term history:`, error);
+                throw error; // Propagate error, do not fallback to snapshot
+            }
+        } else {
+            console.log(`DataManager: Fetching fresh history data for ${hours}h via snapshot`);
+            // Use snapshot instead of direct call
+            const snapshot = await this.getDashboardSnapshot(forceRefresh, hours);
+            data = snapshot.history;
+        }
+        
+        if (!data) throw new Error('History data missing');
         
         this.cache.historyData.set(cacheKey, {
             data,
@@ -125,41 +148,6 @@ export class DataManager {
         if (useCache && !forceRefresh && cache.data && Date.now() - cache.timestamp < cache.ttl) {
             console.log('DataManager: Using cached snapshot data');
             return cache.data;
-        }
-
-        // Try to fetch from history API if requesting > 24 hours
-        if (hours > 24) {
-            try {
-                console.log(`DataManager: Attempting to fetch long-term history (${hours}h) from GetVentilationHistory`);
-                const historyUrl = this.config.historyApiUrl || 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory';
-                const endpoint = `${historyUrl}?deviceId=ESP32-Ventilation-01&hours=${hours}`;
-                
-                // Use the dashboard's authentication system
-                const headers = DashboardUtils.getAuthHeaders();
-                
-                const response = await fetch(endpoint, { headers });
-                
-                if (response.ok) {
-                    const historyData = await response.json();
-                    if (historyData.data && Array.isArray(historyData.data)) {
-                        console.log(`DataManager: Successfully fetched ${historyData.data.length} items from GetVentilationHistory`);
-                        
-                        // Construct a snapshot-like object
-                        const snapshot = {
-                            ...historyData,
-                            history: historyData.data, // Map 'data' to 'history'
-                            fromHistoryApi: true
-                        };
-                        
-                        // We don't cache long-term history in the snapshot slot
-                        return snapshot;
-                    }
-                } else {
-                    console.warn(`DataManager: GetVentilationHistory returned ${response.status}`);
-                }
-            } catch (e) {
-                console.warn('DataManager: Failed to fetch from GetVentilationHistory, falling back to snapshot', e);
-            }
         }
         
         console.log(`DataManager: Fetching fresh dashboard snapshot (hours=${hours})`);
