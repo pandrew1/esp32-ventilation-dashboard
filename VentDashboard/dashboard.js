@@ -1112,13 +1112,13 @@ function startAutoRefresh() {
 // This will be populated with more functions as we extract them from the HTML file
 // For now, let's add placeholders for the main functions we know exist
 
-// Main data refresh function
-/**
- * Refreshes all dashboard data by fetching current status and updating displays
- * Uses DataManager to fetch status data and updates all dashboard widgets
- * Updates last refresh time and handles authentication requirements
- * @returns {Promise<void>}
- */
+        // Main data refresh function
+        /**
+         * Refreshes all dashboard data by fetching current status and updating displays
+         * Uses DataManager to fetch status data and updates all dashboard widgets
+         * Updates last refresh time and handles authentication requirements
+         * @returns {Promise<void>}
+         */
         async function refreshData() {
             Logger.log('🔍 DEBUG: === REFRESHING DASHBOARD DATA (SNAPSHOT) ===');
             
@@ -1133,11 +1133,15 @@ function startAutoRefresh() {
                     return;
                 }
 
+                // Use GlobalDataManager if available (Modular System), otherwise fallback to local DataManager
+                const dataManager = GlobalDataManager || DataManager;
+                
                 // Use consolidated DataManager to get snapshot
-                const snapshot = await DataManager.getDashboardSnapshot();
+                const snapshot = await dataManager.getDashboardSnapshot();
                 Logger.log('DataManager: Dashboard snapshot retrieved successfully');
                 
                 // Populate caches from snapshot to avoid redundant calls
+                // Note: GlobalDataManager handles its own caching, but we update DashboardState for legacy compatibility
                 if (snapshot.history) {
                      DashboardState.cache.historyData.set('hours_24', {
                         data: snapshot.history,
@@ -1149,6 +1153,10 @@ function startAutoRefresh() {
                 // Update dashboard with status data from snapshot
                 if (snapshot.status) {
                     await updateDashboard(snapshot.status);
+                    // Emit event for modular system listeners
+                    if (GlobalEventSystem) {
+                        GlobalEventSystem.emit('data:updated', { type: 'status', snapshot: true });
+                    }
                 }
                 
                 // Update Door Command Center (6-panel grid)
@@ -1189,9 +1197,7 @@ function startAutoRefresh() {
                 showNoDataState();
                 updateConnectionStatus('disconnected');
             }
-        }
-
-// Note: These functions are implemented later in this file
+        }// Note: These functions are implemented later in this file
 
 // Initialize when DOM is ready
 // (Removed duplicate initialization - using the one with enhanced API calls in the code below)
@@ -1332,14 +1338,9 @@ function startAutoRefresh() {
                 window.dataSourceTracker.clearAll();
             }
             
-            // Load dashboard components with modular enhancement
-            if (GlobalDataManager) {
-                // Use enhanced data manager
-                await refreshDataWithModularSystem();
-            } else {
-                // Fallback to legacy data refresh
-                await refreshData();
-            }
+            // Load dashboard components with unified refresh logic
+            // This ensures initial load and auto-refresh use the exact same code path
+            await refreshData();
             
             // Load charts with modular enhancement
             if (GlobalChartManager) {
@@ -1383,46 +1384,7 @@ function startAutoRefresh() {
         // STAGE 5: MODULAR SYSTEM INTEGRATION FUNCTIONS
         // ===================================================================
 
-        /**
-         * Refreshes dashboard data using the modular system architecture
-         * Uses GlobalDataManager for data fetching with intelligent caching
-         * Updates main display, door status, incidents, and emits events
-         * @returns {Promise<void>}
-         */
-        async function refreshDataWithModularSystem() {
-            Logger.log('=== STAGE 5: Using enhanced DataManager for data refresh (Snapshot) ===');
-            
-            try {
-                // Use the modular DataManager with caching
-                const snapshot = await GlobalDataManager.getDashboardSnapshot();
-                
-                if (snapshot.status) {
-                    await updateDashboard(snapshot.status);
-                    GlobalEventSystem.emit('data:updated', { type: 'status', snapshot: true });
-                }
-                
-                // Populate caches
-                if (snapshot.history) {
-                     DashboardState.cache.historyData.set('hours_24', {
-                        data: snapshot.history,
-                        timestamp: Date.now(),
-                        ttl: 45000
-                    });
-                }
-                
-                // Subscribe to future updates
-                GlobalDataManager.subscribe('snapshot', async (data) => {
-                    Logger.log('STAGE 5: Snapshot data subscription update received');
-                    if (data.status) {
-                        await updateDashboard(data.status);
-                    }
-                });
-                
-            } catch (error) {
-                Logger.error('STAGE 5: Enhanced data refresh failed, falling back to legacy:', error);
-                await refreshData(); // Fallback to legacy function
-            }
-        }
+        // refreshDataWithModularSystem removed - unified into refreshData()
 
         /**
          * Loads and updates charts using the modular system architecture
@@ -7262,6 +7224,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Function to refresh the currently displayed chart without changing time period
         async function refreshCurrentChart() {
+            // Use Modular Chart Manager if available
+            if (GlobalChartManager) {
+                if (temperatureChart) {
+                    await GlobalChartManager.updateTemperatureChart(currentChartHours, temperatureChart);
+                }
+                if (pressureChart) {
+                    await GlobalChartManager.updatePressureChart(currentPressureChartHours, pressureChart);
+                }
+                return;
+            }
+
+            // Fallback to legacy chart refresh
             if (temperatureChart) {
                 // Check if there's new chart data before refreshing
                 await checkAndRefreshChart(currentChartHours);
