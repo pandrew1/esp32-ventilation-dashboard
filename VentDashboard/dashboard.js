@@ -274,7 +274,7 @@ const CONFIG = {
     currentStatusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus', // For current system specs and reliability
     historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
-    refreshInterval: 10000, // 10 seconds - check for new telemetry data
+    refreshInterval: 15000, // 15 seconds - check for new telemetry data
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
     enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
 };
@@ -2410,8 +2410,6 @@ function startAutoRefresh() {
          * @param {number} hours - Time range in hours
          */
         async function updateDoorCommandCenter(hours = 24) {
-            console.log('=== STAGE 3b: updateDoorCommandCenter() ===');
-            
             // Check auth
             const headers = getAuthHeaders();
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
@@ -2430,7 +2428,6 @@ function startAutoRefresh() {
             try {
                 const cacheBuster = Date.now();
                 const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`;
-                console.log(`🚪 COMMAND CENTER: Fetching data from ${apiUrl}`);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
@@ -2440,9 +2437,6 @@ function startAutoRefresh() {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 
-                console.log('🚪 COMMAND CENTER: Data received', data);
-                console.log('🚪 COMMAND CENTER: Zone Activity Keys:', data.zoneActivity ? Object.keys(data.zoneActivity) : 'None');
-
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
                 const doorMap = {
@@ -2477,8 +2471,6 @@ function startAutoRefresh() {
                 // Update panels based on zoneActivity
                 if (data.zoneActivity) {
                     Object.entries(data.zoneActivity).forEach(([zoneName, stats]) => {
-                        console.log(`🚪 Processing zone: ${zoneName}`, stats);
-                        
                         // Determine which panel corresponds to this zone
                         let suffix = null;
                         // Improved matching logic to handle various API response formats
@@ -2490,8 +2482,6 @@ function startAutoRefresh() {
                         else if (name.includes('house-outside') || name.includes('house outside')) suffix = 'house-outside';
                         
                         if (suffix) {
-                            console.log(`   -> Matched to panel: ${suffix}`);
-                            
                             // Update Status
                             const statusEl = document.getElementById(`status-${suffix}`);
                             if (statusEl) {
@@ -2530,8 +2520,6 @@ function startAutoRefresh() {
                             if (historyEl) {
                                 historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
                             }
-                        } else {
-                            console.warn(`   -> No panel match found for zone: ${zoneName}`);
                         }
                     });
                 } else {
