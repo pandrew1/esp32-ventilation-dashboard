@@ -284,8 +284,6 @@ function getApiKeyFromUrl() {
 // Configuration - Replace with your actual Azure Function URLs
 const CONFIG = {
     statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData', // For analytics and aggregated data
-    currentStatusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus', // For current system specs and reliability
-    historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 15000, // 15 seconds - check for new telemetry data
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
@@ -793,17 +791,16 @@ const DataManager = {
         console.log(`DataManager: Fetching fresh history data for ${hours}h`);
         
         try {
-            const url = `${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: DashboardUtils.getAuthHeaders()
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Use snapshot instead of direct call to deprecated API
+            // const url = `${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`;
+            
+            // Fetch via snapshot (always gets 24h)
+            const snapshot = await this.getDashboardSnapshot(forceRefresh);
+            const data = snapshot.history;
+            
+            if (!data) {
+                throw new Error('History data missing from snapshot');
             }
-
-            const data = await response.json();
             
             // Cache the response
             historyCache.set(cacheKey, {
@@ -815,7 +812,7 @@ const DataManager = {
             // Notify all subscribers
             this._notifySubscribers('history', { hours, data });
 
-            console.log(`DataManager: History data (${hours}h) fetched and cached successfully`);
+            console.log(`DataManager: History data (${hours}h) extracted from snapshot successfully`);
             return data;
 
         } catch (error) {
@@ -919,24 +916,23 @@ const DataManager = {
         console.log('DataManager: Fetching fresh current system status');
         
         try {
-            const url = `${CONFIG.currentStatusApiUrl}?deviceId=${CONFIG.deviceId}`;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: DashboardUtils.getAuthHeaders()
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Use snapshot instead of direct call to deprecated API
+            // const url = `${CONFIG.currentStatusApiUrl}?deviceId=${CONFIG.deviceId}`;
+            
+            // Fetch via snapshot
+            const snapshot = await this.getDashboardSnapshot(forceRefresh);
+            const data = snapshot.status;
+            
+            if (!data) {
+                throw new Error('Status data missing from snapshot');
             }
-
-            const data = await response.json();
             
             // Cache the response
             cache.data = data;
             cache.timestamp = now;
             DashboardState.cache.currentStatus = cache;
 
-            console.log('DataManager: Current system status fetched and cached successfully');
+            console.log('DataManager: Current system status extracted from snapshot successfully');
             return data;
 
         } catch (error) {
@@ -5173,7 +5169,7 @@ function startAutoRefresh() {
             // SKIP if we already have the data (from snapshot)
             if (!data.sections || !data.reliability) {
                 try {
-                    console.log('🔍 DEBUG: Fetching current system status from GetVentilationStatus');
+                    console.log('🔍 DEBUG: Fetching current system status via DataManager (Snapshot)');
                     const currentStatus = await DataManager.getCurrentSystemStatus();
                     
                     // Merge current system status into the main data structure
@@ -5210,9 +5206,10 @@ function startAutoRefresh() {
             let sensors = {};
             
             // First try to get current sensor data from recent history
-            console.log('🔍 DEBUG: Attempting to fetch current sensor readings from GetVentilationHistory');
+            // OPTIMIZATION: Use 24h history which is already cached by GetDashboardSnapshot
+            console.log('🔍 DEBUG: Attempting to fetch current sensor readings from cached history');
             try {
-                const historyResponse = await DataManager.getHistoryData(1); // Get last 1 hour
+                const historyResponse = await DataManager.getHistoryData(24); // Use cached 24h data instead of fetching 1h
                 if (historyResponse && historyResponse.data && historyResponse.data.length > 0) {
                     // 🐛 FIX: Azure returns data in reverse chronological order (newest first), so use index 0
                     const latestReading = historyResponse.data[0]; // Get the FIRST item (most recent)
@@ -7285,21 +7282,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                });
+                // Use DataManager to get history data (which uses snapshot)
+                const historyResponse = await DataManager.getHistoryData(hours);
                 
-                if (!response.ok) {
-                    // Don't refresh chart if API fails
-                    return;
-                }
-                
-                const data = await response.json();
-                if (!data.data || data.data.length === 0) {
+                if (!historyResponse || !historyResponse.data || historyResponse.data.length === 0) {
                     // No data available, don't refresh
                     return;
                 }
+                
+                const data = historyResponse; // DataManager returns { data: [...] } structure
 
                 // Get the latest timestamp from the new data
                 const latestDataPoint = data.data[0]; // API returns newest first
@@ -8396,42 +8387,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     return null;
                 }
 
-                // Use new monthly aggregation endpoint for better performance
-                const response = await fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&aggregation=monthly&months=12`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                });
-                
-                if (!response.ok) {
-                    console.error('Monthly aggregation API failed, falling back to raw data');
-                    window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Fallback to Legacy', 'API failed, using raw data');
-                    return await fetchTemperatureDataForTrendsLegacy();
-                }
-                
-                const data = await response.json();
-                if (data.data && data.data.length > 0) {
-                    // Track successful use of server-side aggregation
-                    window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Azure Functions API', `${data.data.length} pre-calculated months`);
-                    
-                    // Track each month's data source
-                    data.data.forEach(monthData => {
-                        const yearMonth = `${monthData.Year}-${String(monthData.Month).padStart(2, '0')}`;
-                        window.dataSourceTracker.trackMonthlySource(yearMonth, 'Azure Table', `${monthData.TotalDataPoints} data points`);
-                    });
-                    
-                    // Convert monthly aggregated data to format expected by existing functions
-                    return convertMonthlyStatsToTemperatureData(data.data);
-                }
-                
-                console.log('No monthly aggregated data available');
-                window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'No Data', 'No pre-calculated data available');
+                // TODO: Implement monthly aggregation in GetEnhancedDashboardData or GetDashboardSnapshot
+                // The old GetVentilationHistory API is deprecated and removed.
+                // For now, we return null as we cannot fetch 12 months of data via the snapshot API (which is limited to 24h).
+                console.log('Monthly aggregation data not currently available via Snapshot API');
+                window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Not Available', 'Pending backend implementation');
                 return null;
                 
             } catch (error) {
                 console.error('Error fetching monthly aggregated temperature data:', error);
-                window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Error - Fallback', error.message);
-                // Fallback to legacy method
-                return await fetchTemperatureDataForTrendsLegacy();
+                window.dataSourceTracker.trackTemperatureSource('Monthly Trends', 'Error', error.message);
+                return null;
             }
         }
 
@@ -8519,102 +8485,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Converted ${monthlyStats.length} monthly stats to ${temperatureData.length} temperature data points`);
             
             return temperatureData;
-        }
-
-        // Legacy temperature data fetching (fallback)
-        async function fetchTemperatureDataForTrendsLegacy() {
-            try {
-                const token = localStorage.getItem('ventilation_auth_token');
-                
-                if (!token && !CONFIG.apiSecret) {
-                    window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'No Auth', 'Authentication required');
-                    return null;
-                }
-
-                // Fetch temperature data from multiple time windows to get broader coverage
-                const responses = await Promise.all([
-                    fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=48`, {
-                        method: 'GET',
-                        headers: getAuthHeaders()
-                    }),
-                    fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=168`, { // 7 days
-                        method: 'GET',
-                        headers: getAuthHeaders()
-                    }),
-                    fetch(`${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=720`, { // 30 days
-                        method: 'GET',
-                        headers: getAuthHeaders()
-                    })
-                ]);
-                
-                // Combine all valid responses
-                let allTemperatureData = [];
-                for (const response of responses) {
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.data && data.data.length > 0) {
-                            allTemperatureData = allTemperatureData.concat(data.data);
-                        }
-                    }
-                }
-                
-                // Remove duplicates based on timestamp and filter valid data
-                const uniqueData = [];
-                const seenTimestamps = new Set();
-                
-                allTemperatureData.forEach(item => {
-                    const timestampKey = item.timestamp;
-                    if (!seenTimestamps.has(timestampKey) && isValidTemperatureReading(item)) {
-                        seenTimestamps.add(timestampKey);
-                        uniqueData.push(item);
-                    }
-                });
-                
-                console.log(`Legacy temperature data: ${uniqueData.length} unique data points`);
-                
-                // Track legacy data usage and analyze months
-                if (uniqueData.length > 0) {
-                    // Group data by month to show which months are JavaScript calculated
-                    const monthlyGroups = {};
-                    uniqueData.forEach(item => {
-                        let date;
-                        if (typeof item.timestamp === 'string') {
-                            if (item.timestamp.includes('T') || item.timestamp.includes('-')) {
-                                date = new Date(item.timestamp);
-                            } else {
-                                const unixSeconds = parseInt(item.timestamp);
-                                date = new Date(unixSeconds * 1000);
-                            }
-                        } else {
-                            date = new Date(item.timestamp * 1000);
-                        }
-                        
-                        if (!isNaN(date.getTime())) {
-                            const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                            if (!monthlyGroups[yearMonth]) {
-                                monthlyGroups[yearMonth] = 0;
-                            }
-                            monthlyGroups[yearMonth]++;
-                        }
-                    });
-                    
-                    // Track each month as JavaScript calculated
-                    Object.entries(monthlyGroups).forEach(([yearMonth, count]) => {
-                        window.dataSourceTracker.trackMonthlySource(yearMonth, 'JavaScript', `${count} raw data points`);
-                    });
-                    
-                    window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'Raw Data Processing', `${uniqueData.length} points from ${Object.keys(monthlyGroups).length} months`);
-                } else {
-                    window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'No Data', 'No valid temperature data found');
-                }
-                
-                return uniqueData;
-                
-            } catch (error) {
-                console.error('Error fetching legacy temperature data:', error);
-                window.dataSourceTracker.trackTemperatureSource('Legacy Fallback', 'Error', error.message);
-                return null;
-            }
         }
 
         // Helper function to validate temperature readings

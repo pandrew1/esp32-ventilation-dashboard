@@ -9,8 +9,6 @@ const getApiConfig = () => {
     }
     // Fallback configuration
     return {
-        statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
-        historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
         enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
         doorAnalyticsApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics',
         snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot'
@@ -46,8 +44,12 @@ export class DataManager {
             return cache.data;
         }
         
-        console.log('DataManager: Fetching fresh status data');
-        const data = await this._deduplicatedFetch(this.config.statusApiUrl, 'status');
+        console.log('DataManager: Fetching fresh status data via snapshot');
+        // Use snapshot instead of direct call
+        const snapshot = await this.getDashboardSnapshot(forceRefresh);
+        const data = snapshot.status;
+        
+        if (!data) throw new Error('Status data missing from snapshot');
         
         cache.data = data;
         cache.timestamp = Date.now();
@@ -65,8 +67,12 @@ export class DataManager {
             return cached.data;
         }
         
-        console.log(`DataManager: Fetching fresh history data for ${hours}h`);
-        const data = await this._deduplicatedFetch(`${this.config.historyApiUrl}?hours=${hours}`, `history-${hours}`);
+        console.log(`DataManager: Fetching fresh history data for ${hours}h via snapshot`);
+        // Use snapshot instead of direct call
+        const snapshot = await this.getDashboardSnapshot(forceRefresh);
+        const data = snapshot.history;
+        
+        if (!data) throw new Error('History data missing from snapshot');
         
         this.cache.historyData.set(cacheKey, {
             data,
