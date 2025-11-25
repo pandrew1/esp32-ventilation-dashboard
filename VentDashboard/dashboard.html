@@ -2398,6 +2398,15 @@
                                     <span class="door-name">Analytics & Tools</span>
                                 </div>
                             </div>
+                            
+                            <!-- Algorithm Performance Stats -->
+                            <div id="algoPerformanceStats" style="padding: 10px; font-size: 0.9em; border-bottom: 1px solid #eee; margin-bottom: 10px;">
+                                <div style="display:flex; justify-content:space-between;"><span>Total Events:</span> <strong id="perf-total">0</strong></div>
+                                <div style="display:flex; justify-content:space-between; color:#28a745;"><span>Pressure Detected:</span> <strong id="perf-detected">0</strong></div>
+                                <div style="display:flex; justify-content:space-between; color:#dc3545;"><span>Missed:</span> <strong id="perf-missed">0</strong></div>
+                                <div style="display:flex; justify-content:space-between; color:#e0a800;"><span>False Negatives:</span> <strong id="perf-fn">0</strong></div>
+                            </div>
+
                             <div class="analytics-chart-container">
                                 <canvas id="confidencePieChart"></canvas>
                             </div>

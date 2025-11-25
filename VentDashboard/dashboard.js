@@ -2461,6 +2461,14 @@ function startAutoRefresh() {
                 const confidenceStats = {
                     high: 0, medium: 0, low: 0, reed: 0, total: 0, sum: 0
                 };
+                
+                // Performance Stats
+                const perfStats = {
+                    total: 0,
+                    detected: 0,
+                    missed: 0,
+                    fn: 0
+                };
 
                 if (historyData && historyData.data) {
                     historyData.data.forEach(record => {
@@ -2496,6 +2504,18 @@ function startAutoRefresh() {
                                         confidenceStats.reed++;
                                         confidenceStats.total++;
                                         confidenceStats.sum += 1.0;
+                                        
+                                        // Update Performance Stats for Reed
+                                        perfStats.total++;
+                                        if (t.s7RejectReason === 'PASS') {
+                                            perfStats.detected++;
+                                        } else if (t.s7RejectReason === 'REED_ONLY' || (t.s7RejectReason && t.s7RejectReason !== '')) {
+                                            perfStats.missed++;
+                                            if (t.mlProbability > 0.7) perfStats.fn++;
+                                        } else {
+                                            // Legacy or no S7 data
+                                            perfStats.detected++;
+                                        }
                                     } else if (t.detectionMethod === 'pressure-analysis' || t.detectionMethod === 'pressure') {
                                         const conf = t.confidence || 0;
                                         // Match thresholds with updateConfidenceChart: High >= 0.9, Medium >= 0.5
@@ -2505,6 +2525,10 @@ function startAutoRefresh() {
                                         
                                         confidenceStats.total++;
                                         confidenceStats.sum += conf;
+                                        
+                                        // Pressure events are detected
+                                        perfStats.total++;
+                                        perfStats.detected++;
                                     }
                                 }
                             });
@@ -2512,12 +2536,25 @@ function startAutoRefresh() {
                     });
                 }
                 
-                // Sort events by timestamp descending
+                // Update Performance Stats DOM
+                const perfTotalEl = document.getElementById('perf-total');
+                if (perfTotalEl) perfTotalEl.textContent = perfStats.total;
+                
+                const perfDetectedEl = document.getElementById('perf-detected');
+                if (perfDetectedEl) perfDetectedEl.textContent = perfStats.detected;
+                
+                const perfMissedEl = document.getElementById('perf-missed');
+                if (perfMissedEl) perfMissedEl.textContent = perfStats.missed;
+                
+                const perfFnEl = document.getElementById('perf-fn');
+                if (perfFnEl) perfFnEl.textContent = perfStats.fn;
+                
+                // Sort events by timestamp DESCENDING (Newest First)
                 Object.keys(doorEvents).forEach(key => {
                     doorEvents[key].sort((a, b) => {
                         const tA = typeof a.timestamp === 'string' ? parseFloat(a.timestamp) : a.timestamp;
                         const tB = typeof b.timestamp === 'string' ? parseFloat(b.timestamp) : b.timestamp;
-                        return tB - tA;
+                        return tB - tA; // Descending
                     });
                 });
 
@@ -2592,14 +2629,34 @@ function startAutoRefresh() {
                             }
 
                             // Update Stats
+                            const events = doorEvents[suffix]; // Get events for this door
+                            
                             const firstEl = document.getElementById(`first-${suffix}`);
-                            if (firstEl && stats.firstActivity) {
-                                firstEl.textContent = new Date(stats.firstActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            if (firstEl) {
+                                if (events && events.length > 0) {
+                                     // Events are sorted Descending (Newest first)
+                                     // "First" header usually means "First event of the day" (Oldest)
+                                     // So we take the LAST item in the list
+                                     const oldestEvt = events[events.length - 1];
+                                     const firstTs = oldestEvt.timestamp > 10000000000 ? oldestEvt.timestamp : oldestEvt.timestamp * 1000;
+                                     firstEl.textContent = new Date(firstTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                } else if (stats.firstActivity) {
+                                    firstEl.textContent = new Date(stats.firstActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                }
                             }
                             
                             const lastEl = document.getElementById(`last-${suffix}`);
-                            if (lastEl && stats.lastActivity) {
-                                lastEl.textContent = new Date(stats.lastActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            if (lastEl) {
+                                if (events && events.length > 0) {
+                                     // Events are sorted Descending (Newest first)
+                                     // "Last" header usually means "Last event of the day" (Newest)
+                                     // So we take the FIRST item in the list
+                                     const newestEvt = events[0];
+                                     const lastTs = newestEvt.timestamp > 10000000000 ? newestEvt.timestamp : newestEvt.timestamp * 1000;
+                                     lastEl.textContent = new Date(lastTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                } else if (stats.lastActivity) {
+                                    lastEl.textContent = new Date(stats.lastActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                }
                             }
                             
                             const totalEl = document.getElementById(`total-${suffix}`);
@@ -2610,9 +2667,8 @@ function startAutoRefresh() {
                             // Update History (List of recent events) - NOW USING FULL HISTORY DATA
                             const historyEl = document.getElementById(`history-${suffix}`);
                             if (historyEl) {
-                                const events = doorEvents[suffix];
                                 if (events && events.length > 0) {
-                                    let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.75em;">';
+                                    let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.85em;">';
                                     events.forEach(evt => {
                                         // Handle timestamp (seconds or ms)
                                         const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
@@ -2626,28 +2682,45 @@ function startAutoRefresh() {
                                         const confStr = (method === 'ML' && confPercent > 0) ? `(${confPercent}%)` : '';
                                         
                                         // Format ML Probability
-                                        let mlInfo = '';
+                                        let mlInfoText = '';
                                         if (evt.mlProbability !== undefined && evt.mlProbability !== null) {
                                             const mlProb = (evt.mlProbability * 100).toFixed(1);
-                                            mlInfo = `<div style="font-size:0.85em; color:#666;">ML: ${mlProb}%</div>`;
+                                            mlInfoText = `ML: ${mlProb}%`;
                                         }
                                         
-                                        // Format S7 Status
-                                        let s7Info = '';
-                                        if (evt.s7RejectReason) {
-                                            s7Info = `<div style="font-size:0.85em; color:#dc3545;">S7 Fail: ${evt.s7RejectReason}</div>`;
+                                        // Format S7 Status & Warning Icon
+                                        let s7InfoText = '';
+                                        let s7Color = '';
+                                        let warningIcon = '';
+                                        
+                                        if (evt.s7RejectReason === 'PASS') {
+                                            s7InfoText = 'Pressure Confirmed';
+                                            s7Color = '#28a745';
+                                        } else if (evt.s7RejectReason === 'REED_ONLY') {
+                                            warningIcon = `<span title="Pressure Missed: No candidate found" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
+                                            s7InfoText = 'Pressure Missed';
+                                            s7Color = '#dc3545';
+                                        } else if (evt.s7RejectReason) {
+                                            // Specific rejection reason
+                                            const mlScore = evt.mlProbability !== undefined ? (evt.mlProbability * 100).toFixed(1) + '%' : 'N/A';
+                                            warningIcon = `<span title="Pressure Missed: Rejected by S7 (${evt.s7RejectReason}), ML Score: ${mlScore}" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
+                                            s7InfoText = `Missed (${evt.s7RejectReason})`;
+                                            s7Color = '#dc3545';
                                         } else if (method === 'ML') {
-                                            s7Info = `<div style="font-size:0.85em; color:#28a745;">S7 Pass</div>`;
+                                            s7InfoText = `S7 Pass`;
+                                            s7Color = '#28a745';
                                         }
                                         
-                                        html += `<li style="padding:6px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                        html += `<li style="padding:8px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
                                             <div>
-                                                <div>${timeStr} <strong>${action}</strong></div>
+                                                <span style="color:#666; margin-right:5px;">${timeStr}</span> 
+                                                <strong style="font-size:1.1em;">${action}</strong>
                                             </div>
                                             <div style="text-align:right;">
-                                                <div style="color:${color}; font-weight:bold;">${method} ${confStr}</div>
-                                                ${mlInfo}
-                                                ${s7Info}
+                                                ${warningIcon}
+                                                <span style="color:${color}; font-weight:bold; margin-right:8px;">${method} ${confStr}</span>
+                                                ${mlInfoText ? `<span style="color:#666; margin-right:8px; font-size:0.9em;">${mlInfoText}</span>` : ''}
+                                                ${s7InfoText ? `<span style="color:${s7Color}; font-size:0.9em;">${s7InfoText}</span>` : ''}
                                             </div>
                                         </li>`;
                                     });
@@ -2656,7 +2729,7 @@ function startAutoRefresh() {
                                 } else {
                                     // Fallback to analytics recentEvents if history data is empty
                                     if (stats.recentEvents && stats.recentEvents.length > 0) {
-                                        let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.75em;">';
+                                        let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.85em;">';
                                         stats.recentEvents.forEach(evt => {
                                             const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
                                             const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -2664,15 +2737,20 @@ function startAutoRefresh() {
                                             const method = evt.method === 'reed-switch' ? 'Reed' : 'ML';
                                             const color = evt.method === 'reed-switch' ? '#28a745' : '#17a2b8';
                                             
-                                            html += `<li style="padding:3px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
-                                                <span>${timeStr} <strong>${action}</strong></span>
-                                                <span style="color:${color}; font-weight:bold;">${method}</span>
+                                            html += `<li style="padding:8px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                                <div>
+                                                    <span style="color:#666; margin-right:5px;">${timeStr}</span> 
+                                                    <strong style="font-size:1.1em;">${action}</strong>
+                                                </div>
+                                                <div style="text-align:right;">
+                                                    <span style="color:${color}; font-weight:bold;">${method}</span>
+                                                </div>
                                             </li>`;
                                         });
                                         html += '</ul>';
                                         historyEl.innerHTML = html;
                                     } else {
-                                        historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
+                                        historyEl.innerHTML = `<div style="font-size:0.9em; color:#666; padding:10px;">${stats.count || 0} events today</div>`;
                                     }
                                 }
                             }
