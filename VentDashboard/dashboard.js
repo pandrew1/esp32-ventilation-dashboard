@@ -253,7 +253,8 @@ const ChartUtils = {
     },
 
     updateActiveButton(containerSelector, hours, functionName) {
-        document.querySelectorAll(`${containerSelector} .time-btn`).forEach(btn => {
+        const selector = containerSelector ? `${containerSelector} .time-btn` : '.time-btn';
+        document.querySelectorAll(selector).forEach(btn => {
             const onclick = btn.getAttribute('onclick');
             if (onclick && onclick.includes(functionName)) {
                 btn.classList.remove('active');
@@ -6880,14 +6881,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'No Data', 'API returned empty data set');
                 }
-                updateChart(historyData, hours);
+                return updateChart(historyData, hours);
                 
             } catch (error) {
                 Logger.error('DataManager: Error loading history data for temperature chart:', error);
                 // Show empty chart instead of mock data
                 showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
                 window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Network Error', error.message);
-                updateChart([], hours);
+                return updateChart([], hours);
             }
         }
 
@@ -6963,15 +6964,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         Logger.log(`Pressure chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
                     }
                     latestPressureDataTimestamp = newLatestTimestamp;
-                    updatePressureChart(pressureData, hours);
+                    return updatePressureChart(pressureData, hours);
                 } else {
                     Logger.log('Pressure chart: No new data points, skipping refresh to avoid unnecessary animations');
+                    return pressureChart;
                 }
                 
             } catch (error) {
                 Logger.error('DataManager: Error loading history data for pressure chart:', error);
                 showApiFailureNotice(`Network error loading pressure chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
-                updatePressureChart([], hours);
+                return updatePressureChart([], hours);
             }
         }
 
