@@ -2427,15 +2427,21 @@ function startAutoRefresh() {
 
             try {
                 const cacheBuster = Date.now();
-                const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`;
                 
-                const response = await fetch(apiUrl, {
+                // Fetch both Status (Analytics) and History data in parallel
+                // 1. Status Data (for current state and summary stats)
+                const analyticsPromise = fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
                     method: 'GET',
                     headers: { ...headers }
+                }).then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
                 });
-
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
+                
+                // 2. History Data (for scrolling event lists and pie chart calculation)
+                const historyPromise = DataManager.getHistoryData(hours);
+                
+                const [analyticsData, historyData] = await Promise.all([analyticsPromise, historyPromise]);
                 
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
@@ -2446,6 +2452,71 @@ function startAutoRefresh() {
                     'D4': 'd4',
                     'House-Outside': 'house-outside'
                 };
+
+                // Process History Data for Events List and Confidence Distribution
+                const doorEvents = {
+                    'd1': [], 'd2': [], 'd3': [], 'd4': [], 'house-outside': []
+                };
+                
+                const confidenceStats = {
+                    high: 0, medium: 0, low: 0, reed: 0, total: 0, sum: 0
+                };
+
+                if (historyData && historyData.data) {
+                    historyData.data.forEach(record => {
+                        if (record.doorTransitions) {
+                            record.doorTransitions.forEach(t => {
+                                // Determine panel ID
+                                let panelId = null;
+                                const doorName = (t.doorName || '').toLowerCase();
+                                const zone = (t.zone || '').toLowerCase();
+                                const doorId = t.doorId;
+                                
+                                if (doorId === 0 || doorName.includes('d1') || doorName.includes('main garage')) panelId = 'd1';
+                                else if (doorId === 1 || doorName.includes('d2') || doorName.includes('house door') || doorName.includes('house hinge')) panelId = 'd2';
+                                else if (doorId === 2 || doorName.includes('d3') || doorName.includes('single roller')) panelId = 'd3';
+                                else if (doorId === 3 || doorName.includes('d4') || doorName.includes('double roller')) panelId = 'd4';
+                                else if (doorId === 4 || doorName.includes('house-outside') || zone === 'house-outside') panelId = 'house-outside';
+                                else if (zone === 'garage-house') panelId = 'd2'; // Fallback
+                                else if (zone === 'garage-outside') panelId = 'd1'; // Fallback
+                                
+                                if (panelId) {
+                                    // Add to events list
+                                    doorEvents[panelId].push({
+                                        timestamp: t.timestamp,
+                                        action: t.opened ? 'OPEN' : 'CLOSE',
+                                        method: t.detectionMethod,
+                                        confidence: t.confidence
+                                    });
+                                    
+                                    // Update Confidence Stats
+                                    if (t.detectionMethod === 'reed-switch' || t.detectionMethod === 'reed') {
+                                        confidenceStats.reed++;
+                                        confidenceStats.total++;
+                                        confidenceStats.sum += 1.0;
+                                    } else if (t.detectionMethod === 'pressure-analysis' || t.detectionMethod === 'pressure') {
+                                        const conf = t.confidence || 0;
+                                        if (conf >= 0.8) confidenceStats.high++;
+                                        else if (conf >= 0.5) confidenceStats.medium++;
+                                        else confidenceStats.low++;
+                                        
+                                        confidenceStats.total++;
+                                        confidenceStats.sum += conf;
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // Sort events by timestamp descending
+                Object.keys(doorEvents).forEach(key => {
+                    doorEvents[key].sort((a, b) => {
+                        const tA = typeof a.timestamp === 'string' ? parseFloat(a.timestamp) : a.timestamp;
+                        const tB = typeof b.timestamp === 'string' ? parseFloat(b.timestamp) : b.timestamp;
+                        return tB - tA;
+                    });
+                });
 
                 // Reset all panels to default state first
                 Object.values(doorMap).forEach(suffix => {
@@ -2469,7 +2540,7 @@ function startAutoRefresh() {
                 });
 
                 // Update panels based on doorActivity (preferred) or zoneActivity (fallback)
-                const activitySource = data.doorActivity || data.zoneActivity;
+                const activitySource = analyticsData.doorActivity || analyticsData.zoneActivity;
                 
                 if (activitySource) {
                     Object.entries(activitySource).forEach(([name, stats]) => {
@@ -2533,18 +2604,19 @@ function startAutoRefresh() {
                                 totalEl.textContent = stats.count || 0;
                             }
                             
-                            // Update History (List of recent events)
+                            // Update History (List of recent events) - NOW USING FULL HISTORY DATA
                             const historyEl = document.getElementById(`history-${suffix}`);
                             if (historyEl) {
-                                if (stats.recentEvents && stats.recentEvents.length > 0) {
+                                const events = doorEvents[suffix];
+                                if (events && events.length > 0) {
                                     let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.75em;">';
-                                    stats.recentEvents.forEach(evt => {
+                                    events.forEach(evt => {
                                         // Handle timestamp (seconds or ms)
                                         const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
                                         const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                                         const action = evt.action || 'Event';
-                                        const method = evt.method === 'reed-switch' ? 'Reed' : 'ML';
-                                        const color = evt.method === 'reed-switch' ? '#28a745' : '#17a2b8';
+                                        const method = (evt.method === 'reed-switch' || evt.method === 'reed') ? 'Reed' : 'ML';
+                                        const color = (evt.method === 'reed-switch' || evt.method === 'reed') ? '#28a745' : '#17a2b8';
                                         
                                         html += `<li style="padding:3px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
                                             <span>${timeStr} <strong>${action}</strong></span>
@@ -2554,7 +2626,26 @@ function startAutoRefresh() {
                                     html += '</ul>';
                                     historyEl.innerHTML = html;
                                 } else {
-                                    historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
+                                    // Fallback to analytics recentEvents if history data is empty
+                                    if (stats.recentEvents && stats.recentEvents.length > 0) {
+                                        let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.75em;">';
+                                        stats.recentEvents.forEach(evt => {
+                                            const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
+                                            const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                            const action = evt.action || 'Event';
+                                            const method = evt.method === 'reed-switch' ? 'Reed' : 'ML';
+                                            const color = evt.method === 'reed-switch' ? '#28a745' : '#17a2b8';
+                                            
+                                            html += `<li style="padding:3px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
+                                                <span>${timeStr} <strong>${action}</strong></span>
+                                                <span style="color:${color}; font-weight:bold;">${method}</span>
+                                            </li>`;
+                                        });
+                                        html += '</ul>';
+                                        historyEl.innerHTML = html;
+                                    } else {
+                                        historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
+                                    }
                                 }
                             }
                         }
@@ -2564,62 +2655,72 @@ function startAutoRefresh() {
                 }
                 
                 // Update Analytics Panel
-                if (data.detectionAnalytics || data.eventSummary) {
-                    const avgConf = data.detectionAnalytics?.averageConfidence || 0;
-                    const confEl = document.getElementById('ml-confidence-avg');
-                    if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
-                    
-                    // Inject Time Range Selector if not present
-                    const actionsEl = document.querySelector('.analytics-actions');
-                    if (actionsEl && !document.getElementById('analyticsTimeRange')) {
-                        const selectHtml = `
-                            <select id="analyticsTimeRange" onchange="updateDoorCommandCenter(this.value)" style="margin-bottom:10px; padding:5px; width:100%; border-radius:4px; border:1px solid #ddd; background:white;">
-                                <option value="24" ${hours == 24 ? 'selected' : ''}>Last 24 Hours</option>
-                                <option value="48" ${hours == 48 ? 'selected' : ''}>Last 48 Hours</option>
-                                <option value="168" ${hours == 168 ? 'selected' : ''}>Last 7 Days</option>
-                                <option value="720" ${hours == 720 ? 'selected' : ''}>Last 30 Days</option>
-                            </select>
-                        `;
-                        // Insert before the button
-                        const btn = actionsEl.querySelector('.analytics-btn');
-                        if (btn) {
-                            btn.insertAdjacentHTML('beforebegin', selectHtml);
-                        } else {
-                            actionsEl.innerHTML += selectHtml;
-                        }
-                    } else if (document.getElementById('analyticsTimeRange')) {
-                        // Update selected value if it exists
-                        document.getElementById('analyticsTimeRange').value = hours;
+                // Calculate average confidence from history data if available
+                const avgConf = confidenceStats.total > 0 ? (confidenceStats.sum / confidenceStats.total) : (analyticsData.detectionAnalytics?.averageConfidence || 0);
+                
+                const confEl = document.getElementById('ml-confidence-avg');
+                if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
+                
+                // Inject Time Range Selector if not present
+                const actionsEl = document.querySelector('.analytics-actions');
+                if (actionsEl && !document.getElementById('analyticsTimeRange')) {
+                    const selectHtml = `
+                        <select id="analyticsTimeRange" onchange="updateDoorCommandCenter(this.value)" style="margin-bottom:10px; padding:5px; width:100%; border-radius:4px; border:1px solid #ddd; background:white;">
+                            <option value="24" ${hours == 24 ? 'selected' : ''}>Last 24 Hours</option>
+                            <option value="48" ${hours == 48 ? 'selected' : ''}>Last 48 Hours</option>
+                            <option value="168" ${hours == 168 ? 'selected' : ''}>Last 7 Days</option>
+                            <option value="720" ${hours == 720 ? 'selected' : ''}>Last 30 Days</option>
+                        </select>
+                    `;
+                    // Insert before the button
+                    const btn = actionsEl.querySelector('.analytics-btn');
+                    if (btn) {
+                        btn.insertAdjacentHTML('beforebegin', selectHtml);
+                    } else {
+                        actionsEl.innerHTML += selectHtml;
+                    }
+                } else if (document.getElementById('analyticsTimeRange')) {
+                    // Update selected value if it exists
+                    document.getElementById('analyticsTimeRange').value = hours;
+                }
+                
+                // Update Pie Chart if it exists
+                const ctx = document.getElementById('confidencePieChart');
+                if (ctx) {
+                    // Initialize chart if needed (simplified)
+                    if (!ctx.chartInstance) {
+                        ctx.chartInstance = new Chart(ctx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['High', 'Medium', 'Low', 'Reed'],
+                                datasets: [{
+                                    data: [0, 0, 0, 0],
+                                    backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8']
+                                }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                        });
                     }
                     
-                    // Update Pie Chart if it exists
-                    const ctx = document.getElementById('confidencePieChart');
-                    if (ctx) {
-                        // Initialize chart if needed (simplified)
-                        if (!ctx.chartInstance) {
-                            ctx.chartInstance = new Chart(ctx, {
-                                type: 'doughnut',
-                                data: {
-                                    labels: ['High', 'Medium', 'Low'],
-                                    datasets: [{
-                                        data: [0, 0, 0],
-                                        backgroundColor: ['#28a745', '#ffc107', '#dc3545']
-                                    }]
-                                },
-                                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                            });
-                        }
-                        
-                        // Update chart data
-                        if (data.detectionAnalytics && data.detectionAnalytics.confidenceDistribution) {
-                            const dist = data.detectionAnalytics.confidenceDistribution;
-                            ctx.chartInstance.data.datasets[0].data = [
-                                dist.high || 0,
-                                dist.medium || 0,
-                                dist.low || 0
-                            ];
-                            ctx.chartInstance.update();
-                        }
+                    // Update chart data from calculated stats
+                    if (confidenceStats.total > 0) {
+                        ctx.chartInstance.data.datasets[0].data = [
+                            confidenceStats.high,
+                            confidenceStats.medium,
+                            confidenceStats.low,
+                            confidenceStats.reed
+                        ];
+                        ctx.chartInstance.update();
+                    } else if (analyticsData.detectionAnalytics && analyticsData.detectionAnalytics.confidenceDistribution) {
+                        // Fallback to analytics data if history processing failed
+                        const dist = analyticsData.detectionAnalytics.confidenceDistribution;
+                        ctx.chartInstance.data.datasets[0].data = [
+                            dist.high || 0,
+                            dist.medium || 0,
+                            dist.low || 0,
+                            analyticsData.detectionAnalytics.reedSwitchEvents || 0
+                        ];
+                        ctx.chartInstance.update();
                     }
                 }
 
