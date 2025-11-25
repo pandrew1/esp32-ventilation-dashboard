@@ -2470,10 +2470,19 @@ function startAutoRefresh() {
                     fn: 0
                 };
 
+                // Calculate start of today (midnight) for filtering
+                const now = new Date();
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
                 if (historyData && historyData.data) {
                     historyData.data.forEach(record => {
                         if (record.doorTransitions) {
                             record.doorTransitions.forEach(t => {
+                                // Filter: If viewing "Last 24 Hours" (default), only show events from TODAY
+                                // If viewing longer periods (48h+), show all events in that period
+                                const ts = t.timestamp > 10000000000 ? t.timestamp : t.timestamp * 1000;
+                                if (hours <= 24 && ts < startOfDay) return;
+
                                 // Determine panel ID
                                 let panelId = null;
                                 const doorName = (t.doorName || '').toLowerCase();
