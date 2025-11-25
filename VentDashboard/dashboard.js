@@ -2611,7 +2611,7 @@ function startAutoRefresh() {
                         }
                         
                         // Update chart data
-                        if (data.detectionAnalytics.confidenceDistribution) {
+                        if (data.detectionAnalytics && data.detectionAnalytics.confidenceDistribution) {
                             const dist = data.detectionAnalytics.confidenceDistribution;
                             ctx.chartInstance.data.datasets[0].data = [
                                 dist.high || 0,
