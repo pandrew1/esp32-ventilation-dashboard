@@ -46,7 +46,7 @@ export class DataManager {
         
         console.log('DataManager: Fetching fresh status data via snapshot');
         // Use snapshot instead of direct call
-        const snapshot = await this.getDashboardSnapshot(forceRefresh);
+        const snapshot = await this.getDashboardSnapshot(forceRefresh, 24);
         const data = snapshot.status;
         
         if (!data) throw new Error('Status data missing from snapshot');
@@ -69,7 +69,7 @@ export class DataManager {
         
         console.log(`DataManager: Fetching fresh history data for ${hours}h via snapshot`);
         // Use snapshot instead of direct call
-        const snapshot = await this.getDashboardSnapshot(forceRefresh);
+        const snapshot = await this.getDashboardSnapshot(forceRefresh, hours);
         const data = snapshot.history;
         
         if (!data) throw new Error('History data missing from snapshot');
@@ -117,25 +117,28 @@ export class DataManager {
     }
 
     // Get Dashboard Snapshot (Consolidated Data)
-    async getDashboardSnapshot(forceRefresh = false) {
+    async getDashboardSnapshot(forceRefresh = false, hours = 24) {
         const cache = this.cache.snapshotData;
+        const useCache = (hours === 24); // Only cache the default 24h snapshot in the main slot
         
-        if (!forceRefresh && cache.data && Date.now() - cache.timestamp < cache.ttl) {
+        if (useCache && !forceRefresh && cache.data && Date.now() - cache.timestamp < cache.ttl) {
             console.log('DataManager: Using cached snapshot data');
             return cache.data;
         }
         
-        console.log('DataManager: Fetching fresh dashboard snapshot');
+        console.log(`DataManager: Fetching fresh dashboard snapshot (hours=${hours})`);
         // Use default deviceId and hours if not specified in config (though config usually has URLs only)
         // We append params to the URL
-        const endpoint = `${this.config.snapshotApiUrl}?deviceId=ESP32-Ventilation-01&hours=24`;
+        const endpoint = `${this.config.snapshotApiUrl}?deviceId=ESP32-Ventilation-01&hours=${hours}`;
         
-        const data = await this._deduplicatedFetch(endpoint, 'snapshot');
+        const data = await this._deduplicatedFetch(endpoint, `snapshot-${hours}`);
         
-        cache.data = data;
-        cache.timestamp = Date.now();
+        if (useCache) {
+            cache.data = data;
+            cache.timestamp = Date.now();
+            this._notifySubscribers('snapshot', data);
+        }
         
-        this._notifySubscribers('snapshot', data);
         return data;
     }
 
