@@ -11,7 +11,8 @@ const getApiConfig = () => {
     return {
         enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
         doorAnalyticsApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics',
-        snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot'
+        snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot',
+        historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory'
     };
 };
 
@@ -125,6 +126,41 @@ export class DataManager {
             console.log('DataManager: Using cached snapshot data');
             return cache.data;
         }
+
+        // Try to fetch from history API if requesting > 24 hours
+        if (hours > 24) {
+            try {
+                console.log(`DataManager: Attempting to fetch long-term history (${hours}h) from GetVentilationHistory`);
+                const historyUrl = this.config.historyApiUrl || 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory';
+                const endpoint = `${historyUrl}?deviceId=ESP32-Ventilation-01&hours=${hours}`;
+                
+                // Use the dashboard's authentication system
+                const headers = DashboardUtils.getAuthHeaders();
+                
+                const response = await fetch(endpoint, { headers });
+                
+                if (response.ok) {
+                    const historyData = await response.json();
+                    if (historyData.data && Array.isArray(historyData.data)) {
+                        console.log(`DataManager: Successfully fetched ${historyData.data.length} items from GetVentilationHistory`);
+                        
+                        // Construct a snapshot-like object
+                        const snapshot = {
+                            ...historyData,
+                            history: historyData.data, // Map 'data' to 'history'
+                            fromHistoryApi: true
+                        };
+                        
+                        // We don't cache long-term history in the snapshot slot
+                        return snapshot;
+                    }
+                } else {
+                    console.warn(`DataManager: GetVentilationHistory returned ${response.status}`);
+                }
+            } catch (e) {
+                console.warn('DataManager: Failed to fetch from GetVentilationHistory, falling back to snapshot', e);
+            }
+        }
         
         console.log(`DataManager: Fetching fresh dashboard snapshot (hours=${hours})`);
         // Use default deviceId and hours if not specified in config (though config usually has URLs only)
@@ -132,6 +168,21 @@ export class DataManager {
         const endpoint = `${this.config.snapshotApiUrl}?deviceId=ESP32-Ventilation-01&hours=${hours}`;
         
         const data = await this._deduplicatedFetch(endpoint, `snapshot-${hours}`);
+        
+        // DEBUG: Log the size of the history data received
+        if (data && data.history) {
+            const historyLen = Array.isArray(data.history) ? data.history.length : 'not-array';
+            console.log(`DataManager: DEBUG - Received snapshot for hours=${hours}. History length: ${historyLen}`);
+            if (Array.isArray(data.history) && data.history.length > 0) {
+                const first = data.history[0];
+                const last = data.history[data.history.length - 1];
+                const firstTime = first.timestamp ? new Date(first.timestamp * 1000).toLocaleString() : 'N/A';
+                const lastTime = last.timestamp ? new Date(last.timestamp * 1000).toLocaleString() : 'N/A';
+                console.log(`DataManager: DEBUG - History range: ${firstTime} to ${lastTime}`);
+            }
+        } else {
+            console.log(`DataManager: DEBUG - No history data in snapshot for hours=${hours}`);
+        }
         
         if (useCache) {
             cache.data = data;
