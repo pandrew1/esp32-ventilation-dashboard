@@ -4997,150 +4997,8 @@ function startAutoRefresh() {
 
         /**
          * Main data refresh function for the dashboard (legacy version)
-         * Fetches current ventilation system status and updates all dashboard widgets
-         * Handles authentication, connection status, and error states
-         * Updates temperatures, door status, incidents, and other real-time data
-         * @returns {Promise<void>}
-         */
-        async function refreshData() {
-            console.log('Refreshing dashboard data...');
-            
-            try {
-                updateConnectionStatus('connecting');
-                
-                const token = localStorage.getItem('ventilation_auth_token');
-                
-                // If no authentication method is available, show no data
-                if (!token && !CONFIG.apiSecret) {
-                    showNoDataState();
-                    updateConnectionStatus('disconnected');
-                    return;
-                }
-                
-                const headers = getAuthHeaders();
-                
-                const response = await fetch(`${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`, {
-                    method: 'GET',
-                    headers: headers
-                });
-                
-                // Handle authentication errors (401/403) - redirect to login
-                if (handleAuthError(response, 'GetVentilationStatus API')) {
-                    return; // Auth error handled, function will redirect
-                }
-                
-                if (!response.ok) {
-                    // Log the error details for debugging
-                    console.error(`DEBUGGING: API Error: ${response.status} ${response.statusText}`);
-                    debugDiv.innerHTML += '<br><strong>API ERROR: ' + response.status + ' ' + response.statusText + '</strong>';
-                    
-                    const errorText = await response.text();
-                    console.error('DEBUGGING: Error response:', errorText);
-                    debugDiv.innerHTML += '<br>Error text: ' + (errorText.substring(0, 100) + '...');
-                    
-                    // API call failed, show no data state
-                    debugDiv.innerHTML += '<br><strong>Showing no data state due to ' + response.status + '</strong>';
-                    showApiFailureNotice(`Status API returned ${response.status} ${response.statusText}. Data is currently unavailable.`, 'error');
-                    showNoDataState();
-                    updateConnectionStatus('disconnected');
-                    return;
-                }
-                
-                
-                const data = await response.json();
-                console.log('Dashboard data received successfully');
-                
-                // FETCH ADDITIONAL DATA FROM GetVentilationStatus API
-                // GetEnhancedDashboardData provides analytics but is missing:
-                // - incidents (system reliability data)
-                // - current sensor readings (for alerts)
-                // - current weather data (for storm alerts)
-                // - current door status (for door alerts)
-                try {
-                    console.log('Fetching current status data (incidents, sensors, weather, doors) from GetVentilationStatus...');
-                    const statusResponse = await fetch(`${CONFIG.currentStatusApiUrl}?deviceId=${CONFIG.deviceId}`, {
-                        method: 'GET',
-                        headers: headers
-                    });
-                    
-                    if (statusResponse.ok) {
-                        const statusData = await statusResponse.json();
-                        
-                        // Merge incidents
-                        if (statusData.incidents && Array.isArray(statusData.incidents)) {
-                            data.incidents = statusData.incidents;
-                            console.log(`✓ Merged ${statusData.incidents.length} incidents from GetVentilationStatus`);
-                        } else {
-                            console.warn('⚠ GetVentilationStatus did not return incidents array');
-                        }
-                        
-                        // Merge current sensor data for alerts
-                        if (statusData.sensors) {
-                            data.sensors = statusData.sensors;
-                            console.log('✓ Merged current sensor data from GetVentilationStatus');
-                        }
-                        
-                        // Merge weather data
-                        if (statusData.weather) {
-                            data.weather = statusData.weather;
-                            console.log('✓ Merged weather data from GetVentilationStatus');
-                        }
-                        
-                        // Merge doors data
-                        if (statusData.doors) {
-                            data.doors = statusData.doors;
-                            console.log('✓ Merged doors data from GetVentilationStatus');
-                        }
-                        
-                        // Merge system data if not already present (GetEnhancedDashboardData has sections.startup.system)
-                        if (!data.system && statusData.system) {
-                            data.system = statusData.system;
-                            console.log('✓ Merged system data from GetVentilationStatus');
-                        } else if (statusData.system) {
-                            // Merge missing system fields
-                            data.system = {...statusData.system, ...data.system};
-                        }
-                    } else {
-                        console.warn(`⚠ GetVentilationStatus returned ${statusResponse.status}, incidents and alerts may not be available`);
-                    }
-                } catch (statusError) {
-                    console.error('❌ Error fetching current status from GetVentilationStatus:', statusError);
-                    // Continue without current status rather than failing completely
-                }
-                
-                // Update dashboard with merged data
-                await updateDashboard(data);
-                updateConnectionStatus('connected');
-                
-                // Main sensor widgets are updated with current readings from GetVentilationHistory API below
-
-                // Monthly Data Aggregation moved to Yesterday's Report detailed view - function calls removed
-                // console.log('RefreshData: About to call loadAggregationStatus()');
-                // try {
-                //     await loadAggregationStatus();
-                //     console.log('RefreshData: loadAggregationStatus() completed successfully');
-                // } catch (error) {
-                //     console.error('RefreshData: Error in loadAggregationStatus():', error);
-                // }
-
-                // Refresh chart data if chart is currently displayed
-                refreshCurrentChart();
-                
-                // Clear any existing error notices
-                const apiFailureNotice = document.getElementById('apiFailureNotice');
-                if (apiFailureNotice) {
-                    apiFailureNotice.style.display = 'none';
-                }
-                
-            } catch (error) {
-                console.error('🚨 CRITICAL ERROR in refreshData:', error);
-                console.error('🚨 Error stack:', error.stack);
-                console.error('🚨 Error at line:', error.lineNumber || 'unknown');
-                showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
-                showNoDataState();
-                updateConnectionStatus('disconnected');
-            }
-        }
+        // Legacy refreshData function removed - replaced by modular refreshData at line 1079
+        // This prevents duplicate API calls and ensures consistent data handling via DataManager
 
         /**
          * Displays the dashboard in a "no data" state when authentication is unavailable
@@ -5266,30 +5124,35 @@ function startAutoRefresh() {
             console.log('DEBUG: data keys =', Object.keys(data || {}));
             
             // Fetch current system status for hardware specs and reliability data
-            try {
-                console.log('🔍 DEBUG: Fetching current system status from GetVentilationStatus');
-                const currentStatus = await DataManager.getCurrentSystemStatus();
-                
-                // Merge current system status into the main data structure
-                if (currentStatus && currentStatus.sections) {
-                    // Ensure data.sections exists
-                    if (!data.sections) {
-                        data.sections = {};
+            // SKIP if we already have the data (from snapshot)
+            if (!data.sections || !data.reliability) {
+                try {
+                    console.log('🔍 DEBUG: Fetching current system status from GetVentilationStatus');
+                    const currentStatus = await DataManager.getCurrentSystemStatus();
+                    
+                    // Merge current system status into the main data structure
+                    if (currentStatus && currentStatus.sections) {
+                        // Ensure data.sections exists
+                        if (!data.sections) {
+                            data.sections = {};
+                        }
+                        
+                        // Add/update startup section with current system data
+                        data.sections.startup = currentStatus.sections.startup;
+                        console.log('🔍 DEBUG: Merged current startup data:', data.sections.startup);
                     }
                     
-                    // Add/update startup section with current system data
-                    data.sections.startup = currentStatus.sections.startup;
-                    console.log('🔍 DEBUG: Merged current startup data:', data.sections.startup);
+                    // Merge reliability data
+                    if (currentStatus && currentStatus.reliability) {
+                        data.reliability = currentStatus.reliability;
+                        console.log('🔍 DEBUG: Merged current reliability data:', data.reliability);
+                    }
+                    
+                } catch (error) {
+                    console.log('🔍 DEBUG: Could not fetch current system status, using GetEnhancedDashboardData only:', error);
                 }
-                
-                // Merge reliability data
-                if (currentStatus && currentStatus.reliability) {
-                    data.reliability = currentStatus.reliability;
-                    console.log('🔍 DEBUG: Merged current reliability data:', data.reliability);
-                }
-                
-            } catch (error) {
-                console.log('🔍 DEBUG: Could not fetch current system status, using GetEnhancedDashboardData only:', error);
+            } else {
+                console.log('🔍 DEBUG: Skipping GetVentilationStatus - data already present in snapshot');
             }
             
             // Hide loading, show content
