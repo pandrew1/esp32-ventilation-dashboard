@@ -3905,7 +3905,7 @@ function startAutoRefresh() {
                         // Convert unique events to array
                         doorEvents = Array.from(uniqueEvents.values());
                         
-                        Logger.log(`TIMELINE: Deduplicated events: ${uniqueEvents.size} unique events from ${data.data.length} records`);
+                        Logger.log(`TIMELINE: Deduplicated events: ${uniqueEvents.size} unique events from ${historyData.length} records`);
                         Logger.log(`TIMELINE: Event sources:`, {
                             transitions: doorEvents.filter(e => e.source === 'transition').length,
                             daily_summary: doorEvents.filter(e => e.source === 'daily_summary').length,
@@ -9447,9 +9447,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const actualReduction = startTemp - endTemp;
             const tempDifferential = startTemp - outdoorAvg;
 
-            // Only calculate if conditions favor cooling (outdoor cooler than indoor)
-            if (tempDifferential <= 0) {
-                return null; // No cooling potential
+            // Handle neutral case (temps are equal)
+            if (Math.abs(tempDifferential) < 0.5) {
+                return {
+                    percentage: 100,
+                    actualReduction: 0,
+                    theoreticalMax: 0,
+                    fanMinutes: Math.round(fanMinutes),
+                    startTemp: Math.round(startTemp * 10) / 10,
+                    endTemp: Math.round(endTemp * 10) / 10,
+                    outdoorAvg: Math.round(outdoorAvg * 10) / 10,
+                    tempDifferential: 0,
+                    bonusApplied: 0,
+                    mode: 'Neutral'
+                };
             }
 
             // Balanced effectiveness calculation for meaningful differentiation:
@@ -9464,13 +9475,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let baselineCredit = 0;
             
             // Variable baseline based on temperature differential (conditions matter)
-            if (tempDifferential >= 10) {
+            const absDifferential = Math.abs(tempDifferential);
+            if (absDifferential >= 10) {
                 baselineCredit = 1.5; // Excellent conditions get moderate credit
-            } else if (tempDifferential >= 7) {
+            } else if (absDifferential >= 7) {
                 baselineCredit = 1.2; // Good conditions 
-            } else if (tempDifferential >= 4) {
+            } else if (absDifferential >= 4) {
                 baselineCredit = 0.8; // Fair conditions
-            } else if (tempDifferential >= 2) {
+            } else if (absDifferential >= 2) {
                 baselineCredit = 0.5; // Poor conditions get minimal credit
             }
             
@@ -9484,16 +9496,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Actual cooling is the primary driver - this creates differentiation
-            let adjustedReduction = Math.max(actualReduction, 0) + baselineCredit;
+            // Determine direction (Cooling vs Heating)
+            const isHeating = tempDifferential < 0;
+            let effectiveChange = actualReduction;
+            let effectiveMax = theoreticalMax;
+
+            if (isHeating) {
+                // For heating, we expect negative reduction (warming)
+                // Invert to make positive for calculation
+                effectiveChange = -actualReduction;
+                effectiveMax = -theoreticalMax;
+            }
+
+            let adjustedReduction = Math.max(effectiveChange, 0) + baselineCredit;
             
-            // If significant actual cooling occurred, give bonus credit
-            if (actualReduction >= 2.0) {
-                adjustedReduction += 0.5; // Bonus for real cooling achievement
-            } else if (actualReduction >= 1.0) {
-                adjustedReduction += 0.3; // Smaller bonus for moderate cooling
+            // If significant actual temp change occurred, give bonus credit
+            if (effectiveChange >= 2.0) {
+                adjustedReduction += 0.5; // Bonus for real temp change achievement
+            } else if (effectiveChange >= 1.0) {
+                adjustedReduction += 0.3; // Smaller bonus for moderate temp change
             }
             
-            var effectiveness = (adjustedReduction / theoreticalMax) * 100;
+            var effectiveness = (adjustedReduction / effectiveMax) * 100;
             
             // Apply moderate bonuses based on outdoor conditions and performance:
             // Focus on actual conditions that affect cooling difficulty
@@ -9519,13 +9543,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Shorter sessions get no runtime bonus
             
-            // Reward sessions that achieve significant actual cooling
-            if (actualReduction >= 2.0) {
-                bonusMultiplier += 0.10; // 10% bonus for excellent actual cooling
-            } else if (actualReduction >= 1.0) {
-                bonusMultiplier += 0.05; // 5% bonus for good actual cooling
+            // Reward sessions that achieve significant actual temp change
+            if (effectiveChange >= 2.0) {
+                bonusMultiplier += 0.10; // 10% bonus for excellent actual temp change
+            } else if (effectiveChange >= 1.0) {
+                bonusMultiplier += 0.05; // 5% bonus for good actual temp change
             }
-            // Sessions with minimal actual cooling get no bonus
+            // Sessions with minimal actual temp change get no bonus
             
             effectiveness *= bonusMultiplier;
             
@@ -9541,7 +9565,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 endTemp: Math.round(endTemp * 10) / 10,
                 outdoorAvg: Math.round(outdoorAvg * 10) / 10,
                 tempDifferential: Math.round(tempDifferential * 10) / 10,
-                bonusApplied: Math.round((bonusMultiplier - 1) * 100) // Show bonus percentage
+                bonusApplied: Math.round((bonusMultiplier - 1) * 100), // Show bonus percentage
+                mode: isHeating ? 'Heating' : 'Cooling'
             };
         }
 
@@ -9595,13 +9620,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // More nuanced performance assessment based on score ranges
             if (avgEffectiveness >= 80) {
-                insights.push(`🌟 <strong>Outstanding Performance:</strong> ${Math.round(avgEffectiveness)}% average effectiveness demonstrates exceptional cooling optimization.`);
+                insights.push(`🌟 <strong>Outstanding Performance:</strong> ${Math.round(avgEffectiveness)}% average effectiveness demonstrates exceptional system optimization.`);
             } else if (avgEffectiveness >= 70) {
                 insights.push(`✨ <strong>Excellent Performance:</strong> ${Math.round(avgEffectiveness)}% average shows your system is very well tuned.`);
             } else if (avgEffectiveness >= 60) {
-                insights.push(`✅ <strong>Good Performance:</strong> ${Math.round(avgEffectiveness)}% effectiveness indicates solid, reliable cooling.`);
+                insights.push(`✅ <strong>Good Performance:</strong> ${Math.round(avgEffectiveness)}% effectiveness indicates solid, reliable performance.`);
             } else if (avgEffectiveness >= 50) {
-                insights.push(`👍 <strong>Fair Performance:</strong> ${Math.round(avgEffectiveness)}% shows decent cooling with room for optimization.`);
+                insights.push(`👍 <strong>Fair Performance:</strong> ${Math.round(avgEffectiveness)}% shows decent performance with room for optimization.`);
             } else {
                 insights.push(`📊 <strong>Needs Optimization:</strong> ${Math.round(avgEffectiveness)}% suggests reviewing timing and conditions for better results.`);
             }
@@ -9621,17 +9646,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (avgRuntime >= 55) {
                 insights.push(`⏱️ <strong>Optimal Runtime:</strong> Sessions averaging ${Math.round(avgRuntime)} minutes provide thorough air exchange.`);
             } else {
-                insights.push(`⏱️ <strong>Runtime Pattern:</strong> Sessions averaging ${Math.round(avgRuntime)} minutes show efficient targeted cooling.`);
+                insights.push(`⏱️ <strong>Runtime Pattern:</strong> Sessions averaging ${Math.round(avgRuntime)} minutes show efficient targeted operation.`);
             }
             
             // Temperature differential analysis
             const avgTempDiff = sessions.reduce((sum, s) => sum + s.tempDifferential, 0) / sessions.length;
-            if (avgTempDiff >= 8) {
-                insights.push(`🌡️ <strong>Great Conditions:</strong> Average ${Math.round(avgTempDiff)}°F indoor-outdoor difference provides excellent cooling potential.`);
-            } else if (avgTempDiff >= 4) {
-                insights.push(`🌡️ <strong>Moderate Conditions:</strong> ${Math.round(avgTempDiff)}°F average temperature difference allows for effective cooling.`);
+            const absAvgTempDiff = Math.abs(avgTempDiff);
+            
+            if (absAvgTempDiff >= 8) {
+                insights.push(`🌡️ <strong>Great Conditions:</strong> Average ${Math.round(absAvgTempDiff)}°F indoor-outdoor difference provides excellent thermal potential.`);
+            } else if (absAvgTempDiff >= 4) {
+                insights.push(`🌡️ <strong>Moderate Conditions:</strong> ${Math.round(absAvgTempDiff)}°F average temperature difference allows for effective exchange.`);
             } else {
-                insights.push(`🌡️ <strong>Limited Potential:</strong> Small ${Math.round(avgTempDiff)}°F temperature differences reduce cooling effectiveness.`);
+                insights.push(`🌡️ <strong>Limited Potential:</strong> Small ${Math.round(absAvgTempDiff)}°F temperature differences reduce effectiveness.`);
             }
             
             // Best practices recommendation
