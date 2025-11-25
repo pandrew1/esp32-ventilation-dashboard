@@ -948,6 +948,53 @@ const DataManager = {
             }
             throw error;
         }
+    },
+
+    // Consolidated Dashboard Snapshot API call
+    async getDashboardSnapshot(forceRefresh = false) {
+        const cache = DashboardState.cache.snapshot;
+        const now = Date.now();
+
+        // Return cached data if still valid
+        if (!forceRefresh && cache.data && cache.timestamp && (now - cache.timestamp < cache.ttl)) {
+            console.log('DataManager: Using cached snapshot data');
+            return cache.data;
+        }
+
+        console.log('DataManager: Fetching fresh dashboard snapshot');
+        
+        try {
+            const url = `${CONFIG.snapshotApiUrl}?deviceId=${CONFIG.deviceId}&hours=24`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: DashboardUtils.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Cache the response
+            cache.data = data;
+            cache.timestamp = now;
+
+            // Notify all subscribers
+            this._notifySubscribers('snapshot', data);
+
+            console.log('DataManager: Dashboard snapshot fetched and cached successfully');
+            return data;
+
+        } catch (error) {
+            console.error('DataManager: Error fetching dashboard snapshot:', error);
+            // Return cached data if available, even if expired
+            if (cache.data) {
+                console.log('DataManager: Returning expired cached snapshot due to error');
+                return cache.data;
+            }
+            throw error;
+        }
     }
 };
 
@@ -2496,18 +2543,17 @@ function startAutoRefresh() {
                     fn: 0
                 };
 
-                // Calculate start of today (midnight) for filtering
-                const now = new Date();
-                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                // Calculate cutoff time for filtering (Rolling Window)
+                const nowTime = Date.now();
+                const cutoffTime = nowTime - (hours * 60 * 60 * 1000);
 
                 if (historyData && historyData.data) {
                     historyData.data.forEach(record => {
                         if (record.doorTransitions) {
                             record.doorTransitions.forEach(t => {
-                                // Filter: If viewing "Last 24 Hours" (default), only show events from TODAY
-                                // If viewing longer periods (48h+), show all events in that period
+                                // Filter: Show events within the requested time range (Rolling Window)
                                 const ts = t.timestamp > 10000000000 ? t.timestamp : t.timestamp * 1000;
-                                if (hours <= 24 && ts < startOfDay) return;
+                                if (ts < cutoffTime) return;
 
                                 // Determine panel ID
                                 let panelId = null;
@@ -3735,7 +3781,7 @@ function startAutoRefresh() {
                                                 // Pattern: Add 0x28000000 (671088640) to get into 2025 range
                                                 const TRUNCATION_OFFSET = 671088640; // Brings 2003 timestamps to 2025
                                                 validTimestamp = originalTimestamp + TRUNCATION_OFFSET;
-                                                Logger.log(`🔧 UNWRAPPED truncated timestamp: ${originalTimestamp} (${new Date(originalTimestamp * 1000).toISOString()}) → ${validTimestamp} (${new Date(validTimestamp * 1000).toISOString()})`);
+                                                // Logger.log(`🔧 UNWRAPPED truncated timestamp: ${originalTimestamp} (${new Date(originalTimestamp * 1000).toISOString()}) → ${validTimestamp} (${new Date(validTimestamp * 1000).toISOString()})`);
                                             }
                                             
                                             // Validate timestamp is reasonable (after Jan 1, 2020)
@@ -3794,13 +3840,13 @@ function startAutoRefresh() {
                                         if (typeof timestamp === 'number' && timestamp >= 1000000000 && timestamp < 1500000000) {
                                             const TRUNCATION_OFFSET = 671088640;
                                             unwrappedTimestamp = timestamp + TRUNCATION_OFFSET;
-                                            Logger.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
+                                            // Logger.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
                                         } else if (typeof timestamp === 'string' && !isNaN(timestamp)) {
                                             const numericTimestamp = parseFloat(timestamp);
                                             if (numericTimestamp >= 1000000000 && numericTimestamp < 1500000000) {
                                                 const TRUNCATION_OFFSET = 671088640;
                                                 unwrappedTimestamp = numericTimestamp + TRUNCATION_OFFSET;
-                                                Logger.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
+                                                // Logger.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
                                             }
                                         }
                                         
@@ -3832,7 +3878,7 @@ function startAutoRefresh() {
                                                     source: source
                                                 };
                                                 uniqueEvents.set(eventKey, event);
-                                                Logger.log(`    Added unique ${action} event for ${door.name} at ${unwrappedTimestamp} (${testDate.toLocaleString()})`);
+                                                // Logger.log(`    Added unique ${action} event for ${door.name} at ${unwrappedTimestamp} (${testDate.toLocaleString()})`);
                                             }
                                             
                                         } catch (e) {
