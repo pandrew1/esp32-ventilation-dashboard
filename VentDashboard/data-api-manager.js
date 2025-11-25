@@ -12,7 +12,8 @@ const getApiConfig = () => {
         statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus',
         historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
         enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
-        doorAnalyticsApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics'
+        doorAnalyticsApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics',
+        snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot'
     };
 };
 
@@ -21,13 +22,15 @@ export class DataManager {
         this.cache = {
             statusData: { data: null, timestamp: null, ttl: 30000 }, // 30s TTL
             historyData: new Map(), // Keyed by hours parameter
-            enhancedData: { data: null, timestamp: null, ttl: 30000 } // 30s TTL
+            enhancedData: { data: null, timestamp: null, ttl: 30000 }, // 30s TTL
+            snapshotData: { data: null, timestamp: null, ttl: 30000 } // 30s TTL
         };
         
         this.subscribers = {
             status: [],
             history: [],
-            enhanced: []
+            enhanced: [],
+            snapshot: []
         };
         
         this.activeRequests = new Map();
@@ -105,6 +108,29 @@ export class DataManager {
             console.error('DataManager: Error fetching door analytics data:', error);
             throw error;
         }
+    }
+
+    // Get Dashboard Snapshot (Consolidated Data)
+    async getDashboardSnapshot(forceRefresh = false) {
+        const cache = this.cache.snapshotData;
+        
+        if (!forceRefresh && cache.data && Date.now() - cache.timestamp < cache.ttl) {
+            console.log('DataManager: Using cached snapshot data');
+            return cache.data;
+        }
+        
+        console.log('DataManager: Fetching fresh dashboard snapshot');
+        // Use default deviceId and hours if not specified in config (though config usually has URLs only)
+        // We append params to the URL
+        const endpoint = `${this.config.snapshotApiUrl}?deviceId=ESP32-Ventilation-01&hours=24`;
+        
+        const data = await this._deduplicatedFetch(endpoint, 'snapshot');
+        
+        cache.data = data;
+        cache.timestamp = Date.now();
+        
+        this._notifySubscribers('snapshot', data);
+        return data;
     }
 
     // Subscription system for data updates

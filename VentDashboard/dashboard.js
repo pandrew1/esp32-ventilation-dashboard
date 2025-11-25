@@ -28,7 +28,7 @@ const AuthUtils = {
         // Force logout to clear Bearer token and use X-API-Secret
         if (token) {
             localStorage.removeItem('ventilation_auth_token');
-            console.log('🔧 Cleared Bearer token to force X-API-Secret authentication');
+            Logger.log('🔧 Cleared Bearer token to force X-API-Secret authentication');
         }
         
         // Always use X-API-Secret for reliability
@@ -66,13 +66,13 @@ const ModuleLoader = {
         }
         
         try {
-            console.log(`ModuleLoader: Loading ${fileName}`);
+            Logger.log(`ModuleLoader: Loading ${fileName}`);
             const module = await import(`./${fileName}`);
             this.loadedModules.set(fileName, module);
-            console.log(`ModuleLoader: ${fileName} loaded successfully`);
+            Logger.log(`ModuleLoader: ${fileName} loaded successfully`);
             return module;
         } catch (error) {
-            console.error(`ModuleLoader: Failed to load ${fileName}:`, error);
+            Logger.error(`ModuleLoader: Failed to load ${fileName}:`, error);
             throw error;
         }
     },
@@ -83,7 +83,7 @@ const ModuleLoader = {
 
     clearCache() {
         this.loadedModules.clear();
-        console.log('ModuleLoader: Cache cleared');
+        Logger.log('ModuleLoader: Cache cleared');
     }
 };
 
@@ -100,7 +100,7 @@ let GlobalEventSystem = null;
  */
 async function initializeModularSystems() {
     try {
-        console.log('=== STAGE 5: Initializing Modular Architecture ===');
+        Logger.log('=== STAGE 5: Initializing Modular Architecture ===');
         
         // Load simplified modules
         const { dataManager } = await ModuleLoader.loadModule('data-api-manager.js');
@@ -115,11 +115,11 @@ async function initializeModularSystems() {
         GlobalChartManager = chartManager;
         GlobalEventSystem = DashboardEvents;
         
-        console.log('=== STAGE 5: Modular systems initialized successfully ===');
+        Logger.log('=== STAGE 5: Modular systems initialized successfully ===');
         
         return { dataManager, chartManager, DashboardEvents };
     } catch (error) {
-        console.error('STAGE 5: Failed to initialize modular systems:', error);
+        Logger.error('STAGE 5: Failed to initialize modular systems:', error);
         // Fallback to legacy systems if modules fail
         return null;
     }
@@ -288,7 +288,7 @@ const CONFIG = {
 function initializeApiSecret() {
     if (!CONFIG.apiSecret) {
         CONFIG.apiSecret = getApiKeyFromUrl();
-        console.log('🔍 DEBUG: API secret initialized from URL:', !!CONFIG.apiSecret);
+        Logger.log('🔍 DEBUG: API secret initialized from URL:', !!CONFIG.apiSecret);
     }
     return CONFIG.apiSecret;
 }
@@ -675,7 +675,8 @@ const DashboardState = {
     cache: {
         statusData: { data: null, timestamp: null, ttl: 30000 }, // 30 seconds
         enhancedData: { data: null, timestamp: null, ttl: 60000 }, // 60 seconds  
-        historyData: new Map() // Key: hours, Value: { data, timestamp, ttl }
+        historyData: new Map(), // Key: hours, Value: { data, timestamp, ttl }
+        snapshot: { data: null, timestamp: null, ttl: 30000 } // 30 seconds
     }
 };
 
@@ -685,7 +686,8 @@ const DataManager = {
     subscribers: {
         status: [],
         enhanced: [],
-        history: []
+        history: [],
+        snapshot: []
     },
 
     // Subscribe to data updates
@@ -1061,65 +1063,76 @@ function startAutoRefresh() {
  * @returns {Promise<void>}
  */
         async function refreshData() {
-            console.log('🔍 DEBUG: === REFRESHING DASHBOARD DATA ===');
-            console.log('🔍 DEBUG: CONFIG.apiSecret available:', !!CONFIG.apiSecret);
-            console.log('🔍 DEBUG: localStorage token available:', !!localStorage.getItem('ventilation_auth_token'));
+            Logger.log('🔍 DEBUG: === REFRESHING DASHBOARD DATA (SNAPSHOT) ===');
             
             try {
-                updateConnectionStatus('connecting');        const token = localStorage.getItem('ventilation_auth_token');
+                updateConnectionStatus('connecting');
+                const token = localStorage.getItem('ventilation_auth_token');
         
-        // If no authentication method is available, show no data
-        if (!token && !CONFIG.apiSecret) {
-            showNoDataState();
-            updateConnectionStatus('disconnected');
-            return;
-        }
+                // If no authentication method is available, show no data
+                if (!token && !CONFIG.apiSecret) {
+                    showNoDataState();
+                    updateConnectionStatus('disconnected');
+                    return;
+                }
 
-        // Use consolidated DataManager instead of direct API call
-        const data = await DataManager.getStatusData();
-        console.log('DataManager: Status data retrieved successfully');
-        
-        // Update dashboard with new data
-        await updateDashboard(data);
-        
-        // Update Door Command Center (6-panel grid)
-        try {
-            await updateDoorCommandCenter(24);
-        } catch (e) {
-            console.error('Error updating Door Command Center:', e);
-        }
+                // Use consolidated DataManager to get snapshot
+                const snapshot = await DataManager.getDashboardSnapshot();
+                Logger.log('DataManager: Dashboard snapshot retrieved successfully');
+                
+                // Populate caches from snapshot to avoid redundant calls
+                if (snapshot.history) {
+                     DashboardState.cache.historyData.set('hours_24', {
+                        data: snapshot.history,
+                        timestamp: Date.now(),
+                        ttl: 45000
+                    });
+                }
+                
+                // Update dashboard with status data from snapshot
+                if (snapshot.status) {
+                    await updateDashboard(snapshot.status);
+                }
+                
+                // Update Door Command Center (6-panel grid)
+                try {
+                    // This will now use the cached history data we just populated
+                    await updateDoorCommandCenter(24);
+                } catch (e) {
+                    Logger.error('Error updating Door Command Center:', e);
+                }
 
-        updateConnectionStatus('connected');
+                updateConnectionStatus('connected');
 
-        // Refresh chart data if chart is currently displayed
-        refreshCurrentChart();
-        
-        // Clear any existing error notices
-        const apiFailureNotice = document.getElementById('apiFailureNotice');
-        if (apiFailureNotice) {
-            apiFailureNotice.style.display = 'none';
-        }
-        
-    } catch (error) {
-        console.error('DataManager: Error refreshing dashboard data:', error);
-        
-        // Handle authentication errors
-        if (error.message.includes('401')) {
-            const token = localStorage.getItem('ventilation_auth_token');
-            if (!token && CONFIG.apiSecret) {
-                logout();
-                return;
-            } else if (token) {
-                showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
+                // Refresh chart data if chart is currently displayed
+                refreshCurrentChart();
+                
+                // Clear any existing error notices
+                const apiFailureNotice = document.getElementById('apiFailureNotice');
+                if (apiFailureNotice) {
+                    apiFailureNotice.style.display = 'none';
+                }
+                
+            } catch (error) {
+                Logger.error('DataManager: Error refreshing dashboard data:', error);
+                
+                // Handle authentication errors
+                if (error.message.includes('401')) {
+                    const token = localStorage.getItem('ventilation_auth_token');
+                    if (!token && CONFIG.apiSecret) {
+                        logout();
+                        return;
+                    } else if (token) {
+                        showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
+                    }
+                } else {
+                    showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
+                }
+                
+                showNoDataState();
+                updateConnectionStatus('disconnected');
             }
-        } else {
-            showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
         }
-        
-        showNoDataState();
-        updateConnectionStatus('disconnected');
-    }
-}
 
 // Note: These functions are implemented later in this file
 
@@ -1236,22 +1249,22 @@ function startAutoRefresh() {
          * @returns {Promise<void>}
          */
         async function initializeDashboard() {
-            console.log('Initializing dashboard...');
+            Logger.log('Initializing dashboard...');
             
             // STAGE 5: Initialize modular systems first
             const modularSystems = await initializeModularSystems();
             if (modularSystems) {
-                console.log('=== STAGE 5: Using enhanced modular architecture ===');
+                Logger.log('=== STAGE 5: Using enhanced modular architecture ===');
                 // Set up event subscriptions for modular architecture
                 GlobalEventSystem.on('data:updated', (data) => {
-                    console.log('STAGE 5: Data update event received:', data.type);
+                    Logger.log('STAGE 5: Data update event received:', data.type);
                 });
                 
                 GlobalEventSystem.on('chart:updated', (data) => {
-                    console.log('STAGE 5: Chart update event received:', data.chartType);
+                    Logger.log('STAGE 5: Chart update event received:', data.chartType);
                 });
             } else {
-                console.log('=== STAGE 5: Fallback to legacy systems ===');
+                Logger.log('=== STAGE 5: Fallback to legacy systems ===');
             }
             
             // Initialize API secret from URL parameters
@@ -1266,13 +1279,6 @@ function startAutoRefresh() {
             if (GlobalDataManager) {
                 // Use enhanced data manager
                 await refreshDataWithModularSystem();
-                // ADDITIONAL FIX: Ensure main sensor data is loaded even if modular system has issues
-                console.log('INITIALIZATION: Ensuring sensor data is loaded for main widgets...');
-                try {
-                    await refreshData(); // Also call legacy refresh to populate main widgets
-                } catch (error) {
-                    console.error('INITIALIZATION: Legacy refresh also failed:', error);
-                }
             } else {
                 // Fallback to legacy data refresh
                 await refreshData();
@@ -1299,7 +1305,7 @@ function startAutoRefresh() {
             try {
                 await updateDoorCommandCenter(24);
             } catch (e) {
-                console.error('Error initializing Door Command Center:', e);
+                Logger.error('Error initializing Door Command Center:', e);
             }
 
             await updateSystemHealthWidget();
@@ -1313,7 +1319,7 @@ function startAutoRefresh() {
             // Start auto-refresh
             startAutoRefresh();
             
-            console.log('Dashboard initialization complete');
+            Logger.log('Dashboard initialization complete');
         }
 
         // ===================================================================
@@ -1327,30 +1333,36 @@ function startAutoRefresh() {
          * @returns {Promise<void>}
          */
         async function refreshDataWithModularSystem() {
-            console.log('=== STAGE 5: Using enhanced DataManager for data refresh ===');
+            Logger.log('=== STAGE 5: Using enhanced DataManager for data refresh (Snapshot) ===');
             
             try {
                 // Use the modular DataManager with caching
-                const statusData = await GlobalDataManager.getStatusData();
-                if (statusData && statusData.length > 0) {
-                    const latestRecord = statusData[statusData.length - 1];
-                    // FIX: Use correct updateDashboard() function instead of missing updateMainDisplay()
-                    await updateDashboard(latestRecord);
-                    GlobalEventSystem.emit('data:updated', { type: 'status', count: statusData.length });
+                const snapshot = await GlobalDataManager.getDashboardSnapshot();
+                
+                if (snapshot.status) {
+                    await updateDashboard(snapshot.status);
+                    GlobalEventSystem.emit('data:updated', { type: 'status', snapshot: true });
+                }
+                
+                // Populate caches
+                if (snapshot.history) {
+                     DashboardState.cache.historyData.set('hours_24', {
+                        data: snapshot.history,
+                        timestamp: Date.now(),
+                        ttl: 45000
+                    });
                 }
                 
                 // Subscribe to future updates
-                GlobalDataManager.subscribe('status', async (data) => {
-                    console.log('STAGE 5: Status data subscription update received');
-                    if (data && data.length > 0) {
-                        const latestRecord = data[data.length - 1];
-                        // FIX: Use correct updateDashboard() function instead of missing updateMainDisplay()
-                        await updateDashboard(latestRecord);
+                GlobalDataManager.subscribe('snapshot', async (data) => {
+                    Logger.log('STAGE 5: Snapshot data subscription update received');
+                    if (data.status) {
+                        await updateDashboard(data.status);
                     }
                 });
                 
             } catch (error) {
-                console.error('STAGE 5: Enhanced data refresh failed, falling back to legacy:', error);
+                Logger.error('STAGE 5: Enhanced data refresh failed, falling back to legacy:', error);
                 await refreshData(); // Fallback to legacy function
             }
         }
@@ -1998,10 +2010,10 @@ function startAutoRefresh() {
                 safeUpdate('yesterdayIncidents', 'No incidents');
                 safeUpdate('yesterdayUptime', historyData.length > 0 ? 'Data available' : 'No data');
                 
-                console.log(`ENHANCED SUMMARY: Calculated from ${historyData.length} records - Temp: ${tempMin}°-${tempMax}° (avg ${tempAvg}°), Efficiency: ${efficiency}%, Runtime: ${runtime}h`);
+                Logger.log(`ENHANCED SUMMARY: Calculated from ${historyData.length} records - Temp: ${tempMin}°-${tempMax}° (avg ${tempAvg}°), Efficiency: ${efficiency}%, Runtime: ${runtime}h`);
                 
         } catch (error) {
-            console.error('Enhanced summary calculation failed:', error);
+            Logger.error('Enhanced summary calculation failed:', error);
             // Inline error handling with safe DOM updates
             const safeUpdate = (id, text) => {
                 const element = document.getElementById(id);
@@ -2030,7 +2042,7 @@ function startAutoRefresh() {
          * @returns {Promise<void>}
          */
         async function loadYesterdaySummaryFromEnhancedAPI() {
-            console.log('=== FIXED: loadYesterdaySummaryFromEnhancedAPI() with readable text ===');
+            Logger.log('=== FIXED: loadYesterdaySummaryFromEnhancedAPI() with readable text ===');
             
             // Helper function to set waiting state (no auth available)
             const setYesterdayMetricsToWaiting = () => {
@@ -2060,46 +2072,46 @@ function startAutoRefresh() {
                 const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
                 
                 if (!hasAuth) {
-                    console.log('loadYesterdaySummaryFromEnhancedAPI: No authentication available');
+                    Logger.log('loadYesterdaySummaryFromEnhancedAPI: No authentication available');
                     setYesterdayMetricsToWaiting();
                     return;
                 }
 
                 // Use DataManager to get Enhanced Dashboard Data
                 const data = await DataManager.getEnhancedData();
-                console.log('🔍 DEBUG: Enhanced data received for summary metrics - full structure:');
-                console.log('🔍 DEBUG: - Root keys:', Object.keys(data));
+                Logger.log('🔍 DEBUG: Enhanced data received for summary metrics - full structure:');
+                Logger.log('🔍 DEBUG: - Root keys:', Object.keys(data));
                 if (data.sections) {
-                    console.log('🔍 DEBUG: - sections keys:', Object.keys(data.sections));
+                    Logger.log('🔍 DEBUG: - sections keys:', Object.keys(data.sections));
                     if (data.sections.yesterday) {
-                        console.log('🔍 DEBUG: - yesterday structure:', Object.keys(data.sections.yesterday));
-                        console.log('🔍 DEBUG: - yesterday.environmental:', data.sections.yesterday.environmental ? 'Available' : 'Missing');
-                        console.log('🔍 DEBUG: - yesterday.ventilation:', data.sections.yesterday.ventilation ? 'Available' : 'Missing');
-                        console.log('🔍 DEBUG: - yesterday.doorActivity:', data.sections.yesterday.doorActivity ? 'Available' : 'Missing');
-                        console.log('🔍 DEBUG: - yesterday.systemHealth:', data.sections.yesterday.systemHealth ? 'Available' : 'Missing');
-                        console.log('🔍 DEBUG: - yesterday.incidents:', data.sections.yesterday.incidents ? 'Available' : 'Missing');
+                        Logger.log('🔍 DEBUG: - yesterday structure:', Object.keys(data.sections.yesterday));
+                        Logger.log('🔍 DEBUG: - yesterday.environmental:', data.sections.yesterday.environmental ? 'Available' : 'Missing');
+                        Logger.log('🔍 DEBUG: - yesterday.ventilation:', data.sections.yesterday.ventilation ? 'Available' : 'Missing');
+                        Logger.log('🔍 DEBUG: - yesterday.doorActivity:', data.sections.yesterday.doorActivity ? 'Available' : 'Missing');
+                        Logger.log('🔍 DEBUG: - yesterday.systemHealth:', data.sections.yesterday.systemHealth ? 'Available' : 'Missing');
+                        Logger.log('🔍 DEBUG: - yesterday.incidents:', data.sections.yesterday.incidents ? 'Available' : 'Missing');
                     }
                 }
                 
                 // PHASE 2 FIX: Access data at sections.yesterday (not response.yesterday)
                 const yesterdayData = data.sections && data.sections.yesterday;
-                console.log('🔍 DEBUG: yesterdayData extracted:', !!yesterdayData);
+                Logger.log('🔍 DEBUG: yesterdayData extracted:', !!yesterdayData);
                 
                 // Check if API returned an error or data is missing
                 if (!yesterdayData || yesterdayData.error) {
-                    console.log('PHASE 2 FIX: Yesterday data failed or missing:', yesterdayData);
+                    Logger.log('PHASE 2 FIX: Yesterday data failed or missing:', yesterdayData);
                     setYesterdayMetricsToWaiting();
                     return;
                 }
 
-                console.log('PHASE 2 FIX: Yesterday data structure:', yesterdayData);
+                Logger.log('PHASE 2 FIX: Yesterday data structure:', yesterdayData);
 
                 // 🐛 DEBUG: Log the complete data structure for Yesterday's Report
-                console.log('🐛 YESTERDAY REPORT DEBUG: Full data structure:');
-                console.log('🐛 data.sections:', data.sections);
-                console.log('🐛 data.sections.yesterday:', data.sections.yesterday);
-                console.log('🐛 data.sections.doors:', data.sections.doors);
-                console.log('🐛 yesterdayData:', yesterdayData);
+                Logger.log('🐛 YESTERDAY REPORT DEBUG: Full data structure:');
+                Logger.log('🐛 data.sections:', data.sections);
+                Logger.log('🐛 data.sections.yesterday:', data.sections.yesterday);
+                Logger.log('🐛 data.sections.doors:', data.sections.doors);
+                Logger.log('🐛 yesterdayData:', yesterdayData);
 
                 // Helper function to safely update DOM elements
                 const safeUpdate = (id, text, className = null) => {
@@ -2321,7 +2333,7 @@ function startAutoRefresh() {
          * @returns {Promise<void>}
          */
         async function loadYesterdaySummaryMetrics() {
-            console.log('=== PHASE 2 FIX: loadYesterdaySummaryMetrics() using Enhanced Dashboard API ===');
+            Logger.log('=== PHASE 2 FIX: loadYesterdaySummaryMetrics() using Enhanced Dashboard API ===');
             
             // Show loading states for all metric elements
             const loadingText = 'Loading...';
@@ -2415,7 +2427,7 @@ function startAutoRefresh() {
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
             if (!hasAuth) {
-                console.warn('updateDoorCommandCenter: No authentication available');
+                Logger.warn('updateDoorCommandCenter: No authentication available');
                 // Update UI to show auth required
                 const panels = ['d1', 'd2', 'd3', 'd4', 'house-outside'];
                 panels.forEach(p => {
@@ -2766,7 +2778,7 @@ function startAutoRefresh() {
                         }
                     });
                 } else {
-                    console.warn('🚪 COMMAND CENTER: No doorActivity or zoneActivity data found in response');
+                    Logger.warn('🚪 COMMAND CENTER: No doorActivity or zoneActivity data found in response');
                 }
                 
                 // Update Analytics Panel
@@ -2840,7 +2852,7 @@ function startAutoRefresh() {
                 }
 
             } catch (error) {
-                console.error('updateDoorCommandCenter failed:', error);
+                Logger.error('updateDoorCommandCenter failed:', error);
                 // Show error state in panels
                 const panels = ['d1', 'd2', 'd3', 'd4', 'house-outside'];
                 panels.forEach(p => {
@@ -2858,7 +2870,7 @@ function startAutoRefresh() {
          * @returns {void}
          */
         async function updateEnhancedDoorActivity(hours = 24) {
-            console.log('=== STAGE 3: updateEnhancedDoorActivity() using DataManager ===');
+            Logger.log('=== STAGE 3: updateEnhancedDoorActivity() using DataManager ===');
             
             // Show loading states
             document.getElementById('activeDoorsCount').textContent = '...';
@@ -2880,7 +2892,7 @@ function startAutoRefresh() {
             // console.log('🔍 DEBUG: Authentication check - hasAuth:', hasAuth, 'headers keys:', Object.keys(headers));
             
             if (!hasAuth) {
-                console.error('🚨 DEBUG: updateEnhancedDoorActivity: No authentication available - Bearer token or API key required');
+                Logger.error('🚨 DEBUG: updateEnhancedDoorActivity: No authentication available - Bearer token or API key required');
                 // Set error states for door activity elements
                 document.getElementById('activeDoorsCount').textContent = 'Auth required';
                 document.getElementById('totalSessionsCount').textContent = 'Auth required';
@@ -2918,7 +2930,7 @@ function startAutoRefresh() {
                 updateDoorTimeline(hours);
 
             } catch (error) {
-                console.error('updateEnhancedDoorActivity failed:', error);
+                Logger.error('updateEnhancedDoorActivity failed:', error);
                 // Set error states
                 document.getElementById('activeDoorsCount').textContent = 'Error';
                 document.getElementById('totalSessionsCount').textContent = 'Error';
@@ -3054,7 +3066,7 @@ function startAutoRefresh() {
                 // console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'activeZones:', activeZones, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
                 
             } else {
-                console.log('updateDoorActivityDisplay: No valid data found');
+                Logger.log('updateDoorActivityDisplay: No valid data found');
                 // Set minimal fallback values 
                 document.getElementById('activeDoorsCount').textContent = '0';
                 document.getElementById('totalSessionsCount').textContent = '0';
@@ -3070,28 +3082,28 @@ function startAutoRefresh() {
         function updateConfidenceChart(data) {
             const confidenceCanvas = document.getElementById('confidenceChart');
             if (!confidenceCanvas || !confidenceCanvas.chartInstance) {
-                console.error('🚨 DEBUG: updateConfidenceChart: Chart canvas or instance not found');
+                Logger.error('🚨 DEBUG: updateConfidenceChart: Chart canvas or instance not found');
                 return;
             }
             
-            console.log('🔍 DEBUG: updateConfidenceChart called with data structure:');
-            console.log('🔍 DEBUG: - Full data keys:', Object.keys(data));
-            console.log('🔍 DEBUG: - hasDetectionAnalytics:', !!data.detectionAnalytics);
-            console.log('🔍 DEBUG: - hasConfidenceDistribution:', !!(data.detectionAnalytics?.confidenceDistribution));
-            console.log('🔍 DEBUG: - hasReedSwitchEvents:', data.detectionAnalytics?.reedSwitchEvents !== undefined);
-            console.log('🔍 DEBUG: - data.sections?.doors?.detectionAnalytics:', !!data.sections?.doors?.detectionAnalytics);
-            console.log('🔍 DEBUG: - data.recentPerformance:', !!data.recentPerformance);
-            console.log('🔍 DEBUG: - data.eventSummary:', !!data.eventSummary);
+            Logger.log('🔍 DEBUG: updateConfidenceChart called with data structure:');
+            Logger.log('🔍 DEBUG: - Full data keys:', Object.keys(data));
+            Logger.log('🔍 DEBUG: - hasDetectionAnalytics:', !!data.detectionAnalytics);
+            Logger.log('🔍 DEBUG: - hasConfidenceDistribution:', !!(data.detectionAnalytics?.confidenceDistribution));
+            Logger.log('🔍 DEBUG: - hasReedSwitchEvents:', data.detectionAnalytics?.reedSwitchEvents !== undefined);
+            Logger.log('🔍 DEBUG: - data.sections?.doors?.detectionAnalytics:', !!data.sections?.doors?.detectionAnalytics);
+            Logger.log('🔍 DEBUG: - data.recentPerformance:', !!data.recentPerformance);
+            Logger.log('🔍 DEBUG: - data.eventSummary:', !!data.eventSummary);
             
             // Log the actual data structure we're working with
             if (data.detectionAnalytics) {
-                console.log('🔍 DEBUG: detectionAnalytics structure:', Object.keys(data.detectionAnalytics));
+                Logger.log('🔍 DEBUG: detectionAnalytics structure:', Object.keys(data.detectionAnalytics));
             }
             if (data.sections?.doors) {
-                console.log('🔍 DEBUG: sections.doors structure:', Object.keys(data.sections.doors));
+                Logger.log('🔍 DEBUG: sections.doors structure:', Object.keys(data.sections.doors));
             }
             if (data.recentPerformance) {
-                console.log('🔍 DEBUG: recentPerformance structure:', Object.keys(data.recentPerformance));
+                Logger.log('🔍 DEBUG: recentPerformance structure:', Object.keys(data.recentPerformance));
             }
             
             // FIXED: Handle missing detectionAnalytics gracefully - it's not always available in GetEnhancedDashboardData
@@ -3100,12 +3112,12 @@ function startAutoRefresh() {
             // Try alternative data sources if detectionAnalytics is missing
             if (!analytics && data.sections?.doors?.detectionAnalytics) {
                 analytics = data.sections.doors.detectionAnalytics;
-                console.log('🔍 DEBUG: Using detectionAnalytics from sections.doors');
+                Logger.log('🔍 DEBUG: Using detectionAnalytics from sections.doors');
             }
             
             // If still no analytics data, create fallback from recentPerformance
             if (!analytics && data.recentPerformance) {
-                console.log('🔍 DEBUG: No detectionAnalytics found, creating fallback from recentPerformance');
+                Logger.log('🔍 DEBUG: No detectionAnalytics found, creating fallback from recentPerformance');
                 const recent = data.recentPerformance.last24Hours || {};
                 analytics = {
                     confidenceDistribution: {
@@ -3119,7 +3131,7 @@ function startAutoRefresh() {
             
             // Final fallback if no data is available
             if (!analytics) {
-                console.warn('🚨 DEBUG: No detectionAnalytics available - using zero values');
+                Logger.warn('🚨 DEBUG: No detectionAnalytics available - using zero values');
                 analytics = {
                     confidenceDistribution: { high: 0, medium: 0, low: 0 },
                     reedSwitchEvents: 0
@@ -3128,8 +3140,8 @@ function startAutoRefresh() {
             
             const confidenceDistribution = analytics.confidenceDistribution || { high: 0, medium: 0, low: 0 };
             if (!analytics.confidenceDistribution) {
-                console.warn('🚨 DEBUG: Missing confidenceDistribution in detectionAnalytics - using fallback values');
-                console.log('🔍 DEBUG: Available analytics keys:', Object.keys(analytics));
+                Logger.warn('🚨 DEBUG: Missing confidenceDistribution in detectionAnalytics - using fallback values');
+                Logger.log('🔍 DEBUG: Available analytics keys:', Object.keys(analytics));
             }
             
             // Extract data using the verified API contract
@@ -3170,7 +3182,7 @@ function startAutoRefresh() {
                 if (reedSwitchElement) {
                     safeUpdateElement('reedSwitchCount', reedSwitchEvents);
                 } else {
-                    console.log('🔍 DEBUG: reedSwitchCount element not found - this is normal if not in current HTML');
+                    Logger.log('🔍 DEBUG: reedSwitchCount element not found - this is normal if not in current HTML');
                     // Try alternative element names
                     const altElements = ['reedSwitchEvents', 'reedEvents', 'totalReedSwitchEvents'];
                     for (const altId of altElements) {
@@ -3181,23 +3193,23 @@ function startAutoRefresh() {
                     }
                 }
                 
-                console.log('🔍 DEBUG: Chart successfully updated with data:', { highConf, mediumConf, lowConf, reedSwitchEvents });
+                Logger.log('🔍 DEBUG: Chart successfully updated with data:', { highConf, mediumConf, lowConf, reedSwitchEvents });
                 
             } catch (error) {
-                console.error('🚨 DEBUG: Error updating confidence chart:', error);
+                Logger.error('🚨 DEBUG: Error updating confidence chart:', error);
                 // Don't throw the error - just log it and continue
             }
         }
 
         // FIXED: Update pressure analytics to align with ESP32 source structure  
         function updatePressureAnalytics(data) {
-            console.log('🔍 DEBUG: updatePressureAnalytics called with data keys:', Object.keys(data));
+            Logger.log('🔍 DEBUG: updatePressureAnalytics called with data keys:', Object.keys(data));
             
             // Check for enhanced dashboard data structure first (GetEnhancedDashboardData)
             const detectionAnalytics = data.sections?.doors?.detectionAnalytics || data.detectionAnalytics;
             
             if (detectionAnalytics && detectionAnalytics.averagePressureChange !== undefined) {
-                console.log('🔍 DEBUG: Using detectionAnalytics pressure data');
+                Logger.log('🔍 DEBUG: Using detectionAnalytics pressure data');
                 // Show actual pressure change values from enhanced door detection
                 document.getElementById('avgPressureChange').textContent = 
                     `${detectionAnalytics.averagePressureChange.toFixed(3)} hPa`;
@@ -3205,19 +3217,19 @@ function startAutoRefresh() {
                 document.getElementById('maxPressureChange').textContent = 
                     `${detectionAnalytics.maxPressureChange.toFixed(3)} hPa`;
             } else {
-                console.log('🔍 DEBUG: No detectionAnalytics pressure data, checking fallbacks');
+                Logger.log('🔍 DEBUG: No detectionAnalytics pressure data, checking fallbacks');
                 // Fallback: Check for legacy pressure analysis structure
                 const pressure = data.pressureAnalysis || data.pressure_analysis;
                 
                 if (pressure && pressure.average_pressure_change !== undefined) {
-                    console.log('🔍 DEBUG: Using legacy pressure analysis data');
+                    Logger.log('🔍 DEBUG: Using legacy pressure analysis data');
                     document.getElementById('avgPressureChange').textContent = 
                         `${pressure.average_pressure_change.toFixed(3)} hPa`;
                     
                     document.getElementById('maxPressureChange').textContent = 
                         `${pressure.max_pressure_change.toFixed(3)} hPa`;
                 } else {
-                    console.log('🚨 DEBUG: No pressure data available - showing placeholder');
+                    Logger.log('🚨 DEBUG: No pressure data available - showing placeholder');
                     // No pressure data available
                     document.getElementById('avgPressureChange').textContent = 'No data';
                     document.getElementById('maxPressureChange').textContent = 'No data';
@@ -3353,7 +3365,7 @@ function startAutoRefresh() {
          * @returns {void}
          */
         async function updateSystemHealthWidget() {
-            console.log('=== STAGE 2: updateSystemHealthWidget() using DataManager ===');
+            Logger.log('=== STAGE 2: updateSystemHealthWidget() using DataManager ===');
             
             // Note: Simplified health metrics UI removed to eliminate duplicate/bad data display
             
@@ -3368,23 +3380,23 @@ function startAutoRefresh() {
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
             if (!hasAuth) {
-                console.log('updateSystemHealthWidget: No authentication available - Bearer token or API key required');
+                Logger.log('updateSystemHealthWidget: No authentication available - Bearer token or API key required');
                 return;
             }
             
             try {
                 // Use consolidated DataManager instead of direct API call
                 const data = await DataManager.getEnhancedData();
-                console.log('DataManager: Enhanced data received for system health widget');
+                Logger.log('DataManager: Enhanced data received for system health widget');
                 
                 // Extract startup data from sections - correct API structure
                 const startup = data.sections && data.sections.startup;
-                console.log('updateSystemHealthWidget: Startup section:', startup);
+                Logger.log('updateSystemHealthWidget: Startup section:', startup);
                 
                 if (startup && !startup.error) {
-                    console.log('updateSystemHealthWidget: Processing startup data');
-                    console.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
-                    console.log('updateSystemHealthWidget: Startup system:', startup.system);
+                    Logger.log('updateSystemHealthWidget: Processing startup data');
+                    Logger.log('updateSystemHealthWidget: Startup hardware:', startup.hardware);
+                    Logger.log('updateSystemHealthWidget: Startup system:', startup.system);
                     
                     // Update boot information only (health metrics UI removed)
                     // Note: lastBootInfo and bootReasonInfo already declared at top of function
@@ -3531,19 +3543,19 @@ function startAutoRefresh() {
                 gauge.style.setProperty('--health-percentage', `${percentage}%`);
             }
             // Additional gauge styling could be added here
-            console.log(`System health gauge updated to ${percentage}%`);
+            Logger.log(`System health gauge updated to ${percentage}%`);
         }
 
         function updateDoorTimeline(hours) {
-            console.log(`=== ACTIVITY TIMELINE: updateDoorTimeline(${hours}) started ===`);
+            Logger.log(`=== ACTIVITY TIMELINE: updateDoorTimeline(${hours}) started ===`);
             
             const timelineViz = document.getElementById('doorTimelineViz');
             if (!timelineViz) {
-                console.error('TIMELINE ERROR: doorTimelineViz element not found in DOM');
+                Logger.error('TIMELINE ERROR: doorTimelineViz element not found in DOM');
                 return;
             }
             
-            console.log('TIMELINE: Found doorTimelineViz element, setting loading state');
+            Logger.log('TIMELINE: Found doorTimelineViz element, setting loading state');
             
             // Show loading state
             timelineViz.innerHTML = '<div class="timeline-placeholder"><p>Loading ' + hours + 'h door activity timeline...</p></div>';
@@ -3553,18 +3565,18 @@ function startAutoRefresh() {
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
             if (!hasAuth) {
-                console.log('updateDoorTimeline: No authentication available - Bearer token or API key required');
+                Logger.log('updateDoorTimeline: No authentication available - Bearer token or API key required');
                 timelineViz.innerHTML = '<div class="timeline-error">Authentication required. Please log in to view timeline.</div>';
                 return;
             }
             
-            console.log('TIMELINE: Using authentication headers');
+            Logger.log('TIMELINE: Using authentication headers');
             
             // Use consolidated DataManager for history data
             DataManager.getHistoryData(hours)
                 .then(data => {
-                    console.log(`DataManager: History data received for timeline (${hours}h)`);
-                    console.log('TIMELINE: Received history data for', hours, 'hours:', {
+                    Logger.log(`DataManager: History data received for timeline (${hours}h)`);
+                    Logger.log('TIMELINE: Received history data for', hours, 'hours:', {
                         dataPoints: data.data ? data.data.length : 0,
                         deviceId: data.deviceId,
                         aggregation: data.aggregation,
@@ -3593,7 +3605,7 @@ function startAutoRefresh() {
                         // Track unique door events to avoid duplication
                         const uniqueEvents = new Map(); // key: "timestamp-door-action", value: event
                         
-                        console.log(`TIMELINE: Processing ${data.data.length} API records for door events`);
+                        Logger.log(`TIMELINE: Processing ${data.data.length} API records for door events`);
                         
                         // Extract door events from history data
                         data.data.forEach((record, recordIndex) => {
@@ -3601,9 +3613,9 @@ function startAutoRefresh() {
                             if (record.doorTransitions && Array.isArray(record.doorTransitions)) {
                                 // DEBUG: Log first few transitions to see timestamp format
                                 if (recordIndex === 0 && record.doorTransitions.length > 0) {
-                                    console.log('🐛 TIMELINE DEBUG: Sample doorTransitions (showing first 5):');
+                                    Logger.log('🐛 TIMELINE DEBUG: Sample doorTransitions (showing first 5):');
                                     record.doorTransitions.slice(0, 5).forEach((t, idx) => {
-                                        console.log(`  [${idx}]:`, {
+                                        Logger.log(`  [${idx}]:`, {
                                             timestamp: t.timestamp,
                                             timestampType: typeof t.timestamp,
                                             timestampValue: t.timestamp,
@@ -3709,7 +3721,7 @@ function startAutoRefresh() {
                                                 // Pattern: Add 0x28000000 (671088640) to get into 2025 range
                                                 const TRUNCATION_OFFSET = 671088640; // Brings 2003 timestamps to 2025
                                                 validTimestamp = originalTimestamp + TRUNCATION_OFFSET;
-                                                console.log(`🔧 UNWRAPPED truncated timestamp: ${originalTimestamp} (${new Date(originalTimestamp * 1000).toISOString()}) → ${validTimestamp} (${new Date(validTimestamp * 1000).toISOString()})`);
+                                                Logger.log(`🔧 UNWRAPPED truncated timestamp: ${originalTimestamp} (${new Date(originalTimestamp * 1000).toISOString()}) → ${validTimestamp} (${new Date(validTimestamp * 1000).toISOString()})`);
                                             }
                                             
                                             // Validate timestamp is reasonable (after Jan 1, 2020)
@@ -3730,7 +3742,7 @@ function startAutoRefresh() {
                                         
                                         // Log rejection reasons for debugging (only if still invalid after unwrap attempt)
                                         if (!validTimestamp && rejectionReason) {
-                                            console.warn(`🐛 TIMELINE: Rejected timestamp - ${rejectionReason}`, transition);
+                                            Logger.warn(`🐛 TIMELINE: Rejected timestamp - ${rejectionReason}`, transition);
                                         }
                                         
                                         // Only add event if timestamp is valid
@@ -3749,7 +3761,7 @@ function startAutoRefresh() {
                                             };
                                             uniqueEvents.set(eventKey, event);
                                             const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
-                                            // console.log(`    Added door transition: ${event.door} ${event.action} at ${validTimestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
+                                            // Logger.log(`    Added door transition: ${event.door} ${event.action} at ${validTimestamp} (${event.detectionMethod || 'unknown method'}) ${confirmationStatus}`);
                                         }
                                     }
                                 });
@@ -3768,13 +3780,13 @@ function startAutoRefresh() {
                                         if (typeof timestamp === 'number' && timestamp >= 1000000000 && timestamp < 1500000000) {
                                             const TRUNCATION_OFFSET = 671088640;
                                             unwrappedTimestamp = timestamp + TRUNCATION_OFFSET;
-                                            console.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
+                                            Logger.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
                                         } else if (typeof timestamp === 'string' && !isNaN(timestamp)) {
                                             const numericTimestamp = parseFloat(timestamp);
                                             if (numericTimestamp >= 1000000000 && numericTimestamp < 1500000000) {
                                                 const TRUNCATION_OFFSET = 671088640;
                                                 unwrappedTimestamp = numericTimestamp + TRUNCATION_OFFSET;
-                                                console.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
+                                                Logger.log(`🔧 UNWRAPPED truncated timestamp (summary): ${timestamp} → ${unwrappedTimestamp}`);
                                             }
                                         }
                                         
@@ -3806,11 +3818,11 @@ function startAutoRefresh() {
                                                     source: source
                                                 };
                                                 uniqueEvents.set(eventKey, event);
-                                                console.log(`    Added unique ${action} event for ${door.name} at ${unwrappedTimestamp} (${testDate.toLocaleString()})`);
+                                                Logger.log(`    Added unique ${action} event for ${door.name} at ${unwrappedTimestamp} (${testDate.toLocaleString()})`);
                                             }
                                             
                                         } catch (e) {
-                                            console.log(`    Skipping ${action} - timestamp error:`, timestamp, e.message);
+                                            Logger.log(`    Skipping ${action} - timestamp error:`, timestamp, e.message);
                                         }
                                     };
                                     
@@ -3831,8 +3843,8 @@ function startAutoRefresh() {
                         // Convert unique events to array
                         doorEvents = Array.from(uniqueEvents.values());
                         
-                        console.log(`TIMELINE: Deduplicated events: ${uniqueEvents.size} unique events from ${data.data.length} records`);
-                        console.log(`TIMELINE: Event sources:`, {
+                        Logger.log(`TIMELINE: Deduplicated events: ${uniqueEvents.size} unique events from ${data.data.length} records`);
+                        Logger.log(`TIMELINE: Event sources:`, {
                             transitions: doorEvents.filter(e => e.source === 'transition').length,
                             daily_summary: doorEvents.filter(e => e.source === 'daily_summary').length,
                             current_state: doorEvents.filter(e => e.source === 'current_state').length
@@ -3853,7 +3865,7 @@ function startAutoRefresh() {
                             doorActivityStats.lastActivity = doorEvents[0].timestamp; // Most recent is now at start
                         }
                         
-                        console.log('TIMELINE: Final event statistics:', {
+                        Logger.log('TIMELINE: Final event statistics:', {
                             totalEvents: doorEvents.length,
                             uniqueDoors: uniqueDoors.size,
                             timeRange: `${hours} hours`,
@@ -3875,13 +3887,13 @@ function startAutoRefresh() {
                     window.lastDoorsData = doorsData;
                     window.lastDoorsHours = hours;
 
-                    console.log('TIMELINE: Processed door events:', doorsData);
-                    console.log('TIMELINE: Calling renderActivityTimeline with processed data');
+                    Logger.log('TIMELINE: Processed door events:', doorsData);
+                    Logger.log('TIMELINE: Calling renderActivityTimeline with processed data');
                     renderActivityTimeline(doorsData, hours);
                 })
                 .catch(error => {
-                    console.error('DataManager: Error loading history data for timeline:', error);
-                    console.error('TIMELINE ERROR: Error details:', {
+                    Logger.error('DataManager: Error loading history data for timeline:', error);
+                    Logger.error('TIMELINE ERROR: Error details:', {
                         message: error.message,
                         stack: error.stack,
                         name: error.name
@@ -3891,7 +3903,7 @@ function startAutoRefresh() {
         }
 
         function renderActivityTimeline(doorsData, hours) {
-            console.log('renderActivityTimeline: Processing doors data:', doorsData);
+            Logger.log('renderActivityTimeline: Processing doors data:', doorsData);
             
             const timelineViz = document.getElementById('doorTimelineViz');
             let timeline = doorsData.timeline || [];
@@ -6410,13 +6422,13 @@ function startAutoRefresh() {
                 
                 // Log invalid incidents for debugging
                 if (!validStart || !validEnd) {
-                    console.warn(`Invalid incident timestamps - Type: ${incident.type}, Start: ${incident.startTime} (${new Date(incident.startTime * 1000)}), End: ${incident.endTime} (${incident.endTime > 0 ? new Date(incident.endTime * 1000) : 'ongoing'})`);
+                    Logger.warn(`Invalid incident timestamps - Type: ${incident.type}, Start: ${incident.startTime} (${new Date(incident.startTime * 1000)}), End: ${incident.endTime} (${incident.endTime > 0 ? new Date(incident.endTime * 1000) : 'ongoing'})`);
                 }
                 
                 return validStart && validEnd;
             });
             
-            console.log(`Incidents: ${incidents.length} total, ${validIncidents.length} with valid timestamps`);
+            Logger.log(`Incidents: ${incidents.length} total, ${validIncidents.length} with valid timestamps`);
             
             if (validIncidents.length === 0) {
                 incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No valid incidents found in the last 30 days (some data may be corrupted)</div>';
@@ -6548,7 +6560,7 @@ function startAutoRefresh() {
                 
                 // Log invalid incidents for debugging during filtering
                 if (!validStart || !validEnd) {
-                    console.warn(`Filtered out invalid incident - Type: ${incident.type}, Start: ${incident.startTime}, End: ${incident.endTime}`);
+                    Logger.warn(`Filtered out invalid incident - Type: ${incident.type}, Start: ${incident.startTime}, End: ${incident.endTime}`);
                 }
                 
                 return validStart && validEnd;
@@ -6807,7 +6819,7 @@ document.addEventListener('DOMContentLoaded', () => {
          * @returns {Promise<void>}
          */
         async function createTemperatureChart(hours) {
-            console.log(`=== STAGE 3 FIX: createTemperatureChart(${hours}) using DataManager ===`);
+            Logger.log(`=== STAGE 3 FIX: createTemperatureChart(${hours}) using DataManager ===`);
             
             // Clear previous data source tracking to prevent accumulation
             if (window.dataSourceTracker) {
@@ -6834,7 +6846,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Use consolidated DataManager for history data
                 const data = await DataManager.getHistoryData(hours);
-                console.log(`DataManager: History data received for temperature chart (${hours}h)`);
+                Logger.log(`DataManager: History data received for temperature chart (${hours}h)`);
                 
                 if (data.data && data.data.length > 0) {
                     // Track successful hourly data fetch
@@ -6858,7 +6870,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateChart(data.data || [], hours);
                 
             } catch (error) {
-                console.error('DataManager: Error loading history data for temperature chart:', error);
+                Logger.error('DataManager: Error loading history data for temperature chart:', error);
                 // Show empty chart instead of mock data
                 showApiFailureNotice(`Network error loading chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
                 window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Network Error', error.message);
@@ -6871,12 +6883,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // The fetchPressureData sample function has been removed
 
         async function createPressureChart(hours) {
-            console.log(`=== STAGE 3 FIX: createPressureChart(${hours}) using DataManager ===`);
+            Logger.log(`=== STAGE 3 FIX: createPressureChart(${hours}) using DataManager ===`);
             
             // Check if time range changed before updating currentPressureChartHours
             const previousHours = currentPressureChartHours;
             const timeRangeChanged = previousHours !== hours;
-            console.log(`Pressure chart: previousHours=${previousHours}, newHours=${hours}, timeRangeChanged=${timeRangeChanged}`);
+            Logger.log(`Pressure chart: previousHours=${previousHours}, newHours=${hours}, timeRangeChanged=${timeRangeChanged}`);
             
             // Track the current pressure chart time period
             currentPressureChartHours = hours;
@@ -6889,15 +6901,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const token = localStorage.getItem('ventilation_auth_token');
                 
                 if (!token && !CONFIG.apiSecret) {
-                    console.log('No authentication available for pressure data');
+                    Logger.log('No authentication available for pressure data');
                     updatePressureChart([], hours);
                     return;
                 }
 
                 // Use consolidated DataManager for history data
                 const apiData = await DataManager.getHistoryData(hours);
-                console.log(`DataManager: History data received for pressure chart (${hours}h)`);
-                console.log('Received pressure/forecast data from API:', apiData);
+                Logger.log(`DataManager: History data received for pressure chart (${hours}h)`);
+                Logger.log('Received pressure/forecast data from API:', apiData);
                 
                 // Transform API data into pressure chart format
                 // Map to the actual structure returned by Azure Functions: sensors.outdoor.pressure and weather.forecastHigh
@@ -6918,25 +6930,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newLatestTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
                 
                 if (!newLatestTimestamp) {
-                    console.log('Pressure chart: No valid timestamps found, skipping update');
+                    Logger.log('Pressure chart: No valid timestamps found, skipping update');
                     return;
                 }
                 
                 // Only update if we have new data OR if the time range has changed
                 if (!latestPressureDataTimestamp || newLatestTimestamp > latestPressureDataTimestamp || timeRangeChanged) {
                     if (timeRangeChanged) {
-                        console.log(`Pressure chart: Time range changed to ${hours}h, updating chart`);
+                        Logger.log(`Pressure chart: Time range changed to ${hours}h, updating chart`);
                     } else {
-                        console.log(`Pressure chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
+                        Logger.log(`Pressure chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
                     }
                     latestPressureDataTimestamp = newLatestTimestamp;
                     updatePressureChart(pressureData, hours);
                 } else {
-                    console.log('Pressure chart: No new data points, skipping refresh to avoid unnecessary animations');
+                    Logger.log('Pressure chart: No new data points, skipping refresh to avoid unnecessary animations');
                 }
                 
             } catch (error) {
-                console.error('DataManager: Error loading history data for pressure chart:', error);
+                Logger.error('DataManager: Error loading history data for pressure chart:', error);
                 showApiFailureNotice(`Network error loading pressure chart data: ${error.message}. Chart data is currently unavailable.`, 'warning');
                 updatePressureChart([], hours);
             }
@@ -7348,17 +7360,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Check if this is newer than our stored latest timestamp
                 if (!latestChartDataTimestamp || newLatestTimestamp > latestChartDataTimestamp) {
-                    console.log(`Temperature chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
+                    Logger.log(`Temperature chart: New data detected, updating chart (${newLatestTimestamp.toLocaleTimeString()})`);
                     
                     // Update our stored timestamp and refresh the chart
                     latestChartDataTimestamp = newLatestTimestamp;
                     updateChart(data.data, hours);
                 } else {
-                    console.log('Temperature chart: No new data points, skipping refresh to avoid unnecessary animations');
+                    Logger.log('Temperature chart: No new data points, skipping refresh to avoid unnecessary animations');
                 }
 
             } catch (error) {
-                console.error('Error checking for new chart data:', error);
+                Logger.error('Error checking for new chart data:', error);
                 // On error, don't refresh to avoid unnecessary animations
             }
         }
@@ -7474,7 +7486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return isValidTimestamp(item.timestamp);
             });
             
-            console.log(`Chart data: ${data.length} total items, ${sortedData.length} valid items after timestamp filtering`);
+            Logger.log(`Chart data: ${data.length} total items, ${sortedData.length} valid items after timestamp filtering`);
             
             // Prepare time-based data points for proper temporal spacing
             const timeBasedData = sortedData.map((item, index) => {
@@ -7489,30 +7501,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!isNaN(unixSeconds) && unixSeconds > 1000000000 && unixSeconds < 2000000000) {
                             date = new Date(unixSeconds * 1000);
                         } else {
-                            console.warn('Invalid Unix timestamp:', item.timestamp);
+                            Logger.warn('Invalid Unix timestamp:', item.timestamp);
                             return null; // Skip this item
                         }
                     }
                 } else if (typeof item.timestamp === 'number') {
                     if (item.timestamp < 1000000000 || item.timestamp > 2000000000) {
-                        console.warn('Invalid numeric timestamp:', item.timestamp);
+                        Logger.warn('Invalid numeric timestamp:', item.timestamp);
                         return null; // Skip this item
                     }
                     date = item.timestamp < 10000000000 ? new Date(item.timestamp * 1000) : new Date(item.timestamp);
                 } else {
-                    console.warn('Unknown timestamp format:', item.timestamp);
+                    Logger.warn('Unknown timestamp format:', item.timestamp);
                     return null; // Skip this item
                 }
                 
                 // Final validation - reject if date is invalid or outside reasonable range
                 if (isNaN(date.getTime())) {
-                    console.warn('Failed to parse timestamp:', item.timestamp);
+                    Logger.warn('Failed to parse timestamp:', item.timestamp);
                     return null;
                 }
                 
                 const year = date.getFullYear();
                 if (year < 2020 || year > 2030) {
-                    console.warn('Timestamp outside valid range (corrupted):', date.toISOString(), 'from:', item.timestamp);
+                    Logger.warn('Timestamp outside valid range (corrupted):', date.toISOString(), 'from:', item.timestamp);
                     return null;
                 }
                 
@@ -7525,7 +7537,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Debug: Log the final timestamp range being sent to chart
             if (timeBasedData.length > 0) {
                 // Only essential debugging - removed verbose timestamp range logging
-                console.log(`Chart prepared ${timeBasedData.length} data points`);
+                Logger.log(`Chart prepared ${timeBasedData.length} data points`);
             }
 
             // Extract the actual sensor data with timestamps for Chart.js time scale
@@ -7571,11 +7583,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }).filter(point => point !== null);
 
             // Debug fan status data
-            console.log('Fan status data points:', fanStatus.length);
+            Logger.log('Fan status data points:', fanStatus.length);
 
             // Calculate ventilation effectiveness for substantial sessions (30+ minutes)
             const effectivenessData = calculateVentilationEffectiveness(timeBasedData);
-            console.log('Effectiveness data points:', effectivenessData.length);
+            Logger.log('Effectiveness data points:', effectivenessData.length);
             
             // Debug logging for ongoing sessions
             if (timeBasedData.length > 0) {
@@ -7583,7 +7595,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fanCurrentlyOn = recentDataPoints.some(point => 
                     point.item.system && point.item.system.fanOn === true
                 );
-                console.log('Recent fan status check:', {
+                Logger.log('Recent fan status check:', {
                     recentDataPoints: recentDataPoints.length,
                     fanCurrentlyOn: fanCurrentlyOn,
                     latestTimestamp: recentDataPoints[recentDataPoints.length - 1]?.timestamp
@@ -7793,11 +7805,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const statusElement = document.getElementById('almanacStatus');
             
             // DEBUGGING: Log the filter values
-            console.log('=== INCIDENT ALMANAC: loadIncidentAlmanac() called ===');
-            console.log('ALMANAC DEBUG: viewType =', viewType);
-            console.log('ALMANAC DEBUG: periodFilter =', periodFilter);
-            console.log('ALMANAC DEBUG: severityFilter =', severityFilter);
-            console.log('ALMANAC DEBUG: originalIncidentsData.length =', originalIncidentsData ? originalIncidentsData.length : 'null/undefined');
+            Logger.log('=== INCIDENT ALMANAC: loadIncidentAlmanac() called ===');
+            Logger.log('ALMANAC DEBUG: viewType =', viewType);
+            Logger.log('ALMANAC DEBUG: periodFilter =', periodFilter);
+            Logger.log('ALMANAC DEBUG: severityFilter =', severityFilter);
+            Logger.log('ALMANAC DEBUG: originalIncidentsData.length =', originalIncidentsData ? originalIncidentsData.length : 'null/undefined');
             
             try {
                 statusElement.textContent = 'Loading incident data...';
@@ -7813,27 +7825,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     startDate = new Date(firstOfThisMonth.getFullYear(), firstOfThisMonth.getMonth() - 1, 1);
                     const endOfPrevMonth = new Date(firstOfThisMonth.getTime() - 1);
                     
-                    console.log('ALMANAC DEBUG: Previous Month - from', startDate, 'to', endOfPrevMonth);
+                    Logger.log('ALMANAC DEBUG: Previous Month - from', startDate, 'to', endOfPrevMonth);
                     periodDescription = `${startDate.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}`;
                 } else if (periodFilter === 7) {
                     // Last 7 days
                     startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-                    console.log('ALMANAC DEBUG: Last 7 Days - from', startDate, 'to', now);
+                    Logger.log('ALMANAC DEBUG: Last 7 Days - from', startDate, 'to', now);
                     periodDescription = `Last 7 days (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})})`;
                 } else if (periodFilter === 30) {
                     // Last 30 days
                     startDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-                    console.log('ALMANAC DEBUG: Last 30 Days - from', startDate, 'to', now);
+                    Logger.log('ALMANAC DEBUG: Last 30 Days - from', startDate, 'to', now);
                     periodDescription = `Last 30 days (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})})`;
                 } else if (periodFilter === 90) {
                     // Last 90 days
                     startDate = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000));
-                    console.log('ALMANAC DEBUG: Last 90 Days - from', startDate, 'to', now);
+                    Logger.log('ALMANAC DEBUG: Last 90 Days - from', startDate, 'to', now);
                     periodDescription = `Last 90 days (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})})`;
                 } else if (periodFilter === 12) {
                     // Last 12 months
                     startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
-                    console.log('ALMANAC DEBUG: Last 12 Months - from', startDate, 'to', now);
+                    Logger.log('ALMANAC DEBUG: Last 12 Months - from', startDate, 'to', now);
                     periodDescription = `Last 12 months (since ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})})`;
                 } else {
                     // Default case
@@ -7845,7 +7857,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let incidents = originalIncidentsData || [];
                 
                 if (incidents.length === 0) {
-                    console.log('ALMANAC DEBUG: No incident data available');
+                    Logger.log('ALMANAC DEBUG: No incident data available');
                     statusElement.textContent = 'No incident data available';
                     showAlmanacView(viewType, [], periodFilter);
                     return;
@@ -7863,24 +7875,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     return false;
                 });
                 
-                console.log('ALMANAC DEBUG: After severity filter:', filteredIncidents.length, 'incidents');
+                Logger.log('ALMANAC DEBUG: After severity filter:', filteredIncidents.length, 'incidents');
                 
                 // Filter by time range with additional debugging
                 const cutoffTimestamp = Math.floor(startDate.getTime() / 1000);
-                console.log('ALMANAC DEBUG: cutoffTimestamp =', cutoffTimestamp, new Date(cutoffTimestamp * 1000));
+                Logger.log('ALMANAC DEBUG: cutoffTimestamp =', cutoffTimestamp, new Date(cutoffTimestamp * 1000));
                 
                 // Show sample incident timestamps for debugging
                 const sampleIncidents = filteredIncidents.slice(0, 3);
-                console.log('ALMANAC DEBUG: Sample incident timestamps:');
+                Logger.log('ALMANAC DEBUG: Sample incident timestamps:');
                 sampleIncidents.forEach((incident, i) => {
                     const incidentDate = new Date(incident.startTime * 1000);
-                    console.log(`  Incident ${i+1}: ${incident.startTime} (${incidentDate.toLocaleString()}) - ${incident.startTime >= cutoffTimestamp ? 'PASSES' : 'FILTERED OUT'}`);
+                    Logger.log(`  Incident ${i+1}: ${incident.startTime} (${incidentDate.toLocaleString()}) - ${incident.startTime >= cutoffTimestamp ? 'PASSES' : 'FILTERED OUT'}`);
                 });
                 
                 const beforeTimeFilter = filteredIncidents.length;
                 filteredIncidents = filteredIncidents.filter(incident => incident.startTime >= cutoffTimestamp);
-                console.log('ALMANAC DEBUG: Before time filter:', beforeTimeFilter, 'incidents');
-                console.log('ALMANAC DEBUG: After time filter:', filteredIncidents.length, 'incidents');
+                Logger.log('ALMANAC DEBUG: Before time filter:', beforeTimeFilter, 'incidents');
+                Logger.log('ALMANAC DEBUG: After time filter:', filteredIncidents.length, 'incidents');
                 
                 // More descriptive status message
                 statusElement.textContent = `Showing ${filteredIncidents.length} incidents from ${periodDescription} (${beforeTimeFilter - filteredIncidents.length} filtered out by date)`;
@@ -7889,7 +7901,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showAlmanacView(viewType, filteredIncidents, periodFilter);
                 
             } catch (error) {
-                console.error('Error loading incident almanac:', error);
+                Logger.error('Error loading incident almanac:', error);
                 statusElement.textContent = 'Error loading incident data';
                 showAlmanacView(viewType, [], periodFilter);
             }
