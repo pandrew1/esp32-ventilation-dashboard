@@ -6410,6 +6410,54 @@ function startAutoRefresh() {
         }
 
         /**
+         * Updates the recent door events timeline
+         * @param {Array} events - Array of door events
+         */
+        function updateRecentDoorEvents(events) {
+            const recentEventsList = document.getElementById('recentDoorEvents');
+            if (!recentEventsList) return;
+            
+            recentEventsList.innerHTML = '';
+            
+            if (!events || events.length === 0) {
+                recentEventsList.innerHTML = '<div class="text-muted text-center p-3">No recent door events</div>';
+                return;
+            }
+
+            // Sort events by timestamp descending (newest first)
+            const sortedEvents = [...events].sort((a, b) => b.timestamp - a.timestamp);
+            
+            // Take top 20 events
+            const recentEvents = sortedEvents.slice(0, 20);
+            
+            recentEvents.forEach(event => {
+                const eventItem = document.createElement('div');
+                eventItem.className = 'list-group-item list-group-item-action flex-column align-items-start';
+                
+                const date = new Date(event.timestamp * 1000);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateStr = date.toLocaleDateString();
+                
+                const isOpen = event.state === 1 || event.state === true || event.state === 'OPEN';
+                const badgeClass = isOpen ? 'badge-warning' : 'badge-success';
+                const stateText = isOpen ? 'OPENED' : 'CLOSED';
+                
+                eventItem.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">Door ${event.doorId}</h6>
+                        <small class="text-muted">${dateStr} ${timeStr}</small>
+                    </div>
+                    <p class="mb-1">
+                        <span class="badge ${badgeClass}">${stateText}</span>
+                        <small class="text-muted ml-2">Duration: ${event.duration ? event.duration + 's' : 'N/A'}</small>
+                    </p>
+                `;
+                
+                recentEventsList.appendChild(eventItem);
+            });
+        }
+
+        /**
          * Updates the incidents section with recent system incidents
          * Processes and categorizes incidents by severity and type
          * Applies time period and severity filters, generates summary statistics
