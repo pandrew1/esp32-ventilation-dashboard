@@ -2436,6 +2436,7 @@ function startAutoRefresh() {
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
+                console.log('🚪 COMMAND CENTER DEBUG: API Response', data);
                 
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
@@ -2470,6 +2471,7 @@ function startAutoRefresh() {
 
                 // Update panels based on zoneActivity
                 if (data.zoneActivity) {
+                    console.log('🚪 COMMAND CENTER DEBUG: zoneActivity found', Object.keys(data.zoneActivity));
                     Object.entries(data.zoneActivity).forEach(([zoneName, stats]) => {
                         // Determine which panel corresponds to this zone
                         let suffix = null;
@@ -2480,6 +2482,8 @@ function startAutoRefresh() {
                         else if (name.includes('d3') || name.includes('single roller')) suffix = 'd3';
                         else if (name.includes('d4') || name.includes('double roller')) suffix = 'd4';
                         else if (name.includes('house-outside') || name.includes('house outside')) suffix = 'house-outside';
+                        
+                        console.log(`🚪 COMMAND CENTER DEBUG: Processing zone "${zoneName}" -> suffix "${suffix}"`);
                         
                         if (suffix) {
                             // Update Status
@@ -10270,20 +10274,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // CSV Export function for pressure analysis
-async function exportPressureAnalysisCSV() {
-    const timeRange = document.getElementById('csvTimeRange').value;
+async function exportPressureAnalysisCSV(timeRangeOverride = null) {
+    const timeRange = timeRangeOverride || document.getElementById('csvTimeRange').value;
     const exportButton = document.getElementById('exportCsvBtn');
     const qualityDot = document.getElementById('csvDataQualityDot');
     const qualityText = document.getElementById('csvDataQualityText');
     
     try {
         // Update button state
-        exportButton.disabled = true;
-        exportButton.textContent = '⏳ Generating CSV...';
+        if (exportButton) {
+            exportButton.disabled = true;
+            exportButton.textContent = '⏳ Generating CSV...';
+        }
         
         // Update quality indicator
-        qualityDot.className = 'status-dot yellow';
-        qualityText.textContent = 'Processing...';
+        if (qualityDot) qualityDot.className = 'status-dot yellow';
+        if (qualityText) qualityText.textContent = 'Processing...';
+        
+        console.log(`Starting CSV export for range: ${timeRange}`);
         
         // Use the existing DataManager directly (no module import needed)
         const jsonData = await DataManager.getDoorAnalyticsData(timeRange, 'raw-transitions');
