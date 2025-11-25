@@ -289,7 +289,8 @@ const CONFIG = {
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 15000, // 15 seconds - check for new telemetry data
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
-    enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData'
+    enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
+    snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot'
 };
 
 // Initialize API secret from URL parameter
@@ -4177,12 +4178,15 @@ function startAutoRefresh() {
                     }
                     .timeline-events-scrollable {
                         padding: 8px;
-                        height: 280px;
-                        overflow-y: auto;
+                        max-height: 400px;
+                        height: auto;
+                        overflow-y: auto !important;
+                        display: block;
                         background: #f8f9fa;
                         border-radius: 5px;
                         scrollbar-width: thin;
                         scrollbar-color: #cbd5e0 #f8f9fa;
+                        border: 1px solid #e9ecef;
                     }
                     .timeline-events-scrollable::-webkit-scrollbar {
                         width: 6px;
