@@ -2422,6 +2422,155 @@ function startAutoRefresh() {
         }
 
         /**
+         * Updates the Door Command Center (6-panel grid) with detailed door status
+         * @param {number} hours - Time range in hours
+         */
+        async function updateDoorCommandCenter(hours = 24) {
+            console.log('=== STAGE 3b: updateDoorCommandCenter() ===');
+            
+            // Check auth
+            const headers = getAuthHeaders();
+            const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
+            
+            if (!hasAuth) {
+                console.warn('updateDoorCommandCenter: No authentication available');
+                return;
+            }
+
+            try {
+                const cacheBuster = Date.now();
+                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
+                    method: 'GET',
+                    headers: { ...headers }
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                // Map door IDs to panel IDs
+                // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
+                const doorMap = {
+                    'D1': 'd1',
+                    'D2': 'd2',
+                    'D3': 'd3',
+                    'D4': 'd4',
+                    'House-Outside': 'house-outside'
+                };
+
+                // Reset all panels to default state first
+                Object.values(doorMap).forEach(suffix => {
+                    const statusEl = document.getElementById(`status-${suffix}`);
+                    if (statusEl) {
+                        statusEl.textContent = 'INACTIVE';
+                        statusEl.className = 'status-badge inactive';
+                    }
+                    const totalEl = document.getElementById(`total-${suffix}`);
+                    if (totalEl) totalEl.textContent = '0';
+                    
+                    const firstEl = document.getElementById(`first-${suffix}`);
+                    if (firstEl) firstEl.textContent = '--:--';
+                    
+                    const lastEl = document.getElementById(`last-${suffix}`);
+                    if (lastEl) lastEl.textContent = '--:--';
+                });
+
+                // Update panels based on zoneActivity
+                if (data.zoneActivity) {
+                    Object.entries(data.zoneActivity).forEach(([zoneName, stats]) => {
+                        // Determine which panel corresponds to this zone
+                        let suffix = null;
+                        if (zoneName.includes('D1') || zoneName.includes('Main Garage')) suffix = 'd1';
+                        else if (zoneName.includes('D2') || zoneName.includes('House Door')) suffix = 'd2';
+                        else if (zoneName.includes('D3') || zoneName.includes('Single Roller')) suffix = 'd3';
+                        else if (zoneName.includes('D4') || zoneName.includes('Double Roller')) suffix = 'd4';
+                        else if (zoneName.includes('House-Outside')) suffix = 'house-outside';
+                        
+                        if (suffix) {
+                            // Update Status
+                            const statusEl = document.getElementById(`status-${suffix}`);
+                            if (statusEl) {
+                                // If there was recent activity (e.g. last 15 mins), show ACTIVE
+                                const lastTime = stats.lastActivity || 0;
+                                const now = Date.now() / 1000;
+                                const isRecent = (now - lastTime) < 900; // 15 mins
+                                
+                                if (isRecent) {
+                                    statusEl.textContent = 'ACTIVE';
+                                    statusEl.className = 'status-badge active';
+                                } else {
+                                    statusEl.textContent = 'INACTIVE';
+                                    statusEl.className = 'status-badge inactive';
+                                }
+                            }
+
+                            // Update Stats
+                            const firstEl = document.getElementById(`first-${suffix}`);
+                            if (firstEl && stats.firstActivity) {
+                                firstEl.textContent = new Date(stats.firstActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            }
+                            
+                            const lastEl = document.getElementById(`last-${suffix}`);
+                            if (lastEl && stats.lastActivity) {
+                                lastEl.textContent = new Date(stats.lastActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            }
+                            
+                            const totalEl = document.getElementById(`total-${suffix}`);
+                            if (totalEl) {
+                                totalEl.textContent = stats.count || 0;
+                            }
+                            
+                            // Update History (Simple list of recent events if available, or just a summary)
+                            const historyEl = document.getElementById(`history-${suffix}`);
+                            if (historyEl) {
+                                historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
+                            }
+                        }
+                    });
+                }
+                
+                // Update Analytics Panel
+                if (data.detectionAnalytics) {
+                    const avgConf = data.detectionAnalytics.averageConfidence || 0;
+                    const confEl = document.getElementById('ml-confidence-avg');
+                    if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
+                    
+                    // Update Pie Chart if it exists
+                    const ctx = document.getElementById('confidencePieChart');
+                    if (ctx) {
+                        // Initialize chart if needed (simplified)
+                        if (!ctx.chartInstance) {
+                            ctx.chartInstance = new Chart(ctx, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: ['High', 'Medium', 'Low'],
+                                    datasets: [{
+                                        data: [0, 0, 0],
+                                        backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+                                    }]
+                                },
+                                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            });
+                        }
+                        
+                        // Update chart data
+                        if (data.detectionAnalytics.confidenceDistribution) {
+                            const dist = data.detectionAnalytics.confidenceDistribution;
+                            ctx.chartInstance.data.datasets[0].data = [
+                                dist.high || 0,
+                                dist.medium || 0,
+                                dist.low || 0
+                            ];
+                            ctx.chartInstance.update();
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error('updateDoorCommandCenter failed:', error);
+            }
+        }
+
+        /**
          * Updates the enhanced door activity widget with current door status and activity
          * Uses DataManager to fetch status data and processes door information
          * Updates active doors count, sessions, and activity statistics
