@@ -13,6 +13,19 @@
 // STAGE 5: MODULAR ARCHITECTURE SYSTEM
 // ===================================================================
 
+// Logger Utility
+const Logger = {
+    log: function(message, ...args) {
+        console.log(`[Dashboard] ${message}`, ...args);
+    },
+    error: function(message, ...args) {
+        console.error(`[Dashboard] ${message}`, ...args);
+    },
+    warn: function(message, ...args) {
+        console.warn(`[Dashboard] ${message}`, ...args);
+    }
+};
+
 // Authentication Utilities 
 const AuthUtils = {
     getAuthHeaders() {
