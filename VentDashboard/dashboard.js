@@ -2495,17 +2495,25 @@ function startAutoRefresh() {
                             // Update Status
                             const statusEl = document.getElementById(`status-${suffix}`);
                             if (statusEl) {
-                                // If there was recent activity (e.g. last 15 mins), show ACTIVE
-                                const lastTime = stats.lastActivity || 0;
-                                const now = Date.now() / 1000;
-                                const isRecent = (now - lastTime) < 900; // 15 mins
-                                
-                                if (isRecent) {
-                                    statusEl.textContent = 'ACTIVE';
-                                    statusEl.className = 'status-badge active';
+                                // NEW LOGIC: Use currentState if available
+                                if (stats.currentState && stats.currentState !== 'UNKNOWN') {
+                                    statusEl.textContent = stats.currentState;
+                                    // Add specific classes for styling (open=danger/warning, closed=success/inactive)
+                                    const statusClass = stats.currentState === 'OPEN' ? 'active' : 'inactive';
+                                    statusEl.className = `status-badge ${statusClass}`; 
                                 } else {
-                                    statusEl.textContent = 'INACTIVE';
-                                    statusEl.className = 'status-badge inactive';
+                                    // Fallback to existing logic
+                                    const lastTime = stats.lastActivity || 0;
+                                    const now = Date.now() / 1000;
+                                    const isRecent = (now - lastTime) < 900; // 15 mins
+                                    
+                                    if (isRecent) {
+                                        statusEl.textContent = 'ACTIVE';
+                                        statusEl.className = 'status-badge active';
+                                    } else {
+                                        statusEl.textContent = 'INACTIVE';
+                                        statusEl.className = 'status-badge inactive';
+                                    }
                                 }
                             }
 
@@ -2525,10 +2533,29 @@ function startAutoRefresh() {
                                 totalEl.textContent = stats.count || 0;
                             }
                             
-                            // Update History (Simple list of recent events if available, or just a summary)
+                            // Update History (List of recent events)
                             const historyEl = document.getElementById(`history-${suffix}`);
                             if (historyEl) {
-                                historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
+                                if (stats.recentEvents && stats.recentEvents.length > 0) {
+                                    let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.75em;">';
+                                    stats.recentEvents.forEach(evt => {
+                                        // Handle timestamp (seconds or ms)
+                                        const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
+                                        const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                        const action = evt.action || 'Event';
+                                        const method = evt.method === 'reed-switch' ? 'Reed' : 'ML';
+                                        const color = evt.method === 'reed-switch' ? '#28a745' : '#17a2b8';
+                                        
+                                        html += `<li style="padding:3px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
+                                            <span>${timeStr} <strong>${action}</strong></span>
+                                            <span style="color:${color}; font-weight:bold;">${method}</span>
+                                        </li>`;
+                                    });
+                                    html += '</ul>';
+                                    historyEl.innerHTML = html;
+                                } else {
+                                    historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
+                                }
                             }
                         }
                     });
@@ -2537,10 +2564,33 @@ function startAutoRefresh() {
                 }
                 
                 // Update Analytics Panel
-                if (data.detectionAnalytics) {
-                    const avgConf = data.detectionAnalytics.averageConfidence || 0;
+                if (data.detectionAnalytics || data.eventSummary) {
+                    const avgConf = data.detectionAnalytics?.averageConfidence || 0;
                     const confEl = document.getElementById('ml-confidence-avg');
                     if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
+                    
+                    // Inject Time Range Selector if not present
+                    const actionsEl = document.querySelector('.analytics-actions');
+                    if (actionsEl && !document.getElementById('analyticsTimeRange')) {
+                        const selectHtml = `
+                            <select id="analyticsTimeRange" onchange="updateDoorCommandCenter(this.value)" style="margin-bottom:10px; padding:5px; width:100%; border-radius:4px; border:1px solid #ddd; background:white;">
+                                <option value="24" ${hours == 24 ? 'selected' : ''}>Last 24 Hours</option>
+                                <option value="48" ${hours == 48 ? 'selected' : ''}>Last 48 Hours</option>
+                                <option value="168" ${hours == 168 ? 'selected' : ''}>Last 7 Days</option>
+                                <option value="720" ${hours == 720 ? 'selected' : ''}>Last 30 Days</option>
+                            </select>
+                        `;
+                        // Insert before the button
+                        const btn = actionsEl.querySelector('.analytics-btn');
+                        if (btn) {
+                            btn.insertAdjacentHTML('beforebegin', selectHtml);
+                        } else {
+                            actionsEl.innerHTML += selectHtml;
+                        }
+                    } else if (document.getElementById('analyticsTimeRange')) {
+                        // Update selected value if it exists
+                        document.getElementById('analyticsTimeRange').value = hours;
+                    }
                     
                     // Update Pie Chart if it exists
                     const ctx = document.getElementById('confidencePieChart');
@@ -10281,7 +10331,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // CSV Export function for pressure analysis
 async function exportPressureAnalysisCSV(timeRangeOverride = null) {
-    const timeRange = timeRangeOverride || document.getElementById('csvTimeRange').value;
+    const timeRangeElement = document.getElementById('analyticsTimeRange');
+    const timeRange = timeRangeOverride || (timeRangeElement ? timeRangeElement.value : '24h');
     const exportButton = document.getElementById('exportCsvBtn');
     const qualityDot = document.getElementById('csvDataQualityDot');
     const qualityText = document.getElementById('csvDataQualityText');
