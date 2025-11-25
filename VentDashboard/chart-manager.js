@@ -33,7 +33,14 @@ export class ChartManager {
         try {
             // Get data using DataManager instead of global function
             const apiData = await this.dataManager.getHistoryData(hours);
-            const data = apiData?.data || [];
+            
+            // Handle both array response (from snapshot) and object response (legacy/wrapper)
+            let data = [];
+            if (Array.isArray(apiData)) {
+                data = apiData;
+            } else if (apiData && Array.isArray(apiData.data)) {
+                data = apiData.data;
+            }
             
             if (!data || data.length === 0) {
                 console.log('ChartManager: No temperature data available');
@@ -87,7 +94,14 @@ export class ChartManager {
         try {
             // Get data using DataManager instead of global function
             const apiData = await this.dataManager.getHistoryData(hours);
-            const data = apiData?.data || [];
+            
+            // Handle both array response (from snapshot) and object response (legacy/wrapper)
+            let data = [];
+            if (Array.isArray(apiData)) {
+                data = apiData;
+            } else if (apiData && Array.isArray(apiData.data)) {
+                data = apiData.data;
+            }
             
             if (!data || data.length === 0) {
                 console.log('ChartManager: No pressure data available');

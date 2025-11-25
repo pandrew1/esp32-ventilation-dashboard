@@ -2507,9 +2507,19 @@ function startAutoRefresh() {
                     fn: 0
                 };
 
-                // Calculate cutoff time for filtering (Rolling Window)
-                const nowTime = Date.now();
-                const cutoffTime = nowTime - (hours * 60 * 60 * 1000);
+                // Calculate cutoff time for filtering
+                // FIX: If hours is 24, use Midnight Today (Local) instead of rolling 24h window
+                // This ensures "Today" view only shows events from today
+                const now = new Date();
+                let cutoffTime;
+                
+                if (hours === 24) {
+                    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    cutoffTime = midnight;
+                    Logger.log(`Filtering events since midnight: ${new Date(cutoffTime).toLocaleString()}`);
+                } else {
+                    cutoffTime = Date.now() - (hours * 60 * 60 * 1000);
+                }
 
                 // Handle both array response (from snapshot) and object response (legacy/wrapper)
                 let historyRecords = [];
@@ -2605,9 +2615,13 @@ function startAutoRefresh() {
                 // Sort events by timestamp DESCENDING (Newest First)
                 Object.keys(doorEvents).forEach(key => {
                     doorEvents[key].sort((a, b) => {
-                        const tA = typeof a.timestamp === 'string' ? parseFloat(a.timestamp) : a.timestamp;
-                        const tB = typeof b.timestamp === 'string' ? parseFloat(b.timestamp) : b.timestamp;
-                        return tB - tA; // Descending
+                        // Handle both numeric timestamps (Unix) and ISO strings
+                        const getTs = (t) => {
+                            if (typeof t === 'number') return t > 10000000000 ? t : t * 1000;
+                            const d = new Date(t);
+                            return isNaN(d.getTime()) ? 0 : d.getTime();
+                        };
+                        return getTs(b.timestamp) - getTs(a.timestamp); // Descending
                     });
                 });
 
@@ -2714,7 +2728,13 @@ function startAutoRefresh() {
                             
                             const totalEl = document.getElementById(`total-${suffix}`);
                             if (totalEl) {
-                                totalEl.textContent = stats.count || 0;
+                                // FIX: Use the actual count of events in the list for consistency
+                                // This ensures the number matches the list items shown
+                                if (doorEvents[suffix] && doorEvents[suffix].length > 0) {
+                                    totalEl.textContent = doorEvents[suffix].length;
+                                } else {
+                                    totalEl.textContent = stats.count || 0;
+                                }
                             }
                             
                             // Update History (List of recent events) - NOW USING FULL HISTORY DATA
@@ -2737,8 +2757,11 @@ function startAutoRefresh() {
                                         // Format ML Probability
                                         let mlInfoText = '';
                                         if (evt.mlProbability !== undefined && evt.mlProbability !== null) {
-                                            const mlProb = (evt.mlProbability * 100).toFixed(1);
-                                            mlInfoText = `ML: ${mlProb}%`;
+                                            // FIX: Hide negative ML probabilities (error codes)
+                                            if (evt.mlProbability >= 0) {
+                                                const mlProb = (evt.mlProbability * 100).toFixed(1);
+                                                mlInfoText = `ML: ${mlProb}%`;
+                                            }
                                         }
                                         
                                         // Format S7 Status & Warning Icon
@@ -2750,12 +2773,12 @@ function startAutoRefresh() {
                                             s7InfoText = 'Pressure Confirmed';
                                             s7Color = '#28a745';
                                         } else if (evt.s7RejectReason === 'REED_ONLY') {
-                                            warningIcon = `<span title="Pressure Missed: No candidate found" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
+                                            warningIcon = `<span title="Pressure Missed: No pressure signature found to validate this event" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
                                             s7InfoText = 'Pressure Missed';
                                             s7Color = '#dc3545';
                                         } else if (evt.s7RejectReason) {
                                             // Specific rejection reason
-                                            const mlScore = evt.mlProbability !== undefined ? (evt.mlProbability * 100).toFixed(1) + '%' : 'N/A';
+                                            const mlScore = (evt.mlProbability !== undefined && evt.mlProbability >= 0) ? (evt.mlProbability * 100).toFixed(1) + '%' : 'N/A';
                                             warningIcon = `<span title="Pressure Missed: Rejected by S7 (${evt.s7RejectReason}), ML Score: ${mlScore}" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
                                             s7InfoText = `Missed (${evt.s7RejectReason})`;
                                             s7Color = '#dc3545';
@@ -6792,7 +6815,7 @@ document.addEventListener('DOMContentLoaded', () => {
          * @param {number} hours - Number of hours of historical data to display
          * @returns {Promise<void>}
          */
-        async function createTemperatureChart(hours) {
+        async function createTemperatureChart(hours, bypassEnhanced = false) {
             Logger.log(`=== STAGE 3 FIX: createTemperatureChart(${hours}) using DataManager ===`);
             
             // Clear previous data source tracking to prevent accumulation
@@ -6806,6 +6829,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Update active button using consolidated utility
             ChartUtils.updateActiveButton('', hours, 'createTemperatureChart');
+
+            // Check if we should use the enhanced modular system
+            // If bypassEnhanced is true (passed by ChartManager), skip this check to avoid infinite loop
+            if (!bypassEnhanced && GlobalChartManager && temperatureChart) {
+                // Use enhanced chart loading which utilizes ChartManager for smart updates
+                enhancedLoadChart(hours);
+                return;
+            }
 
             try {
                 const token = localStorage.getItem('ventilation_auth_token');
