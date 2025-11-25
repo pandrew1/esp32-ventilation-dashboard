@@ -723,37 +723,21 @@ const DataManager = {
         console.log('DataManager: Fetching fresh enhanced data');
         
         try {
-            console.log('🔍 DEBUG: DataManager.getEnhancedData() - Making API call to:', CONFIG.enhancedApiUrl);
-            console.log('🔍 DEBUG: Auth headers:', DashboardUtils.getAuthHeaders());
+            // console.log('🔍 DEBUG: DataManager.getEnhancedData() - Making API call to:', CONFIG.enhancedApiUrl);
             
             const response = await fetch(CONFIG.enhancedApiUrl, {
                 method: 'GET',
                 headers: DashboardUtils.getAuthHeaders()
             });
 
-            console.log('🔍 DEBUG: GetEnhancedDashboardData response status:', response.status, response.statusText);
+            // console.log('🔍 DEBUG: GetEnhancedDashboardData response status:', response.status, response.statusText);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('🔍 DEBUG: GetEnhancedDashboardData full response structure:');
-            console.log('🔍 DEBUG: - timestamp:', data.timestamp);
-            console.log('🔍 DEBUG: - deviceId:', data.deviceId);
-            console.log('🔍 DEBUG: - sections keys:', Object.keys(data.sections || {}));
-            if (data.sections?.yesterday) {
-                console.log('🔍 DEBUG: - yesterday keys:', Object.keys(data.sections.yesterday));
-                console.log('🔍 DEBUG: - yesterday.environmental:', !!data.sections.yesterday.environmental);
-                console.log('🔍 DEBUG: - yesterday.ventilation:', !!data.sections.yesterday.ventilation);
-                console.log('🔍 DEBUG: - yesterday.doorActivity:', !!data.sections.yesterday.doorActivity);
-                console.log('🔍 DEBUG: - yesterday.systemHealth:', !!data.sections.yesterday.systemHealth);
-            }
-            if (data.sections?.doors) {
-                console.log('🔍 DEBUG: - doors keys:', Object.keys(data.sections.doors));
-                console.log('🔍 DEBUG: - doors.detectionAnalytics:', !!data.sections.doors.detectionAnalytics);
-                console.log('🔍 DEBUG: - doors.timeline length:', data.sections.doors.timeline?.length || 0);
-            }
+            // console.log('🔍 DEBUG: GetEnhancedDashboardData full response structure:', Object.keys(data));
             
             // Cache the response
             cache.data = data;
@@ -2434,12 +2418,21 @@ function startAutoRefresh() {
             
             if (!hasAuth) {
                 console.warn('updateDoorCommandCenter: No authentication available');
+                // Update UI to show auth required
+                const panels = ['d1', 'd2', 'd3', 'd4', 'house-outside'];
+                panels.forEach(p => {
+                    const el = document.getElementById(`history-${p}`);
+                    if (el) el.innerHTML = '<div style="color:orange; padding:10px; text-align:center;">Auth Required</div>';
+                });
                 return;
             }
 
             try {
                 const cacheBuster = Date.now();
-                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
+                const apiUrl = `https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`;
+                console.log(`🚪 COMMAND CENTER: Fetching data from ${apiUrl}`);
+                
+                const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: { ...headers }
                 });
@@ -2447,6 +2440,9 @@ function startAutoRefresh() {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 
+                console.log('🚪 COMMAND CENTER: Data received', data);
+                console.log('🚪 COMMAND CENTER: Zone Activity Keys:', data.zoneActivity ? Object.keys(data.zoneActivity) : 'None');
+
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
                 const doorMap = {
@@ -2472,20 +2468,30 @@ function startAutoRefresh() {
                     
                     const lastEl = document.getElementById(`last-${suffix}`);
                     if (lastEl) lastEl.textContent = '--:--';
+                    
+                    // Clear loading state
+                    const historyEl = document.getElementById(`history-${suffix}`);
+                    if (historyEl) historyEl.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">No activity</div>';
                 });
 
                 // Update panels based on zoneActivity
                 if (data.zoneActivity) {
                     Object.entries(data.zoneActivity).forEach(([zoneName, stats]) => {
+                        console.log(`🚪 Processing zone: ${zoneName}`, stats);
+                        
                         // Determine which panel corresponds to this zone
                         let suffix = null;
-                        if (zoneName.includes('D1') || zoneName.includes('Main Garage')) suffix = 'd1';
-                        else if (zoneName.includes('D2') || zoneName.includes('House Door')) suffix = 'd2';
-                        else if (zoneName.includes('D3') || zoneName.includes('Single Roller')) suffix = 'd3';
-                        else if (zoneName.includes('D4') || zoneName.includes('Double Roller')) suffix = 'd4';
-                        else if (zoneName.includes('House-Outside')) suffix = 'house-outside';
+                        // Improved matching logic to handle various API response formats
+                        const name = zoneName.toLowerCase();
+                        if (name.includes('d1') || name.includes('main garage')) suffix = 'd1';
+                        else if (name.includes('d2') || name.includes('house door') || name.includes('house hinge')) suffix = 'd2';
+                        else if (name.includes('d3') || name.includes('single roller')) suffix = 'd3';
+                        else if (name.includes('d4') || name.includes('double roller')) suffix = 'd4';
+                        else if (name.includes('house-outside') || name.includes('house outside')) suffix = 'house-outside';
                         
                         if (suffix) {
+                            console.log(`   -> Matched to panel: ${suffix}`);
+                            
                             // Update Status
                             const statusEl = document.getElementById(`status-${suffix}`);
                             if (statusEl) {
@@ -2524,8 +2530,12 @@ function startAutoRefresh() {
                             if (historyEl) {
                                 historyEl.innerHTML = `<div style="font-size:0.8em; color:#666; padding:5px;">${stats.count || 0} events today</div>`;
                             }
+                        } else {
+                            console.warn(`   -> No panel match found for zone: ${zoneName}`);
                         }
                     });
+                } else {
+                    console.warn('🚪 COMMAND CENTER: No zoneActivity data found in response');
                 }
                 
                 // Update Analytics Panel
@@ -2567,6 +2577,12 @@ function startAutoRefresh() {
 
             } catch (error) {
                 console.error('updateDoorCommandCenter failed:', error);
+                // Show error state in panels
+                const panels = ['d1', 'd2', 'd3', 'd4', 'house-outside'];
+                panels.forEach(p => {
+                    const el = document.getElementById(`history-${p}`);
+                    if (el) el.innerHTML = `<div style="color:red; padding:10px; text-align:center;">Error: ${error.message}</div>`;
+                });
             }
         }
 
@@ -2597,7 +2613,7 @@ function startAutoRefresh() {
             const headers = getAuthHeaders();
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
             
-            console.log('🔍 DEBUG: Authentication check - hasAuth:', hasAuth, 'headers keys:', Object.keys(headers));
+            // console.log('🔍 DEBUG: Authentication check - hasAuth:', hasAuth, 'headers keys:', Object.keys(headers));
             
             if (!hasAuth) {
                 console.error('🚨 DEBUG: updateEnhancedDoorActivity: No authentication available - Bearer token or API key required');
@@ -2609,7 +2625,7 @@ function startAutoRefresh() {
             }            try {
                 // FIXED: Use absolute URL with proper parameter format
                 const cacheBuster = Date.now();
-                console.log('🔍 DEBUG: Making GetEnhancedDoorAnalytics API call for', hours, 'hours');
+                // console.log('🔍 DEBUG: Making GetEnhancedDoorAnalytics API call for', hours, 'hours');
                 const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
                     method: 'GET',
                     headers: {
@@ -2622,12 +2638,7 @@ function startAutoRefresh() {
                 }
 
                 const analyticsData = await response.json();
-                console.log('🔍 DEBUG: Enhanced door analytics received - structure:');
-                console.log('🔍 DEBUG: - Root keys:', Object.keys(analyticsData));
-                console.log('🔍 DEBUG: - eventSummary:', analyticsData.eventSummary);
-                console.log('🔍 DEBUG: - recentPerformance:', analyticsData.recentPerformance);
-                console.log('🔍 DEBUG: - totalEvents:', analyticsData.totalEvents);
-                console.log('🔍 DEBUG: - hourlyBreakdown keys:', analyticsData.hourlyBreakdown ? Object.keys(analyticsData.hourlyBreakdown).length : 0);
+                // console.log('🔍 DEBUG: Enhanced door analytics received - structure:', Object.keys(analyticsData));
 
                 // Process and display the enhanced data
                 updateDoorActivityDisplay(analyticsData);
@@ -2702,22 +2713,13 @@ function startAutoRefresh() {
 
         // NEW: Update door activity display with enhanced data
         function updateDoorActivityDisplay(data) {
-            console.log('🔍 DEBUG: updateDoorActivityDisplay called with data structure:');
-            console.log('🔍 DEBUG: - Root keys:', Object.keys(data));
-            console.log('🔍 DEBUG: - data.eventSummary:', data.eventSummary);
-            console.log('🔍 DEBUG: - data.recentPerformance:', data.recentPerformance);
-            console.log('🔍 DEBUG: - data.hourlyBreakdown keys:', data.hourlyBreakdown ? Object.keys(data.hourlyBreakdown) : 'none');
-            console.log('🔍 DEBUG: - data.totalEvents:', data.totalEvents);
-            console.log('🔍 DEBUG: - data.zoneActivity:', data.zoneActivity);
-            console.log('🔍 DEBUG: - data.detectionAnalytics:', data.detectionAnalytics);
+            // console.log('🔍 DEBUG: updateDoorActivityDisplay called with data structure:', Object.keys(data));
             
             // FIXED: Use enhanced GetEnhancedDoorAnalytics API response with new dashboard fields
             
             if (data.eventSummary || data.totalEvents !== undefined) {
                 const summary = data.eventSummary || {};
-                console.log('updateDoorActivityDisplay: summary object:', summary);
-                console.log('updateDoorActivityDisplay: summary.uniqueZonesActive:', summary.uniqueZonesActive);
-                console.log('updateDoorActivityDisplay: summary.latestActivity:', summary.latestActivity);
+                // console.log('updateDoorActivityDisplay: summary object:', summary);
                 
                 // Use eventSummary.totalEvents for total sessions (443 in this case)
                 const totalEvents = summary.totalEvents || data.totalEvents || 0;
@@ -2785,7 +2787,7 @@ function startAutoRefresh() {
                     document.getElementById('peakHourStat').textContent = 'Peak: No activity';
                 }
                 
-                console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'activeZones:', activeZones, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
+                // console.log('updateDoorActivityDisplay: Updated with totalEvents:', totalEvents, 'activeZones:', activeZones, 'pressureEvents:', pressureCount, 'reedEvents:', reedCount);
                 
             } else {
                 console.log('updateDoorActivityDisplay: No valid data found');
