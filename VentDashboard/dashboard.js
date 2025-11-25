@@ -1954,10 +1954,16 @@ function startAutoRefresh() {
                 }
 
                 // Use DataManager to get yesterday's raw data (same as individual sensor function)
-                const data = await DataManager.getHistoryData(24);
+                const historyResponse = await DataManager.getHistoryData(24);
                 console.log('DataManager: History data received for summary calculation (24h)');
                 
-                const historyData = data.data || [];
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(historyResponse)) {
+                    historyData = historyResponse;
+                } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                    historyData = historyResponse.data;
+                }
                 
                 if (!historyData || historyData.length === 0) {
                     console.log('No history data available for summary calculation');
@@ -2505,8 +2511,16 @@ function startAutoRefresh() {
                 const nowTime = Date.now();
                 const cutoffTime = nowTime - (hours * 60 * 60 * 1000);
 
-                if (historyData && historyData.data) {
-                    historyData.data.forEach(record => {
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyRecords = [];
+                if (Array.isArray(historyData)) {
+                    historyRecords = historyData;
+                } else if (historyData && Array.isArray(historyData.data)) {
+                    historyRecords = historyData.data;
+                }
+
+                if (historyRecords.length > 0) {
+                    historyRecords.forEach(record => {
                         if (record.doorTransitions) {
                             record.doorTransitions.forEach(t => {
                                 // Filter: Show events within the requested time range (Rolling Window)
@@ -3592,20 +3606,27 @@ function startAutoRefresh() {
             
             // Use consolidated DataManager for history data
             DataManager.getHistoryData(hours)
-                .then(data => {
+                .then(historyResponse => {
                     Logger.log(`DataManager: History data received for timeline (${hours}h)`);
+                    
+                    // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                    let historyData = [];
+                    if (Array.isArray(historyResponse)) {
+                        historyData = historyResponse;
+                    } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                        historyData = historyResponse.data;
+                    }
+                    
                     Logger.log('TIMELINE: Received history data for', hours, 'hours:', {
-                        dataPoints: data.data ? data.data.length : 0,
-                        deviceId: data.deviceId,
-                        aggregation: data.aggregation,
+                        dataPoints: historyData.length,
                         timeRange: `${hours} hours requested`,
-                        firstRecord: data.data && data.data.length > 0 ? {
-                            timestamp: data.data[0].timestamp,
-                            doorCount: data.data[0].doors ? data.data[0].doors.length : 0
+                        firstRecord: historyData.length > 0 ? {
+                            timestamp: historyData[0].timestamp,
+                            doorCount: historyData[0].doors ? historyData[0].doors.length : 0
                         } : 'No data',
-                        lastRecord: data.data && data.data.length > 0 ? {
-                            timestamp: data.data[data.data.length - 1].timestamp,
-                            doorCount: data.data[data.data.length - 1].doors ? data.data[data.data.length - 1].doors.length : 0
+                        lastRecord: historyData.length > 0 ? {
+                            timestamp: historyData[historyData.length - 1].timestamp,
+                            doorCount: historyData[historyData.length - 1].doors ? historyData[historyData.length - 1].doors.length : 0
                         } : 'No data'
                     });
                     
@@ -3619,14 +3640,14 @@ function startAutoRefresh() {
                         peakHour: null
                     };
                     
-                    if (data.data && data.data.length > 0) {
+                    if (historyData.length > 0) {
                         // Track unique door events to avoid duplication
                         const uniqueEvents = new Map(); // key: "timestamp-door-action", value: event
                         
-                        Logger.log(`TIMELINE: Processing ${data.data.length} API records for door events`);
+                        Logger.log(`TIMELINE: Processing ${historyData.length} API records for door events`);
                         
                         // Extract door events from history data
-                        data.data.forEach((record, recordIndex) => {
+                        historyData.forEach((record, recordIndex) => {
                             // Process explicit door transitions first (most accurate)
                             if (record.doorTransitions && Array.isArray(record.doorTransitions)) {
                                 // DEBUG: Log first few transitions to see timestamp format
@@ -4440,11 +4461,16 @@ function startAutoRefresh() {
                 }
                 
                 // Use consolidated DataManager for 24h history data
-                const data = await DataManager.getHistoryData(24);
+                const historyResponse = await DataManager.getHistoryData(24);
                 console.log('DataManager: History data received for yesterday door activity (24h)');
                 
-                // History API returns {deviceId: ..., data: [...]}
-                const historyData = data.data || [];
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(historyResponse)) {
+                    historyData = historyResponse;
+                } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                    historyData = historyResponse.data;
+                }
                 
                 if (!historyData || historyData.length === 0) {
                     yesterdayElement.innerHTML = '<div class="info-state">No history data available for yesterday</div>';
@@ -4560,10 +4586,16 @@ function startAutoRefresh() {
                 }
 
                 // Use DataManager to get yesterday's sensor data
-                const data = await DataManager.getHistoryData(24);
+                const historyResponse = await DataManager.getHistoryData(24);
                 console.log('DataManager: History data received for individual sensor analysis (24h)');
                 
-                const historyData = data.data || [];
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(historyResponse)) {
+                    historyData = historyResponse;
+                } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                    historyData = historyResponse.data;
+                }
                 
                 if (!historyData || historyData.length === 0) {
                     console.log('No history data available for individual sensor analysis');
@@ -5172,9 +5204,18 @@ function startAutoRefresh() {
             console.log('🔍 DEBUG: Attempting to fetch current sensor readings from cached history');
             try {
                 const historyResponse = await DataManager.getHistoryData(24); // Use cached 24h data instead of fetching 1h
-                if (historyResponse && historyResponse.data && historyResponse.data.length > 0) {
+                
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(historyResponse)) {
+                    historyData = historyResponse;
+                } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                    historyData = historyResponse.data;
+                }
+                
+                if (historyData.length > 0) {
                     // 🐛 FIX: Azure returns data in reverse chronological order (newest first), so use index 0
-                    const latestReading = historyResponse.data[0]; // Get the FIRST item (most recent)
+                    const latestReading = historyData[0]; // Get the FIRST item (most recent)
                     console.log('🔍 DEBUG: Latest reading timestamp:', latestReading.timestamp, 'sensors:', latestReading.sensors);
                     if (latestReading.sensors) {
                         sensors = {
@@ -6778,16 +6819,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Use consolidated DataManager for history data
-                const data = await DataManager.getHistoryData(hours);
+                const historyResponse = await DataManager.getHistoryData(hours);
                 Logger.log(`DataManager: History data received for temperature chart (${hours}h)`);
                 
-                if (data.data && data.data.length > 0) {
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(historyResponse)) {
+                    historyData = historyResponse;
+                } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                    historyData = historyResponse.data;
+                }
+                
+                if (historyData.length > 0) {
                     // Track successful hourly data fetch
-                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Raw Sensor Data', `${data.data.length} data points`);
+                    window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Raw Sensor Data', `${historyData.length} data points`);
                     
                     try {
-                        const firstTimestamp = new Date(data.data[0].timestamp);
-                        const lastTimestamp = new Date(data.data[data.data.length - 1].timestamp);
+                        const firstTimestamp = new Date(historyData[0].timestamp);
+                        const lastTimestamp = new Date(historyData[historyData.length - 1].timestamp);
                         
                         // Check if timestamps are valid before trying to use them
                         if (!isNaN(firstTimestamp.getTime()) && !isNaN(lastTimestamp.getTime())) {
@@ -6800,7 +6849,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'No Data', 'API returned empty data set');
                 }
-                updateChart(data.data || [], hours);
+                updateChart(historyData, hours);
                 
             } catch (error) {
                 Logger.error('DataManager: Error loading history data for temperature chart:', error);
@@ -6844,9 +6893,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 Logger.log(`DataManager: History data received for pressure chart (${hours}h)`);
                 Logger.log('Received pressure/forecast data from API:', apiData);
                 
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(apiData)) {
+                    historyData = apiData;
+                } else if (apiData && Array.isArray(apiData.data)) {
+                    historyData = apiData.data;
+                }
+                
                 // Transform API data into pressure chart format
                 // Map to the actual structure returned by Azure Functions: sensors.outdoor.pressure and weather.forecastHigh
-                const pressureData = (apiData.data || []).map(point => {
+                const pressureData = historyData.map(point => {
                     const hasValidPressure = point.sensors && point.sensors.outdoor && point.sensors.outdoor.pressure && point.sensors.outdoor.pressure !== 1013.25;
                     
                     return {
@@ -7259,15 +7316,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Use DataManager to get history data (which uses snapshot)
                 const historyResponse = await DataManager.getHistoryData(hours);
                 
-                if (!historyResponse || !historyResponse.data || historyResponse.data.length === 0) {
+                // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                let historyData = [];
+                if (Array.isArray(historyResponse)) {
+                    historyData = historyResponse;
+                } else if (historyResponse && Array.isArray(historyResponse.data)) {
+                    historyData = historyResponse.data;
+                }
+                
+                if (historyData.length === 0) {
                     // No data available, don't refresh
                     return;
                 }
                 
-                const data = historyResponse; // DataManager returns { data: [...] } structure
-
                 // Get the latest timestamp from the new data
-                const latestDataPoint = data.data[0]; // API returns newest first
+                const latestDataPoint = historyData[0]; // API returns newest first
                 let newLatestTimestamp = null;
 
                 // Parse the timestamp from the latest data point
@@ -7293,7 +7356,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // If we can't parse the timestamp, refresh anyway to be safe
                 if (!newLatestTimestamp || isNaN(newLatestTimestamp.getTime())) {
-                    updateChart(data.data, hours);
+                    updateChart(historyData, hours);
                     return;
                 }
 
@@ -7303,7 +7366,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // Update our stored timestamp and refresh the chart
                     latestChartDataTimestamp = newLatestTimestamp;
-                    updateChart(data.data, hours);
+                    updateChart(historyData, hours);
                 } else {
                     Logger.log('Temperature chart: No new data points, skipping refresh to avoid unnecessary animations');
                 }
