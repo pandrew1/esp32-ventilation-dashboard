@@ -2436,7 +2436,6 @@ function startAutoRefresh() {
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
-                console.log('🚪 COMMAND CENTER DEBUG: API Response', data);
                 
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
@@ -2469,21 +2468,28 @@ function startAutoRefresh() {
                     if (historyEl) historyEl.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">No activity</div>';
                 });
 
-                // Update panels based on zoneActivity
-                if (data.zoneActivity) {
-                    console.log('🚪 COMMAND CENTER DEBUG: zoneActivity found', Object.keys(data.zoneActivity));
-                    Object.entries(data.zoneActivity).forEach(([zoneName, stats]) => {
-                        // Determine which panel corresponds to this zone
+                // Update panels based on doorActivity (preferred) or zoneActivity (fallback)
+                const activitySource = data.doorActivity || data.zoneActivity;
+                
+                if (activitySource) {
+                    Object.entries(activitySource).forEach(([name, stats]) => {
+                        // Determine which panel corresponds to this door/zone
                         let suffix = null;
-                        // Improved matching logic to handle various API response formats
-                        const name = zoneName.toLowerCase();
-                        if (name.includes('d1') || name.includes('main garage')) suffix = 'd1';
-                        else if (name.includes('d2') || name.includes('house door') || name.includes('house hinge')) suffix = 'd2';
-                        else if (name.includes('d3') || name.includes('single roller')) suffix = 'd3';
-                        else if (name.includes('d4') || name.includes('double roller')) suffix = 'd4';
-                        else if (name.includes('house-outside') || name.includes('house outside')) suffix = 'house-outside';
+                        const lowerName = name.toLowerCase();
                         
-                        console.log(`🚪 COMMAND CENTER DEBUG: Processing zone "${zoneName}" -> suffix "${suffix}"`);
+                        // Check for specific door names first (from doorActivity)
+                        if (lowerName.includes('d1') || lowerName.includes('main garage')) suffix = 'd1';
+                        else if (lowerName.includes('d2') || lowerName.includes('house door') || lowerName.includes('house hinge')) suffix = 'd2';
+                        else if (lowerName.includes('d3') || lowerName.includes('single roller')) suffix = 'd3';
+                        else if (lowerName.includes('d4') || lowerName.includes('double roller')) suffix = 'd4';
+                        else if (lowerName.includes('house-outside') || lowerName.includes('house outside')) suffix = 'house-outside';
+                        
+                        // Fallback for zone names (from zoneActivity)
+                        else if (lowerName === 'garage-outside') {
+                             // Map garage-outside to D1 as primary if no specific door data
+                             suffix = 'd1'; 
+                        }
+                        else if (lowerName === 'garage-house') suffix = 'd2';
                         
                         if (suffix) {
                             // Update Status
@@ -2527,7 +2533,7 @@ function startAutoRefresh() {
                         }
                     });
                 } else {
-                    console.warn('🚪 COMMAND CENTER: No zoneActivity data found in response');
+                    console.warn('🚪 COMMAND CENTER: No doorActivity or zoneActivity data found in response');
                 }
                 
                 // Update Analytics Panel
