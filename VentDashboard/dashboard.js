@@ -2486,7 +2486,9 @@ function startAutoRefresh() {
                                         timestamp: t.timestamp,
                                         action: t.opened ? 'OPEN' : 'CLOSE',
                                         method: t.detectionMethod,
-                                        confidence: t.confidence
+                                        confidence: t.confidence,
+                                        mlProbability: t.mlProbability,
+                                        s7RejectReason: t.s7RejectReason
                                     });
                                     
                                     // Update Confidence Stats
@@ -2496,7 +2498,8 @@ function startAutoRefresh() {
                                         confidenceStats.sum += 1.0;
                                     } else if (t.detectionMethod === 'pressure-analysis' || t.detectionMethod === 'pressure') {
                                         const conf = t.confidence || 0;
-                                        if (conf >= 0.8) confidenceStats.high++;
+                                        // Match thresholds with updateConfidenceChart: High >= 0.9, Medium >= 0.5
+                                        if (conf >= 0.9) confidenceStats.high++;
                                         else if (conf >= 0.5) confidenceStats.medium++;
                                         else confidenceStats.low++;
                                         
@@ -2618,9 +2621,34 @@ function startAutoRefresh() {
                                         const method = (evt.method === 'reed-switch' || evt.method === 'reed') ? 'Reed' : 'ML';
                                         const color = (evt.method === 'reed-switch' || evt.method === 'reed') ? '#28a745' : '#17a2b8';
                                         
-                                        html += `<li style="padding:3px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
-                                            <span>${timeStr} <strong>${action}</strong></span>
-                                            <span style="color:${color}; font-weight:bold;">${method}</span>
+                                        // Format confidence percentage
+                                        const confPercent = evt.confidence ? Math.round(evt.confidence * 100) : 0;
+                                        const confStr = (method === 'ML' && confPercent > 0) ? `(${confPercent}%)` : '';
+                                        
+                                        // Format ML Probability
+                                        let mlInfo = '';
+                                        if (evt.mlProbability !== undefined && evt.mlProbability !== null) {
+                                            const mlProb = (evt.mlProbability * 100).toFixed(1);
+                                            mlInfo = `<div style="font-size:0.85em; color:#666;">ML: ${mlProb}%</div>`;
+                                        }
+                                        
+                                        // Format S7 Status
+                                        let s7Info = '';
+                                        if (evt.s7RejectReason) {
+                                            s7Info = `<div style="font-size:0.85em; color:#dc3545;">S7 Fail: ${evt.s7RejectReason}</div>`;
+                                        } else if (method === 'ML') {
+                                            s7Info = `<div style="font-size:0.85em; color:#28a745;">S7 Pass</div>`;
+                                        }
+                                        
+                                        html += `<li style="padding:6px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                            <div>
+                                                <div>${timeStr} <strong>${action}</strong></div>
+                                            </div>
+                                            <div style="text-align:right;">
+                                                <div style="color:${color}; font-weight:bold;">${method} ${confStr}</div>
+                                                ${mlInfo}
+                                                ${s7Info}
+                                            </div>
                                         </li>`;
                                     });
                                     html += '</ul>';
@@ -2692,7 +2720,7 @@ function startAutoRefresh() {
                         ctx.chartInstance = new Chart(ctx, {
                             type: 'doughnut',
                             data: {
-                                labels: ['High', 'Medium', 'Low', 'Reed'],
+                                labels: ['High (≥0.9)', 'Medium (0.5-0.9)', 'Low (<0.5)', 'Reed Switch (1.0)'],
                                 datasets: [{
                                     data: [0, 0, 0, 0],
                                     backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8']
