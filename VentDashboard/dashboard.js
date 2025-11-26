@@ -2907,10 +2907,23 @@ function startAutoRefresh() {
                                 labels: ['High (≥0.9)', 'Medium (0.5-0.9)', 'Low (<0.5)', 'Reed Switch (1.0)'],
                                 datasets: [{
                                     data: [0, 0, 0, 0],
-                                    backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8']
+                                    backgroundColor: ['#17a2b8', '#ffc107', '#dc3545', '#28a745']
                                 }]
                             },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            options: { 
+                                responsive: true, 
+                                maintainAspectRatio: false, 
+                                plugins: { 
+                                    legend: { 
+                                        display: true,
+                                        position: 'right',
+                                        labels: {
+                                            boxWidth: 12,
+                                            font: { size: 10 }
+                                        }
+                                    } 
+                                } 
+                            }
                         });
                     }
                     
@@ -6489,9 +6502,14 @@ function startAutoRefresh() {
 
         // Function to apply both time period and severity filters
         function applyIncidentFilters() {
-            const timePeriodValue = document.getElementById('timePeriodFilter').value;
-            const severityValue = document.getElementById('severityFilter').value;
+            const timePeriodFilter = document.getElementById('timePeriodFilter');
+            const severityFilter = document.getElementById('severityFilter');
             const filterStatus = document.getElementById('filterStatus');
+
+            if (!timePeriodFilter || !severityFilter || !filterStatus) return;
+
+            const timePeriodValue = timePeriodFilter.value;
+            const severityValue = severityFilter.value;
             
             if (!originalIncidentsData || originalIncidentsData.length === 0) {
                 filterStatus.textContent = 'No incident data available';
