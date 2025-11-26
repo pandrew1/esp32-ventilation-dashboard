@@ -3862,7 +3862,8 @@ function startAutoRefresh() {
                                                 confidence: transition.confidence || null,
                                                 confirmedByReed: transition.confirmedByReed || false,
                                                 s7RejectReason: transition.s7RejectReason || null,
-                                                mlProbability: transition.mlProbability || null
+                                                mlProbability: transition.mlProbability || null,
+                                                classifierType: transition.classifierType || null
                                             };
                                             uniqueEvents.set(eventKey, event);
                                             const confirmationStatus = event.confirmedByReed ? '✅ CONFIRMED' : (event.detectionMethod === 'pressure' ? '⚠️ UNCONFIRMED' : '');
@@ -4107,6 +4108,7 @@ function startAutoRefresh() {
                                             <th>Method</th>
                                             <th>S7 Status</th>
                                             <th>ML Prob</th>
+                                            <th>Classifier</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -4194,6 +4196,11 @@ function startAutoRefresh() {
                                     if (event.mlProbability !== null && event.mlProbability !== undefined) {
                                         mlProbHtml = `<span style="color: #6c757d; font-size: 0.8em;">${(event.mlProbability * 100).toFixed(1)}%</span>`;
                                     }
+
+                                    let classifierHtml = '';
+                                    if (event.classifierType) {
+                                        classifierHtml = `<span style="color: #6c757d; font-size: 0.8em;">${event.classifierType}</span>`;
+                                    }
                                     // -------------------
                                     
                                     return `
@@ -4214,6 +4221,7 @@ function startAutoRefresh() {
                                             <td>${detectionMethodHtml}</td>
                                             <td>${s7StatusHtml}</td>
                                             <td>${mlProbHtml}</td>
+                                            <td>${classifierHtml}</td>
                                         </tr>
                                     `;
                                 }).join('')}
