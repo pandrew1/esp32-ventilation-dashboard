@@ -139,7 +139,8 @@ export class ChartManager {
     async _performTemperatureChartUpdate(data, hours, existingChart) {
         // Use existing global chart creation function with correct parameter order
         if (typeof createTemperatureChart === 'function') {
-            return createTemperatureChart(hours, existingChart);
+            // Pass true for bypassEnhanced, and pass the data to avoid double-fetch
+            return createTemperatureChart(hours, true, data);
         } else {
             console.error('ChartManager: createTemperatureChart function not available');
             return existingChart;
@@ -149,7 +150,8 @@ export class ChartManager {
     async _performPressureChartUpdate(data, hours, existingChart) {
         // Use existing global chart creation function with correct parameter order  
         if (typeof createPressureChart === 'function') {
-            return createPressureChart(hours, existingChart);
+            // Pass true for bypassEnhanced, and pass the data to avoid double-fetch
+            return createPressureChart(hours, true, data);
         } else {
             console.error('ChartManager: createPressureChart function not available');
             return existingChart;

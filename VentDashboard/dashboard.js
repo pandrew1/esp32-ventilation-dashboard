@@ -289,7 +289,8 @@ const CONFIG = {
     refreshInterval: 15000, // 15 seconds - check for new telemetry data
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
     enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
-    snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot'
+    snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot',
+    historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory'
 };
 
 // Initialize API secret from URL parameter
@@ -792,15 +793,43 @@ const DataManager = {
         console.log(`DataManager: Fetching fresh history data for ${hours}h`);
         
         try {
-            // Use snapshot instead of direct call to deprecated API
-            // const url = `${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`;
+            let data;
             
-            // Fetch via snapshot (always gets 24h)
-            const snapshot = await this.getDashboardSnapshot(forceRefresh);
-            const data = snapshot.history;
-            
-            if (!data) {
-                throw new Error('History data missing from snapshot');
+            // DECISION: Use GetVentilationHistory for long-term data (>24h)
+            // Use GetDashboardSnapshot for short-term data (<=24h) which includes status/etc
+            if (hours > 24) {
+                console.log(`DataManager: Fetching long-term history data for ${hours}h via GetVentilationHistory`);
+                const url = `${CONFIG.historyApiUrl}?deviceId=${CONFIG.deviceId}&hours=${hours}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: DashboardUtils.getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const responseData = await response.json();
+                
+                // Handle response wrapper
+                if (responseData && Array.isArray(responseData.data)) {
+                    data = responseData.data;
+                } else if (Array.isArray(responseData)) {
+                    data = responseData;
+                } else {
+                    throw new Error('Invalid response format from GetVentilationHistory');
+                }
+                
+                console.log(`DataManager: Successfully fetched ${data.length} history items`);
+            } else {
+                // Fetch via snapshot (always gets 24h)
+                const snapshot = await this.getDashboardSnapshot(forceRefresh);
+                data = snapshot.history;
+                
+                if (!data) {
+                    throw new Error('History data missing from snapshot');
+                }
             }
             
             // Cache the response
@@ -813,7 +842,7 @@ const DataManager = {
             // Notify all subscribers
             this._notifySubscribers('history', { hours, data });
 
-            console.log(`DataManager: History data (${hours}h) extracted from snapshot successfully`);
+            console.log(`DataManager: History data (${hours}h) processed successfully`);
             return data;
 
         } catch (error) {
@@ -6816,7 +6845,7 @@ document.addEventListener('DOMContentLoaded', () => {
          * @param {number} hours - Number of hours of historical data to display
          * @returns {Promise<void>}
          */
-        async function createTemperatureChart(hours, bypassEnhanced = false) {
+        async function createTemperatureChart(hours, bypassEnhanced = false, providedData = null) {
             Logger.log(`=== STAGE 3 FIX: createTemperatureChart(${hours}) using DataManager ===`);
             
             // Clear previous data source tracking to prevent accumulation
@@ -6837,6 +6866,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Use enhanced chart loading which utilizes ChartManager for smart updates
                 enhancedLoadChart(hours);
                 return;
+            }
+
+            // Optimization: Use provided data if available (avoids double-fetch)
+            if (providedData && Array.isArray(providedData) && providedData.length > 0) {
+                Logger.log(`createTemperatureChart: Using provided data (${providedData.length} items)`);
+                window.dataSourceTracker.trackTemperatureSource(`${hours} Hours`, 'Pre-fetched Data', `${providedData.length} data points`);
+                return updateChart(providedData, hours);
             }
 
             try {
@@ -6896,7 +6932,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Pressure chart now uses real data from Azure Functions API
         // The fetchPressureData sample function has been removed
 
-        async function createPressureChart(hours) {
+        async function createPressureChart(hours, bypassEnhanced = false, providedData = null) {
             Logger.log(`=== STAGE 3 FIX: createPressureChart(${hours}) using DataManager ===`);
             
             // Check if time range changed before updating currentPressureChartHours
@@ -6911,26 +6947,33 @@ document.addEventListener('DOMContentLoaded', () => {
             ChartUtils.updateActiveButton('', hours, 'createPressureChart');
 
             try {
-                // Fetch real pressure and forecast data from Azure Functions API
-                const token = localStorage.getItem('ventilation_auth_token');
-                
-                if (!token && !CONFIG.apiSecret) {
-                    Logger.log('No authentication available for pressure data');
-                    updatePressureChart([], hours);
-                    return;
-                }
-
-                // Use consolidated DataManager for history data
-                const apiData = await DataManager.getHistoryData(hours);
-                Logger.log(`DataManager: History data received for pressure chart (${hours}h)`);
-                Logger.log('Received pressure/forecast data from API:', apiData);
-                
-                // Handle both array response (from snapshot) and object response (legacy/wrapper)
                 let historyData = [];
-                if (Array.isArray(apiData)) {
-                    historyData = apiData;
-                } else if (apiData && Array.isArray(apiData.data)) {
-                    historyData = apiData.data;
+
+                // Optimization: Use provided data if available
+                if (providedData && Array.isArray(providedData)) {
+                    historyData = providedData;
+                    Logger.log(`createPressureChart: Using provided data (${historyData.length} items)`);
+                } else {
+                    // Fetch real pressure and forecast data from Azure Functions API
+                    const token = localStorage.getItem('ventilation_auth_token');
+                    
+                    if (!token && !CONFIG.apiSecret) {
+                        Logger.log('No authentication available for pressure data');
+                        updatePressureChart([], hours);
+                        return;
+                    }
+
+                    // Use consolidated DataManager for history data
+                    const apiData = await DataManager.getHistoryData(hours);
+                    Logger.log(`DataManager: History data received for pressure chart (${hours}h)`);
+                    Logger.log('Received pressure/forecast data from API:', apiData);
+                    
+                    // Handle both array response (from snapshot) and object response (legacy/wrapper)
+                    if (Array.isArray(apiData)) {
+                        historyData = apiData;
+                    } else if (apiData && Array.isArray(apiData.data)) {
+                        historyData = apiData.data;
+                    }
                 }
                 
                 // Transform API data into pressure chart format
