@@ -2589,7 +2589,9 @@ function startAutoRefresh() {
                                         method: t.detectionMethod,
                                         confidence: t.confidence,
                                         mlProbability: t.mlProbability,
-                                        s7RejectReason: t.s7RejectReason
+                                        classifierType: t.classifierType,
+                                        s7RejectReason: t.s7RejectReason,
+                                        reedMatchConfidence: t.reedMatchConfidence
                                     });
                                     
                                     // Update Confidence Stats
@@ -2784,13 +2786,23 @@ function startAutoRefresh() {
                                         const confPercent = evt.confidence ? Math.round(evt.confidence * 100) : 0;
                                         const confStr = (method === 'ML' && confPercent > 0) ? `(${confPercent}%)` : '';
                                         
-                                        // Format ML Probability
+                                        // Format ML Probability & Classifier Type
                                         let mlInfoText = '';
                                         if (evt.mlProbability !== undefined && evt.mlProbability !== null) {
                                             // FIX: Hide negative ML probabilities (error codes)
                                             if (evt.mlProbability >= 0) {
                                                 const mlProb = (evt.mlProbability * 100).toFixed(1);
-                                                mlInfoText = `ML: ${mlProb}%`;
+                                                
+                                                // User requested "percent internal and external classifier"
+                                                // Display the specific classifier used and its confidence
+                                                if (evt.classifierType === 'INTERNAL') {
+                                                    mlInfoText = `Internal: ${mlProb}%`;
+                                                } else if (evt.classifierType === 'EXTERNAL') {
+                                                    mlInfoText = `External: ${mlProb}%`;
+                                                } else {
+                                                    // Fallback if type is missing or unknown
+                                                    mlInfoText = `ML: ${mlProb}%`;
+                                                }
                                             }
                                         }
                                         
@@ -2800,21 +2812,34 @@ function startAutoRefresh() {
                                         let warningIcon = '';
                                         
                                         if (evt.s7RejectReason === 'PASS') {
-                                            s7InfoText = 'Pressure Confirmed';
+                                            s7InfoText = 'S7: PASS';
                                             s7Color = '#28a745';
                                         } else if (evt.s7RejectReason === 'REED_ONLY') {
                                             warningIcon = `<span title="Pressure Missed: No pressure signature found to validate this event" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
-                                            s7InfoText = 'Pressure Missed';
+                                            s7InfoText = 'S7: NO_SIG';
                                             s7Color = '#dc3545';
                                         } else if (evt.s7RejectReason) {
                                             // Specific rejection reason
                                             const mlScore = (evt.mlProbability !== undefined && evt.mlProbability >= 0) ? (evt.mlProbability * 100).toFixed(1) + '%' : 'N/A';
                                             warningIcon = `<span title="Pressure Missed: Rejected by S7 (${evt.s7RejectReason}), ML Score: ${mlScore}" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
-                                            s7InfoText = `Missed (${evt.s7RejectReason})`;
+                                            s7InfoText = `S7: ${evt.s7RejectReason}`;
                                             s7Color = '#dc3545';
                                         } else if (method === 'ML') {
-                                            s7InfoText = `S7 Pass`;
+                                            s7InfoText = `S7: PASS`;
                                             s7Color = '#28a745';
+                                        }
+
+                                        // Format Reed Status
+                                        let reedInfoText = '';
+                                        let reedColor = '#999';
+                                        if (method === 'Reed') {
+                                            reedInfoText = 'Reed: YES';
+                                            reedColor = '#28a745';
+                                        } else if (evt.reedMatchConfidence && evt.reedMatchConfidence !== 'NONE') {
+                                            reedInfoText = `Reed: ${evt.reedMatchConfidence}`;
+                                            reedColor = '#17a2b8';
+                                        } else {
+                                            reedInfoText = 'Reed: NO';
                                         }
                                         
                                         html += `<li style="padding:8px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
@@ -2826,7 +2851,8 @@ function startAutoRefresh() {
                                                 ${warningIcon}
                                                 <span style="color:${color}; font-weight:bold; margin-right:8px;">${method} ${confStr}</span>
                                                 ${mlInfoText ? `<span style="color:#666; margin-right:8px; font-size:0.9em;">${mlInfoText}</span>` : ''}
-                                                ${s7InfoText ? `<span style="color:${s7Color}; font-size:0.9em;">${s7InfoText}</span>` : ''}
+                                                ${s7InfoText ? `<span style="color:${s7Color}; font-size:0.9em; margin-right:8px;">${s7InfoText}</span>` : ''}
+                                                <span style="color:${reedColor}; font-size:0.9em;">${reedInfoText}</span>
                                             </div>
                                         </li>`;
                                     });
