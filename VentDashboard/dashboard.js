@@ -10572,9 +10572,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // CSV Export function for pressure analysis
-async function exportPressureAnalysisCSV(timeRangeOverride = null) {
-    const timeRangeElement = document.getElementById('analyticsTimeRange');
-    const timeRange = timeRangeOverride || (timeRangeElement ? timeRangeElement.value : '24h');
+async function exportPressureAnalysisCSV(sourceIdOrValue = null) {
+    let timeRange = '24h'; // Default
+
+    // 1. Try to resolve argument as an Element ID
+    if (sourceIdOrValue) {
+        const element = document.getElementById(sourceIdOrValue);
+        if (element && (element.tagName === 'SELECT' || element.tagName === 'INPUT')) {
+            timeRange = element.value;
+        } else {
+            // Not an element ID, assume it's the value itself
+            timeRange = sourceIdOrValue;
+        }
+    } else {
+        // 2. No argument provided, try to find the elements in priority order
+        // This handles legacy calls without arguments
+        const csvElement = document.getElementById('csvTimeRange');
+        const analyticsElement = document.getElementById('analyticsTimeRange');
+        
+        if (csvElement) {
+            timeRange = csvElement.value;
+        } else if (analyticsElement) {
+            timeRange = analyticsElement.value;
+        }
+    }
+
     const exportButton = document.getElementById('exportCsvBtn');
     const qualityDot = document.getElementById('csvDataQualityDot');
     const qualityText = document.getElementById('csvDataQualityText');

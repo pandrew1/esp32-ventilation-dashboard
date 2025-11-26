@@ -1878,7 +1878,7 @@
                                             <option value="30d">Last 30 Days</option>
                                         </select>
                                     </div>
-                                    <button id="exportCsvBtn" onclick="exportPressureAnalysisCSV()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background 0.2s;">
+                                    <button id="exportCsvBtn" onclick="exportPressureAnalysisCSV('csvTimeRange')" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background 0.2s;">
                                         📥 Export CSV Data
                                     </button>
                                     <div class="data-quality-indicator" style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
@@ -2424,7 +2424,7 @@
                                     <option value="168">Last 7 Days</option>
                                     <option value="720">Last 30 Days</option>
                                 </select>
-                                <button class="analytics-btn" onclick="exportPressureAnalysisCSV()">
+                                <button class="analytics-btn" onclick="exportPressureAnalysisCSV('analyticsTimeRange')">
                                     📥 Export CSV Data
                                 </button>
                             </div>
