@@ -6200,14 +6200,17 @@ function startAutoRefresh() {
             const timestamp = updateTime.toLocaleString('en-US', dateOptions);
             
             // Display time with clear indication of source
-            if (isESP32Time) {
-                document.getElementById('lastUpdate').innerHTML = timestamp;
-                document.getElementById('lastUpdate').style.color = '#28a745'; // Green for ESP32 time
-                document.getElementById('lastUpdate').title = 'ESP32 device time - actual transmission timestamp (local time)';
-            } else {
-                document.getElementById('lastUpdate').innerHTML = `${timestamp}<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - No ESP32 timestamp]</small>`;
-                document.getElementById('lastUpdate').style.color = '#dc3545'; // Red for browser fallback
-                document.getElementById('lastUpdate').title = 'Browser time fallback - ESP32 did not provide timestamp (local time)';
+            const lastUpdateElement = document.getElementById('lastUpdate');
+            if (lastUpdateElement) {
+                if (isESP32Time) {
+                    lastUpdateElement.innerHTML = timestamp;
+                    lastUpdateElement.style.color = '#28a745'; // Green for ESP32 time
+                    lastUpdateElement.title = 'ESP32 device time - actual transmission timestamp (local time)';
+                } else {
+                    lastUpdateElement.innerHTML = `${timestamp}<br><small style="color: #dc3545; font-weight: bold;">[Browser Time - No ESP32 timestamp]</small>`;
+                    lastUpdateElement.style.color = '#dc3545'; // Red for browser fallback
+                    lastUpdateElement.title = 'Browser time fallback - ESP32 did not provide timestamp (local time)';
+                }
             }
             
             // Fallback: Ensure systemConfig is never stuck on "Loading configuration..."
@@ -6230,145 +6233,150 @@ function startAutoRefresh() {
             const doorSection = document.getElementById('doorSection');
             const doorList = document.getElementById('doorList');
             
+            if (!doorSection) return;
+
             if (doors.length === 0) {
                 doorSection.style.display = 'none';
                 return;
             }
 
             doorSection.style.display = 'block';
-            doorList.innerHTML = '';
             
-            // Add confirmation analytics section if available
-            if (confirmationAnalytics) {
-                const confirmationSection = document.createElement('div');
-                confirmationSection.className = 'confirmation-analytics-section';
-                confirmationSection.style.cssText = `
-                    margin-bottom: 15px;
-                    padding: 12px;
-                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                    border: 1px solid #dee2e6;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                `;
+            if (doorList) {
+                doorList.innerHTML = '';
                 
-                const formatTime = (timestamp) => {
-                    if (!timestamp) return 'N/A';
-                    const date = new Date(timestamp);
-                    return date.toLocaleString();
-                };
-                
-                confirmationSection.innerHTML = `
-                    <h6 style="margin: 0 0 10px 0; color: #495057; display: flex; align-items: center;">
-                        <span style="margin-right: 8px;">🔍</span>
-                        Reed/Pressure Correlation Analytics
-                    </h6>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                        <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
-                            <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Confirmed Detections</div>
-                            <div style="font-weight: bold; color: #28a745; font-size: 1.1em;">
-                                ✅ ${confirmationAnalytics.confirmedDetections || 0}
-                            </div>
-                        </div>
-                        <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
-                            <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Confirmation Rate</div>
-                            <div style="font-weight: bold; color: ${(confirmationAnalytics.confirmationRate || 0) > 50 ? '#28a745' : '#ffc107'}; font-size: 1.1em;">
-                                ${(confirmationAnalytics.confirmationRate || 0).toFixed(1)}%
-                            </div>
-                        </div>
-                        <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
-                            <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Latest Confirmation</div>
-                            <div style="font-weight: bold; color: #6f42c1; font-size: 0.9em;">
-                                ${formatTime(confirmationAnalytics.latestConfirmation)}
-                            </div>
-                        </div>
-                    </div>
-                    <div style="margin-top: 8px; font-size: 0.8em; color: #6c757d; text-align: center;">
-                        Reed switch validates pressure detections within 20-second window
-                    </div>
-                `;
-                
-                doorList.appendChild(confirmationSection);
-            }
-
-            doors.forEach(door => {
-                const doorItem = document.createElement('div');
-                doorItem.className = 'door-item';
-                doorItem.style.cssText = `
-                    border: 1px solid #ddd;
-                    border-radius: 8px;
-                    padding: 15px;
-                    margin-bottom: 10px;
-                    background: ${door.open ? '#fff5f5' : '#f8fff8'};
-                    border-color: ${door.open ? '#ffcccb' : '#ccffcc'};
-                `;
-                
-                // Format timestamps
-                const formatTime = (timestamp) => {
-                    if (!timestamp || timestamp === '0') return 'N/A';
-                    const date = new Date(parseInt(timestamp) * 1000);
-                    const now = new Date();
-                    const isToday = date.toDateString() === now.toDateString();
+                // Add confirmation analytics section if available
+                if (confirmationAnalytics) {
+                    const confirmationSection = document.createElement('div');
+                    confirmationSection.className = 'confirmation-analytics-section';
+                    confirmationSection.style.cssText = `
+                        margin-bottom: 15px;
+                        padding: 12px;
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        border: 1px solid #dee2e6;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    `;
                     
-                    if (isToday) {
-                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    } else {
-                        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const formatTime = (timestamp) => {
+                        if (!timestamp) return 'N/A';
+                        const date = new Date(timestamp);
+                        return date.toLocaleString();
+                    };
+                    
+                    confirmationSection.innerHTML = `
+                        <h6 style="margin: 0 0 10px 0; color: #495057; display: flex; align-items: center;">
+                            <span style="margin-right: 8px;">🔍</span>
+                            Reed/Pressure Correlation Analytics
+                        </h6>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                            <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
+                                <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Confirmed Detections</div>
+                                <div style="font-weight: bold; color: #28a745; font-size: 1.1em;">
+                                    ✅ ${confirmationAnalytics.confirmedDetections || 0}
+                                </div>
+                            </div>
+                            <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
+                                <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Confirmation Rate</div>
+                                <div style="font-weight: bold; color: ${(confirmationAnalytics.confirmationRate || 0) > 50 ? '#28a745' : '#ffc107'}; font-size: 1.1em;">
+                                    ${(confirmationAnalytics.confirmationRate || 0).toFixed(1)}%
+                                </div>
+                            </div>
+                            <div style="background: white; padding: 8px; border-radius: 5px; border: 1px solid #e9ecef;">
+                                <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 3px;">Latest Confirmation</div>
+                                <div style="font-weight: bold; color: #6f42c1; font-size: 0.9em;">
+                                    ${formatTime(confirmationAnalytics.latestConfirmation)}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 0.8em; color: #6c757d; text-align: center;">
+                            Reed switch validates pressure detections within 20-second window
+                        </div>
+                    `;
+                    
+                    doorList.appendChild(confirmationSection);
+                }
+
+                doors.forEach(door => {
+                    const doorItem = document.createElement('div');
+                    doorItem.className = 'door-item';
+                    doorItem.style.cssText = `
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        padding: 15px;
+                        margin-bottom: 10px;
+                        background: ${door.open ? '#fff5f5' : '#f8fff8'};
+                        border-color: ${door.open ? '#ffcccb' : '#ccffcc'};
+                    `;
+                    
+                    // Format timestamps
+                    const formatTime = (timestamp) => {
+                        if (!timestamp || timestamp === '0') return 'N/A';
+                        const date = new Date(parseInt(timestamp) * 1000);
+                        const now = new Date();
+                        const isToday = date.toDateString() === now.toDateString();
+                        
+                        if (isToday) {
+                            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        } else {
+                            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        }
+                    };
+                    
+                    const formatDuration = (minutes) => {
+                        if (minutes < 60) return `${minutes}m`;
+                        const hours = Math.floor(minutes / 60);
+                        const mins = minutes % 60;
+                        return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+                    };
+                    
+                    // Door name and current status
+                    let statusHtml = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong style="font-size: 1.1em;">${door.name || `Door ${door.id}`}</strong>
+                            <span class="sensor-value ${door.open ? 'fan-on' : 'fan-off'}" style="font-size: 1.2em;">
+                                ${door.open ? '🔓 OPEN' : '🔒 CLOSED'}
+                            </span>
+                        </div>
+                    `;
+                    
+                    // Current session info
+                    if (door.open) {
+                        statusHtml += `
+                            <div class="door-detail">
+                                <strong>Current Session:</strong>
+                                <div style="margin-left: 15px;">
+                                    • Opened at: ${formatTime(door.openedAt)}<br>
+                                    • Duration: ${formatDuration(door.minutesOpen || 0)}
+                                </div>
+                            </div>
+                        `;
                     }
-                };
-                
-                const formatDuration = (minutes) => {
-                    if (minutes < 60) return `${minutes}m`;
-                    const hours = Math.floor(minutes / 60);
-                    const mins = minutes % 60;
-                    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-                };
-                
-                // Door name and current status
-                let statusHtml = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <strong style="font-size: 1.1em;">${door.name || `Door ${door.id}`}</strong>
-                        <span class="sensor-value ${door.open ? 'fan-on' : 'fan-off'}" style="font-size: 1.2em;">
-                            ${door.open ? '🔓 OPEN' : '🔒 CLOSED'}
-                        </span>
-                    </div>
-                `;
-                
-                // Current session info
-                if (door.open) {
-                    statusHtml += `
-                        <div class="door-detail">
-                            <strong>Current Session:</strong>
-                            <div style="margin-left: 15px;">
-                                • Opened at: ${formatTime(door.openedAt)}<br>
-                                • Duration: ${formatDuration(door.minutesOpen || 0)}
+                    
+                    // Daily summary
+                    if (door.wasOpenedToday) {
+                        statusHtml += `
+                            <div class="door-detail" style="margin-top: 10px;">
+                                <strong>Today's Activity:</strong>
+                                <div style="margin-left: 15px;">
+                                    • Total time open: ${formatDuration(door.minutesTotalToday || 0)}<br>
+                                    • First opened: ${formatTime(door.firstOpenedToday)}<br>
+                                    • Last opened: ${formatTime(door.lastOpenedToday)}
+                                </div>
                             </div>
-                        </div>
-                    `;
-                }
-                
-                // Daily summary
-                if (door.wasOpenedToday) {
-                    statusHtml += `
-                        <div class="door-detail" style="margin-top: 10px;">
-                            <strong>Today's Activity:</strong>
-                            <div style="margin-left: 15px;">
-                                • Total time open: ${formatDuration(door.minutesTotalToday || 0)}<br>
-                                • First opened: ${formatTime(door.firstOpenedToday)}<br>
-                                • Last opened: ${formatTime(door.lastOpenedToday)}
+                        `;
+                    } else {
+                        statusHtml += `
+                            <div class="door-detail" style="margin-top: 10px; color: #666;">
+                                <strong>Today's Activity:</strong> Not opened today
                             </div>
-                        </div>
-                    `;
-                } else {
-                    statusHtml += `
-                        <div class="door-detail" style="margin-top: 10px; color: #666;">
-                            <strong>Today's Activity:</strong> Not opened today
-                        </div>
-                    `;
-                }
-                
-                doorItem.innerHTML = statusHtml;
-                doorList.appendChild(doorItem);
-            });
+                        `;
+                    }
+                    
+                    doorItem.innerHTML = statusHtml;
+                    doorList.appendChild(doorItem);
+                });
+            }
         }
 
         /**
