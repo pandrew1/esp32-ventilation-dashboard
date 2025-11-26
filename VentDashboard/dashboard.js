@@ -6439,13 +6439,16 @@ function startAutoRefresh() {
             const incidentsList = document.getElementById('incidentsList');
             const incidentsSummary = document.getElementById('incidentsSummary');
             
+            if (!incidentsList || !incidentsSummary) return;
+
             // Store original data for filtering
             originalIncidentsData = incidents || [];
             
             if (!incidents || incidents.length === 0) {
                 incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No incidents recorded in the last 30 days</div>';
                 incidentsSummary.innerHTML = '<strong>All systems operating normally</strong> - No incidents detected';
-                document.getElementById('filterStatus').textContent = 'No incident data available';
+                const filterStatus = document.getElementById('filterStatus');
+                if (filterStatus) filterStatus.textContent = 'No incident data available';
                 return;
             }
 
@@ -6468,7 +6471,8 @@ function startAutoRefresh() {
             if (validIncidents.length === 0) {
                 incidentsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No valid incidents found in the last 30 days (some data may be corrupted)</div>';
                 incidentsSummary.innerHTML = '<strong>No valid incident data available</strong> - Check for data corruption';
-                document.getElementById('filterStatus').textContent = 'No valid incident data available';
+                const filterStatus = document.getElementById('filterStatus');
+                if (filterStatus) filterStatus.textContent = 'No valid incident data available';
                 return;
             }
 
