@@ -1146,11 +1146,6 @@
         .status-dot.yellow { background: #ffc107; }  
         .status-dot.red { background: #dc3545; }
 
-        .status-text {
-            font-size: 0.9em;
-            color: #495057;
-        }
-
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -1815,16 +1810,24 @@
                                 </div>
                                 <div class="confidence-stats">
                                     <div class="stat-item">
+                                        <div style="width: 10px; height: 10px; background-color: #17a2b8; border-radius: 50%; margin-right: 8px;"></div>
                                         <span class="stat-label">High Confidence (≥0.8):</span>
                                         <span class="stat-value" id="highConfidenceCount">--</span>
                                     </div>
                                     <div class="stat-item">
+                                        <div style="width: 10px; height: 10px; background-color: #ffc107; border-radius: 50%; margin-right: 8px;"></div>
                                         <span class="stat-label">Medium Confidence (0.5-0.8):</span>
                                         <span class="stat-value" id="mediumConfidenceCount">--</span>
                                     </div>
                                     <div class="stat-item">
+                                        <div style="width: 10px; height: 10px; background-color: #dc3545; border-radius: 50%; margin-right: 8px;"></div>
                                         <span class="stat-label">Low Confidence (&lt;0.5):</span>
                                         <span class="stat-value" id="lowConfidenceCount">--</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div style="width: 10px; height: 10px; background-color: #28a745; border-radius: 50%; margin-right: 8px;"></div>
+                                        <span class="stat-label">Reed Switch (1.0):</span>
+                                        <span class="stat-value" id="reedSwitchCount">--</span>
                                     </div>
                                 </div>
                             </div>
@@ -2426,7 +2429,7 @@
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div
                     
                     <div id="doorList" style="display:none;"></div>
                 </div>

@@ -3059,7 +3059,7 @@ function startAutoRefresh() {
                         labels: ['High (≥0.9)', 'Medium (0.5-0.9)', 'Low (<0.5)', 'Reed Switch (1.0)'],
                         datasets: [{
                             data: [0, 0, 0, 0],
-                            backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8']
+                            backgroundColor: ['#17a2b8', '#ffc107', '#dc3545', '#28a745']
                         }]
                     },
                     options: {
