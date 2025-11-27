@@ -2799,12 +2799,12 @@ function startAutoRefresh() {
                                         const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
                                         const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                                         const action = evt.action || 'Event';
-                                        const method = (evt.method === 'reed-switch' || evt.method === 'reed') ? 'Reed' : 'ML';
+                                        const method = (evt.method === 'reed-switch' || evt.method === 'reed') ? 'Reed' : 'Pressure';
                                         const color = (evt.method === 'reed-switch' || evt.method === 'reed') ? '#28a745' : '#17a2b8';
                                         
                                         // Format confidence percentage
                                         const confPercent = evt.confidence ? Math.round(evt.confidence * 100) : 0;
-                                        const confStr = (method === 'ML' && confPercent > 0) ? `(${confPercent}%)` : '';
+                                        const confStr = (method === 'Pressure' && confPercent > 0) ? `(${confPercent}%)` : '';
                                         
                                         // Format ML Probability & Classifier Type
                                         let mlInfoText = '';
@@ -2850,7 +2850,7 @@ function startAutoRefresh() {
                                             warningIcon = `<span title="Pressure Missed: Rejected by S7 (${evt.s7RejectReason}), ML Score: ${mlScore}" style="cursor:help; font-size:1.2em; margin-right:5px;">⚠️</span>`;
                                             s7InfoText = `S7: ${evt.s7RejectReason}`;
                                             s7Color = '#dc3545';
-                                        } else if (method === 'ML') {
+                                        } else if (method === 'Pressure') {
                                             s7InfoText = `S7: PASS`;
                                             s7Color = '#28a745';
                                         }
@@ -2868,7 +2868,19 @@ function startAutoRefresh() {
                                             reedInfoText = 'Reed: NO';
                                         }
                                         
-                                        html += `<li style="padding:8px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                        // Determine if this is a "Real" event for highlighting
+                                        // Criteria: Pressure Confidence >= 0.8 OR ML Probability >= 0.8
+                                        let isRealEvent = false;
+                                        if (method === 'Pressure') {
+                                            if (evt.confidence >= 0.8) isRealEvent = true;
+                                            if (evt.mlProbability >= 0.8) isRealEvent = true;
+                                            if (evt.mlProbabilityInternal >= 0.8) isRealEvent = true;
+                                            if (evt.mlProbabilityExternal >= 0.8) isRealEvent = true;
+                                        }
+                                        
+                                        const highlightStyle = isRealEvent ? 'background-color: #e6fffa; border-left: 4px solid #28a745; padding-left: 8px;' : '';
+                                        
+                                        html += `<li style="padding:8px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; ${highlightStyle}">
                                             <div>
                                                 <span style="color:#666; margin-right:5px;">${timeStr}</span> 
                                                 <strong style="font-size:1.1em;">${action}</strong>
@@ -2886,30 +2898,9 @@ function startAutoRefresh() {
                                     historyEl.innerHTML = html;
                                 } else {
                                     // Fallback to analytics recentEvents if history data is empty
-                                    if (stats.recentEvents && stats.recentEvents.length > 0) {
-                                        let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.85em;">';
-                                        stats.recentEvents.forEach(evt => {
-                                            const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
-                                            const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                            const action = evt.action || 'Event';
-                                            const method = evt.method === 'reed-switch' ? 'Reed' : 'ML';
-                                            const color = evt.method === 'reed-switch' ? '#28a745' : '#17a2b8';
-                                            
-                                            html += `<li style="padding:8px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                                                <div>
-                                                    <span style="color:#666; margin-right:5px;">${timeStr}</span> 
-                                                    <strong style="font-size:1.1em;">${action}</strong>
-                                                </div>
-                                                <div style="text-align:right;">
-                                                    <span style="color:${color}; font-weight:bold;">${method}</span>
-                                                </div>
-                                            </li>`;
-                                        });
-                                        html += '</ul>';
-                                        historyEl.innerHTML = html;
-                                    } else {
-                                        historyEl.innerHTML = `<div style="font-size:0.9em; color:#666; padding:10px;">${stats.count || 0} events today</div>`;
-                                    }
+                                    // REMOVED: User requested removal of fallback data that might be incomplete or misleading
+                                    // If history data is empty, we show "No activity" or the count
+                                    historyEl.innerHTML = `<div style="font-size:0.9em; color:#666; padding:10px;">${stats.count || 0} events today</div>`;
                                 }
                             }
                         }
