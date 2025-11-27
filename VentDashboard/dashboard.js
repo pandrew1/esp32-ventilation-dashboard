@@ -3069,9 +3069,9 @@ function startAutoRefresh() {
                 // Process and display the enhanced data
                 updateDoorActivityDisplay(analyticsData);
                 
-                // NOTE: Don't update confidence chart here - it's already updated by loadYesterdaySummaryMetrics()
-                // with the correct data from GetEnhancedDashboardData which has the full detectionAnalytics
-                // The GetEnhancedDoorAnalytics API doesn't return confidence distribution data
+                // FIXED: Update confidence chart with available data (using fallbacks if needed)
+                // This ensures the chart updates when time range changes (e.g. 24h -> 7d)
+                updateConfidenceChart(analyticsData);
                 
                 // Always update pressure analytics with available data
                 updatePressureAnalytics(analyticsData);
