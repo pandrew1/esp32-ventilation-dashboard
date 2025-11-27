@@ -2761,8 +2761,8 @@ function startAutoRefresh() {
                                      const oldestEvt = events[events.length - 1];
                                      const firstTs = oldestEvt.timestamp > 10000000000 ? oldestEvt.timestamp : oldestEvt.timestamp * 1000;
                                      firstEl.textContent = new Date(firstTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                } else if (stats.firstActivity) {
-                                    firstEl.textContent = new Date(stats.firstActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                } else {
+                                    firstEl.textContent = '--:--';
                                 }
                             }
                             
@@ -2775,20 +2775,15 @@ function startAutoRefresh() {
                                      const newestEvt = events[0];
                                      const lastTs = newestEvt.timestamp > 10000000000 ? newestEvt.timestamp : newestEvt.timestamp * 1000;
                                      lastEl.textContent = new Date(lastTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                } else if (stats.lastActivity) {
-                                    lastEl.textContent = new Date(stats.lastActivity * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                } else {
+                                    lastEl.textContent = '--:--';
                                 }
                             }
                             
                             const totalEl = document.getElementById(`total-${suffix}`);
                             if (totalEl) {
-                                // FIX: Use the actual count of events in the list for consistency
-                                // This ensures the number matches the list items shown
-                                if (doorEvents[suffix] && doorEvents[suffix].length > 0) {
-                                    totalEl.textContent = doorEvents[suffix].length;
-                                } else {
-                                    totalEl.textContent = stats.count || 0;
-                                }
+                                // Always use the filtered event count to ensure consistency with the list
+                                totalEl.textContent = (events ? events.length : 0);
                             }
                             
                             // Update History (List of recent events) - NOW USING FULL HISTORY DATA
@@ -2899,10 +2894,10 @@ function startAutoRefresh() {
                                     html += '</ul>';
                                     historyEl.innerHTML = html;
                                 } else {
-                                    // Fallback to analytics recentEvents if history data is empty
-                                    // REMOVED: User requested removal of fallback data that might be incomplete or misleading
-                                    // If history data is empty, we show "No activity" or the count
-                                    historyEl.innerHTML = `<div style="font-size:0.9em; color:#666; padding:10px;">${stats.count || 0} events today</div>`;
+                                    // If history data is empty, show "No activity"
+                                    // Do NOT use stats.count as it may include events outside the "Since Midnight" filter
+                                    const noActivityText = hours === 24 ? 'No activity today' : 'No activity in this period';
+                                    historyEl.innerHTML = `<div style="font-size:0.9em; color:#666; padding:10px;">${noActivityText}</div>`;
                                 }
                             }
                         }
