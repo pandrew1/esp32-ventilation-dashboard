@@ -2589,6 +2589,8 @@ function startAutoRefresh() {
                                         method: t.detectionMethod,
                                         confidence: t.confidence,
                                         mlProbability: t.mlProbability,
+                                        mlProbabilityInternal: t.mlProbabilityInternal,
+                                        mlProbabilityExternal: t.mlProbabilityExternal,
                                         classifierType: t.classifierType,
                                         s7RejectReason: t.s7RejectReason,
                                         reedMatchConfidence: t.reedMatchConfidence
@@ -2645,15 +2647,33 @@ function startAutoRefresh() {
                 if (perfFnEl) perfFnEl.textContent = perfStats.fn;
                 
                 // Sort events by timestamp DESCENDING (Newest First)
+                // Secondary sort: Action (CLOSE before OPEN for descending view)
+                // This ensures that if timestamps are identical (e.g. recovery events),
+                // the logical order is preserved (Open -> Close -> Open -> Close)
                 Object.keys(doorEvents).forEach(key => {
                     doorEvents[key].sort((a, b) => {
                         // Handle both numeric timestamps (Unix) and ISO strings
                         const getTs = (t) => {
-                            if (typeof t === 'number') return t > 10000000000 ? t : t * 1000;
+                            // Try parsing as number first (handles "1764202045" string from JSON)
+                            const n = Number(t);
+                            if (!isNaN(n)) {
+                                // If it's a small number (seconds), convert to ms
+                                return n > 10000000000 ? n : n * 1000;
+                            }
+                            // Handle ISO strings
                             const d = new Date(t);
                             return isNaN(d.getTime()) ? 0 : d.getTime();
                         };
-                        return getTs(b.timestamp) - getTs(a.timestamp); // Descending
+                        
+                        const tsDiff = getTs(b.timestamp) - getTs(a.timestamp);
+                        if (tsDiff !== 0) return tsDiff;
+                        
+                        // Secondary sort: Action
+                        // We want CLOSE to appear above OPEN in a descending list
+                        // So if b is CLOSE and a is OPEN, b comes first (positive result)
+                        if (b.action === 'CLOSE' && a.action === 'OPEN') return 1;
+                        if (b.action === 'OPEN' && a.action === 'CLOSE') return -1;
+                        return 0;
                     });
                 });
 
@@ -2793,15 +2813,21 @@ function startAutoRefresh() {
                                             if (evt.mlProbability >= 0) {
                                                 const mlProb = (evt.mlProbability * 100).toFixed(1);
                                                 
-                                                // User requested "percent internal and external classifier"
-                                                // Display the specific classifier used and its confidence
-                                                if (evt.classifierType === 'INTERNAL') {
-                                                    mlInfoText = `Internal: ${mlProb}%`;
-                                                } else if (evt.classifierType === 'EXTERNAL') {
-                                                    mlInfoText = `External: ${mlProb}%`;
+                                                // Check for detailed internal/external probabilities
+                                                if (evt.mlProbabilityInternal > 0 || evt.mlProbabilityExternal > 0) {
+                                                    const intProb = evt.mlProbabilityInternal ? (evt.mlProbabilityInternal * 100).toFixed(1) : '0.0';
+                                                    const extProb = evt.mlProbabilityExternal ? (evt.mlProbabilityExternal * 100).toFixed(1) : '0.0';
+                                                    mlInfoText = `Int: ${intProb}% Ext: ${extProb}%`;
                                                 } else {
-                                                    // Fallback if type is missing or unknown
-                                                    mlInfoText = `ML: ${mlProb}%`;
+                                                    // Fallback to legacy display
+                                                    if (evt.classifierType === 'INTERNAL') {
+                                                        mlInfoText = `Internal: ${mlProb}%`;
+                                                    } else if (evt.classifierType === 'EXTERNAL') {
+                                                        mlInfoText = `External: ${mlProb}%`;
+                                                    } else {
+                                                        // Fallback if type is missing or unknown
+                                                        mlInfoText = `ML: ${mlProb}%`;
+                                                    }
                                                 }
                                             }
                                         }
