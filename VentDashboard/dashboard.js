@@ -1970,6 +1970,7 @@ function startAutoRefresh() {
          * This ensures the top 4 boxes show accurate data instead of N/A values
          * @returns {Promise<void>}
          */
+        /* UNUSED FUNCTION - Commented out to avoid confusion with placeholders
         async function calculateYesterdaySummaryFromRawData() {
             console.log('=== ENHANCED: calculateYesterdaySummaryFromRawData() for accurate summary metrics ===');
             
@@ -2089,6 +2090,7 @@ function startAutoRefresh() {
             safeUpdate('yesterdayUptime', 'No data');
         }
         }
+        */
 
         /**
          * PHASE 2 FIX: Loads yesterday's summary metrics using Enhanced Dashboard API
@@ -4029,7 +4031,7 @@ function startAutoRefresh() {
                         count: doorEvents.length,
                         timeRange: `${hours} hours`,
                         doorActivity: doorActivityStats,
-                        message: doorEvents.length === 0 ? 'No recent door activity data available - using placeholder' : null
+                        message: doorEvents.length === 0 ? 'No recent door activity data available' : null
                     };
                     
                     // Store for re-rendering when filters change
