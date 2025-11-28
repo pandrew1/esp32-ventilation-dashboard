@@ -6518,6 +6518,27 @@ function startAutoRefresh() {
                 const badgeClass = isOpen ? 'badge-warning' : 'badge-success';
                 const stateText = isOpen ? 'OPENED' : 'CLOSED';
                 
+                // NEW: T0 Diagnostics Display
+                let diagnosticsHtml = '';
+                if (event.t0_amplitude !== undefined && event.t0_amplitude !== null) {
+                    diagnosticsHtml = `
+                        <div class="mt-2 p-2 bg-light rounded border" style="font-size: 0.85em;">
+                            <div class="d-flex justify-content-between">
+                                <span><strong>T0 Amp:</strong> ${parseFloat(event.t0_amplitude).toFixed(4)} hPa</span>
+                                <span><strong>AntiCorr:</strong> ${event.t0_anticorr_pass ? '<span class="text-success">PASS</span>' : '<span class="text-danger">FAIL</span>'}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <span><strong>ΔP A:</strong> ${parseFloat(event.t0_deltaP_A).toFixed(4)}</span>
+                                <span><strong>ΔP B:</strong> ${parseFloat(event.t0_deltaP_B).toFixed(4)}</span>
+                            </div>
+                             <div class="d-flex justify-content-between mt-1">
+                                <span><strong>Iso Ratio:</strong> ${parseFloat(event.t0_isolation_ratio).toFixed(1)}</span>
+                                <span><strong>Quiet:</strong> ${parseFloat(event.t0_quiet_zone).toFixed(4)}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 eventItem.innerHTML = `
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">Door ${event.doorId}</h6>
@@ -6527,6 +6548,7 @@ function startAutoRefresh() {
                         <span class="badge ${badgeClass}">${stateText}</span>
                         <small class="text-muted ml-2">Duration: ${event.duration ? event.duration + 's' : 'N/A'}</small>
                     </p>
+                    ${diagnosticsHtml}
                 `;
                 
                 recentEventsList.appendChild(eventItem);
