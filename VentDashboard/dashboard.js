@@ -282,6 +282,7 @@ function getApiKeyFromUrl() {
 // Configuration - Replace with your actual Azure Function URLs
 const CONFIG = {
     statusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData', // For analytics and aggregated data
+    ventilationStatusApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationStatus', // For real-time status and aggregation status
     deviceId: 'ESP32-Ventilation-01',
     refreshInterval: 15000, // 15 seconds - check for new telemetry data
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
@@ -3040,13 +3041,22 @@ function startAutoRefresh() {
             }            try {
                 // FIXED: Use absolute URL with proper parameter format
                 const cacheBuster = Date.now();
-                // console.log('🔍 DEBUG: Making GetEnhancedDoorAnalytics API call for', hours, 'hours');
+                console.log('🔍 DEBUG: Making GetEnhancedDoorAnalytics API call for', hours, 'hours');
                 const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
                     method: 'GET',
                     headers: {
                         ...headers
                     }
                 });
+                
+                console.log('🔍 DEBUG: GetEnhancedDoorAnalytics response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('🔍 DEBUG: GetEnhancedDoorAnalytics data received:', data);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3070,6 +3080,7 @@ function startAutoRefresh() {
 
             } catch (error) {
                 Logger.error('updateEnhancedDoorActivity failed:', error);
+                console.error('Stack trace:', error.stack);
                 // Set error states
                 document.getElementById('activeDoorsCount').textContent = 'Error';
                 document.getElementById('totalSessionsCount').textContent = 'Error';
@@ -4991,7 +5002,7 @@ function startAutoRefresh() {
                 }
                 
                 // Get data from Status API - same call as updateDashboard uses
-                const apiUrl = `${CONFIG.statusApiUrl}?deviceId=${CONFIG.deviceId}`;
+                const apiUrl = `${CONFIG.ventilationStatusApiUrl}?deviceId=${CONFIG.deviceId}`;
                 const response = await fetch(apiUrl, { method: 'GET', headers: headers });
                 
                 if (!response.ok) {
@@ -4999,6 +5010,8 @@ function startAutoRefresh() {
                 }
                 
                 const data = await response.json();
+                console.log('YESTERDAY MONTHLY AGGREGATION: Data received:', data);
+                if (data.system) console.log('YESTERDAY MONTHLY AGGREGATION: data.system:', data.system);
                 
                 // Use the exact same logic as updateDashboard function (line 3252)
                 if (data.system && data.system.MonthlyAggregationStatus) {
@@ -5744,8 +5757,13 @@ function startAutoRefresh() {
                 
                 // Update pressure differentials
                 const indoorOutdoorElement = document.getElementById('indoor-outdoor-diff');
-                if (indoorOutdoorElement && buildingPerformance.indoorOutdoorDiff != null) {
-                    const diffVal = Number(buildingPerformance.indoorOutdoorDiff);
+                // Handle both flat and nested structure for pressure differentials
+                const indoorOutdoorVal = buildingPerformance.indoorOutdoorDiff != null ? 
+                    buildingPerformance.indoorOutdoorDiff : 
+                    (buildingPerformance.pressureDifferentials ? buildingPerformance.pressureDifferentials.indoorOutdoor : null);
+                    
+                if (indoorOutdoorElement && indoorOutdoorVal != null) {
+                    const diffVal = Number(indoorOutdoorVal);
                     const diff = diffVal.toFixed(2);
                     indoorOutdoorElement.textContent = `${diff} hPa`;
                     // Color code based on pressure difference magnitude
@@ -5760,8 +5778,12 @@ function startAutoRefresh() {
                 }
                 
                 const garageOutdoorElement = document.getElementById('garage-outdoor-diff');
-                if (garageOutdoorElement && buildingPerformance.garageOutdoorDiff != null) {
-                    const diffVal = Number(buildingPerformance.garageOutdoorDiff);
+                const garageOutdoorVal = buildingPerformance.garageOutdoorDiff != null ? 
+                    buildingPerformance.garageOutdoorDiff : 
+                    (buildingPerformance.pressureDifferentials ? buildingPerformance.pressureDifferentials.garageOutdoor : null);
+
+                if (garageOutdoorElement && garageOutdoorVal != null) {
+                    const diffVal = Number(garageOutdoorVal);
                     const diff = diffVal.toFixed(2);
                     garageOutdoorElement.textContent = `${diff} hPa`;
                     // Color code based on pressure difference magnitude
@@ -5862,8 +5884,11 @@ function startAutoRefresh() {
                 
                 // Update migraine risk
                 const migraineriskElement = document.getElementById('migraine-risk');
-                if (migraineriskElement && healthMonitoring.migraineRisk != null) {
-                    const riskVal = Number(healthMonitoring.migraineRisk);
+                // Handle both camelCase and lowercase property names
+                const migraineRiskVal = healthMonitoring.migraineRisk != null ? healthMonitoring.migraineRisk : healthMonitoring.migrainerisk;
+                
+                if (migraineriskElement && migraineRiskVal != null) {
+                    const riskVal = Number(migraineRiskVal);
                     const risk = riskVal.toFixed(0);
                     migraineriskElement.textContent = `${risk}%`;
                     
