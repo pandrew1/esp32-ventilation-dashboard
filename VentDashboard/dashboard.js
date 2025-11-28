@@ -325,13 +325,14 @@ const DashboardUtils = {
             'Content-Type': 'application/json'
         };
         
-        // If user is logged in, use Bearer token authentication
+        // Always include X-API-Secret if available (most reliable method)
+        if (CONFIG.apiSecret) {
+            headers['X-API-Secret'] = CONFIG.apiSecret;
+        }
+        
+        // If user is logged in, use Bearer token authentication as well
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
-        }
-        // Otherwise, use API key if available
-        else if (CONFIG.apiSecret) {
-            headers['X-API-Secret'] = CONFIG.apiSecret;
         }
         
         return headers;
@@ -739,7 +740,8 @@ const DataManager = {
         try {
             // console.log('🔍 DEBUG: DataManager.getEnhancedData() - Making API call to:', CONFIG.enhancedApiUrl);
             
-            const response = await fetch(CONFIG.enhancedApiUrl, {
+            const url = `${CONFIG.enhancedApiUrl}?deviceId=${CONFIG.deviceId}`;
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: DashboardUtils.getAuthHeaders()
             });
@@ -2501,7 +2503,7 @@ function startAutoRefresh() {
                 
                 // Fetch both Status (Analytics) and History data in parallel
                 // 1. Status Data (for current state and summary stats)
-                const analyticsPromise = fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
+                const analyticsPromise = fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=${CONFIG.deviceId}&_t=${cacheBuster}`, {
                     method: 'GET',
                     headers: { ...headers }
                 }).then(r => {
@@ -3042,7 +3044,7 @@ function startAutoRefresh() {
                 // FIXED: Use absolute URL with proper parameter format
                 const cacheBuster = Date.now();
                 console.log('🔍 DEBUG: Making GetEnhancedDoorAnalytics API call for', hours, 'hours');
-                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=ESP32-Ventilation-01&_t=${cacheBuster}`, {
+                const response = await fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=${CONFIG.deviceId}&_t=${cacheBuster}`, {
                     method: 'GET',
                     headers: {
                         ...headers
