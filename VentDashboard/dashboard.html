@@ -2234,53 +2234,6 @@
                     </div>
                 </div>
 
-                <!-- Ventilation Effectiveness Summary -->
-                <div class="card">
-                    <h3>🎯 Ventilation Effectiveness Analysis</h3>
-                    <div id="effectivenessAnalysis" style="display: none;">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                            <div class="sensor-reading">
-                                <span>Recent Sessions</span>
-                                <span class="sensor-value" id="recentSessions">-</span>
-                            </div>
-                            <div class="sensor-reading">
-                                <span>Average Effectiveness</span>
-                                <span class="sensor-value" id="avgEffectiveness">-%</span>
-                            </div>
-                            <div class="sensor-reading">
-                                <span>Best Performance</span>
-                                <span class="sensor-value" id="bestEffectiveness">-%</span>
-                            </div>
-                            <div class="sensor-reading">
-                                <span>Total Thermal Impact</span>
-                                <span class="sensor-value" id="totalCooling">-°F</span>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
-                            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">💡 Effectiveness Insights</h4>
-                            <div id="effectivenessInsights">
-                                <p style="margin: 5px 0; color: #666;">Analyzing ventilation patterns...</p>
-                            </div>
-                        </div>
-
-                        <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
-                            <strong>How Effectiveness is Calculated:</strong><br>
-                            • Adaptive thresholds: 25+ minutes standard, 20+ for long sessions, 10+ for ongoing<br>
-                            • Effectiveness = (Actual Cooling + Moderate Baseline) ÷ Theoretical Maximum × 100%<br>
-                            • Theoretical maximum: 70% efficiency based on indoor-outdoor temperature difference<br>
-                            • Baseline credits: 0.5-2.3°F based on conditions and duration (creates differentiation)<br>
-                            • Performance bonuses: Up to +30% for challenging conditions and actual cooling achieved<br>
-                            • Adjusted ratings: 70%+ Excellent, 50-69% Good, 30-49% Fair, <30% Poor
-                        </div>
-                    </div>
-                    
-                    <div id="noEffectivenessData" style="text-align: center; padding: 20px; color: #666;">
-                        <p>📊 No substantial ventilation sessions detected in current time period.</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 25+ minutes of operation (10+ for ongoing sessions).</p>
-                    </div>
-                </div>
-
                 <!-- Historical Charts -->
                 <div class="card">
                     <h3>📈 Historical Data</h3>
@@ -2343,6 +2296,53 @@
                                 <span>Imminent (3)</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Ventilation Effectiveness Summary -->
+                <div class="card">
+                    <h3>🎯 Ventilation Effectiveness Analysis</h3>
+                    <div id="effectivenessAnalysis" style="display: none;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                            <div class="sensor-reading">
+                                <span>Recent Sessions</span>
+                                <span class="sensor-value" id="recentSessions">-</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Average Effectiveness</span>
+                                <span class="sensor-value" id="avgEffectiveness">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Best Performance</span>
+                                <span class="sensor-value" id="bestEffectiveness">-%</span>
+                            </div>
+                            <div class="sensor-reading">
+                                <span>Total Thermal Impact</span>
+                                <span class="sensor-value" id="totalCooling">-°F</span>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
+                            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">💡 Effectiveness Insights</h4>
+                            <div id="effectivenessInsights">
+                                <p style="margin: 5px 0; color: #666;">Analyzing ventilation patterns...</p>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                            <strong>How Effectiveness is Calculated:</strong><br>
+                            • Adaptive thresholds: 25+ minutes standard, 20+ for long sessions, 10+ for ongoing<br>
+                            • Effectiveness = (Actual Cooling + Moderate Baseline) ÷ Theoretical Maximum × 100%<br>
+                            • Theoretical maximum: 70% efficiency based on indoor-outdoor temperature difference<br>
+                            • Baseline credits: 0.5-2.3°F based on conditions and duration (creates differentiation)<br>
+                            • Performance bonuses: Up to +30% for challenging conditions and actual cooling achieved<br>
+                            • Adjusted ratings: 70%+ Excellent, 50-69% Good, 30-49% Fair, <30% Poor
+                        </div>
+                    </div>
+                    
+                    <div id="noEffectivenessData" style="text-align: center; padding: 20px; color: #666;">
+                        <p>📊 No substantial ventilation sessions detected in current time period.</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Effectiveness analysis requires 25+ minutes of operation (10+ for ongoing sessions).</p>
                     </div>
                 </div>
 
@@ -2527,7 +2527,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.11.28-0933-effectiveness-v3.1</span>
+        Build: <span id="buildInfo">2025.11.28-1046-effectiveness-v3.1</span>
     </div>
 </body>
 </html>

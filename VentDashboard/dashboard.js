@@ -3357,17 +3357,22 @@ function startAutoRefresh() {
         function updatePressureAnalytics(data) {
             Logger.log('🔍 DEBUG: updatePressureAnalytics called with data keys:', Object.keys(data));
             
+            // Helper for safe element updates
+            const safeUpdateElement = (id, value) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = value;
+                }
+            };
+
             // Check for enhanced dashboard data structure first (GetEnhancedDashboardData)
             const detectionAnalytics = data.sections?.doors?.detectionAnalytics || data.detectionAnalytics;
             
             if (detectionAnalytics && detectionAnalytics.averagePressureChange !== undefined) {
                 Logger.log('🔍 DEBUG: Using detectionAnalytics pressure data');
                 // Show actual pressure change values from enhanced door detection
-                document.getElementById('avgPressureChange').textContent = 
-                    `${detectionAnalytics.averagePressureChange.toFixed(3)} hPa`;
-                
-                document.getElementById('maxPressureChange').textContent = 
-                    `${detectionAnalytics.maxPressureChange.toFixed(3)} hPa`;
+                safeUpdateElement('avgPressureChange', `${detectionAnalytics.averagePressureChange.toFixed(3)} hPa`);
+                safeUpdateElement('maxPressureChange', `${detectionAnalytics.maxPressureChange.toFixed(3)} hPa`);
             } else {
                 Logger.log('🔍 DEBUG: No detectionAnalytics pressure data, checking fallbacks');
                 // Fallback: Check for legacy pressure analysis structure
@@ -3375,16 +3380,13 @@ function startAutoRefresh() {
                 
                 if (pressure && pressure.average_pressure_change !== undefined) {
                     Logger.log('🔍 DEBUG: Using legacy pressure analysis data');
-                    document.getElementById('avgPressureChange').textContent = 
-                        `${pressure.average_pressure_change.toFixed(3)} hPa`;
-                    
-                    document.getElementById('maxPressureChange').textContent = 
-                        `${pressure.max_pressure_change.toFixed(3)} hPa`;
+                    safeUpdateElement('avgPressureChange', `${pressure.average_pressure_change.toFixed(3)} hPa`);
+                    safeUpdateElement('maxPressureChange', `${pressure.max_pressure_change.toFixed(3)} hPa`);
                 } else {
                     Logger.log('🚨 DEBUG: No pressure data available - showing placeholder');
                     // No pressure data available
-                    document.getElementById('avgPressureChange').textContent = 'No data';
-                    document.getElementById('maxPressureChange').textContent = 'No data';
+                    safeUpdateElement('avgPressureChange', 'No data');
+                    safeUpdateElement('maxPressureChange', 'No data');
                 }
             }
             
@@ -3392,22 +3394,22 @@ function startAutoRefresh() {
             const zoneActivity = data.sections?.doors?.zoneActivity || data.zoneActivity;
             
             if (zoneActivity && Object.keys(zoneActivity).length > 0) {
-                document.getElementById('garageHouseCount').textContent = zoneActivity['garage-house'] || 0;
-                document.getElementById('houseOutsideCount').textContent = zoneActivity['house-outside'] || 0;
-                document.getElementById('garageOutsideCount').textContent = zoneActivity['garage-outside'] || 0;
+                safeUpdateElement('garageHouseCount', zoneActivity['garage-house'] || 0);
+                safeUpdateElement('houseOutsideCount', zoneActivity['house-outside'] || 0);
+                safeUpdateElement('garageOutsideCount', zoneActivity['garage-outside'] || 0);
             } else {
                 // Fallback: Check legacy zone data structure
                 const zones = data.zoneActivity || data.pressureAnalysis?.zone_breakdown || {};
                 
                 if (Object.keys(zones).length > 0) {
-                    document.getElementById('garageHouseCount').textContent = zones['garage-house'] || 0;
-                    document.getElementById('houseOutsideCount').textContent = zones['house-outside'] || 0;
-                    document.getElementById('garageOutsideCount').textContent = zones['garage-outside'] || 0;
+                    safeUpdateElement('garageHouseCount', zones['garage-house'] || 0);
+                    safeUpdateElement('houseOutsideCount', zones['house-outside'] || 0);
+                    safeUpdateElement('garageOutsideCount', zones['garage-outside'] || 0);
                 } else {
                     // No zone data available
-                    document.getElementById('garageHouseCount').textContent = '--';
-                    document.getElementById('houseOutsideCount').textContent = '--';
-                    document.getElementById('garageOutsideCount').textContent = '--';
+                    safeUpdateElement('garageHouseCount', '--');
+                    safeUpdateElement('houseOutsideCount', '--');
+                    safeUpdateElement('garageOutsideCount', '--');
                 }
             }
             
@@ -3415,12 +3417,12 @@ function startAutoRefresh() {
             const mostActiveZone = data.sections?.doors?.mostActiveZone || data.mostActiveZone;
             
             if (mostActiveZone && mostActiveZone !== 'None') {
-                document.getElementById('mostActiveZone').textContent = mostActiveZone;
+                safeUpdateElement('mostActiveZone', mostActiveZone);
             } else if (zoneActivity && Object.keys(zoneActivity).length > 0) {
                 const mostActive = Object.keys(zoneActivity).reduce((a, b) => zoneActivity[a] > zoneActivity[b] ? a : b, 'unknown');
-                document.getElementById('mostActiveZone').textContent = zoneActivity[mostActive] > 0 ? mostActive : '--';
+                safeUpdateElement('mostActiveZone', zoneActivity[mostActive] > 0 ? mostActive : '--');
             } else {
-                document.getElementById('mostActiveZone').textContent = '--';
+                safeUpdateElement('mostActiveZone', '--');
             }
         }
 
