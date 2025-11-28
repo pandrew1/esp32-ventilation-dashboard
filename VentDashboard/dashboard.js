@@ -7108,7 +7108,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         timestamp: point.timestamp || Math.floor(Date.now() / 1000),
                         pressure: hasValidPressure ? point.sensors.outdoor.pressure : null, // Only use real pressure readings from ESP32
                         pressureChange: point.pressureChange || 0,
-                        forecastTemp: (point.weather && point.weather.forecastHigh) || undefined // Real forecast data from ESP32
+                        forecastTemp: (point.weather && point.weather.forecastHigh) || undefined, // Real forecast data from ESP32
+                        stormRisk: (point.weather && point.weather.stormRisk) || 'Clear' // Real storm risk from ESP32
                     };
                 }).filter(point => point.pressure !== null && point.timestamp); // Only show points with real pressure data
                 
@@ -7169,7 +7170,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pressureData = data.map(point => ({
                     x: new Date(point.timestamp * 1000),
                     y: point.pressure, // Use only real pressure data from ESP32
-                    pressureChange: point.pressureChange || 0
+                    pressureChange: point.pressureChange || 0,
+                    stormRisk: point.stormRisk
                 }));
                 
                 datasets.push({
@@ -7185,23 +7187,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     tension: 0.1
                 });
                 
-                // Calculate storm risk based on pressure trends
+                // Calculate storm risk based on pressure trends OR use ESP32 reported risk
                 const stormRiskData = pressureData.map((point, index) => {
                     let riskLevel = 0;
                     let pressureChange = 0;
                     
-                    // Calculate pressure change over last few hours (adjusted for hPa units)
-                    if (index >= 3) { // Need at least 3 points for trend
-                        const currentPressure = point.y;
-                        const pastPressure = pressureData[index - 3].y;
-                        pressureChange = currentPressure - pastPressure;
-                        
-                        // Determine storm risk based on pressure drop rate (hPa thresholds)
-                        // Match the legend: Clear(0), Possible(1), Likely(2), Imminent(3)
-                        if (pressureChange <= -8) riskLevel = 3; // Imminent (was 4)
-                        else if (pressureChange <= -5) riskLevel = 2; // Likely (was 3)
-                        else if (pressureChange <= -3) riskLevel = 1; // Possible (was 2)
-                        else riskLevel = 0; // Clear (was 0-1 range)
+                    // Check if we have explicit storm risk from ESP32
+                    if (point.stormRisk && point.stormRisk !== 'Clear' && point.stormRisk !== 'NONE') {
+                        // Map string values to risk levels
+                        const risk = String(point.stormRisk).toUpperCase();
+                        if (risk.includes('IMMINENT') || risk.includes('ALERT')) riskLevel = 3;
+                        else if (risk.includes('LIKELY') || risk.includes('WARNING')) riskLevel = 2;
+                        else if (risk.includes('POSSIBLE') || risk.includes('WATCH')) riskLevel = 1;
+                        else riskLevel = 0;
+                    } else {
+                        // Fallback to manual calculation
+                        // Calculate pressure change over last few hours (adjusted for hPa units)
+                        if (index >= 3) { // Need at least 3 points for trend
+                            const currentPressure = point.y;
+                            const pastPressure = pressureData[index - 3].y;
+                            pressureChange = currentPressure - pastPressure;
+                            
+                            // Determine storm risk based on pressure drop rate (hPa thresholds)
+                            // Match the legend: Clear(0), Possible(1), Likely(2), Imminent(3)
+                            if (pressureChange <= -8) riskLevel = 3; // Imminent (was 4)
+                            else if (pressureChange <= -5) riskLevel = 2; // Likely (was 3)
+                            else if (pressureChange <= -3) riskLevel = 1; // Possible (was 2)
+                            else riskLevel = 0; // Clear (was 0-1 range)
+                        }
                     }
                     
                     return {
