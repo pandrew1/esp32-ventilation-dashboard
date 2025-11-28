@@ -1627,8 +1627,8 @@ function startAutoRefresh() {
                         // Calculate derived metrics
                         const uptimeMinutes = (perfData && perfData.uptimeMinutes) ? perfData.uptimeMinutes : 0;
                         const uptimeFormatted = uptimeMinutes > 0 ? `${Math.floor(uptimeMinutes / 60)}h ${uptimeMinutes % 60}m` : 'Unknown';
-                        const dutyCycle = (ventData && ventData.fanMinutesToday) ? ((ventData.fanMinutesToday / 1440) * 100).toFixed(1) : 'Unknown'; // 1440 min = 24h
-                        const ventRuntime = (ventData && ventData.fanMinutesToday) ? (ventData.fanMinutesToday / 60).toFixed(1) : 'Unknown';
+                        const dutyCycle = (ventData && ventData.fanMinutesToday !== undefined) ? ((ventData.fanMinutesToday / 1440) * 100).toFixed(1) : 'Unknown'; // 1440 min = 24h
+                        const ventRuntime = (ventData && ventData.fanMinutesToday !== undefined) ? (ventData.fanMinutesToday / 60).toFixed(1) : 'Unknown';
                         
                         document.getElementById('yesterdayPerformance').innerHTML = `
                             <div class="perf-health-summary">
