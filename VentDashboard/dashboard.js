@@ -1,6 +1,4 @@
 // ESP32 Ventilation Dashboard JavaScript
-// Extracted from dashboard.html for easier debugging and maintenance
-
 /*
 🚨 CRITICAL DEPLOYMENT REMINDER:
 - This dashboard ONLY works on Azure Static Web App (has API keys)
@@ -69,7 +67,6 @@ const AuthUtils = {
     }
 };
 
-// Simplified Module Loading System
 const ModuleLoader = {
     loadedModules: new Map(),
     
@@ -139,7 +136,7 @@ async function initializeModularSystems() {
 }
 
 // ===================================================================
-// STAGE 4: CONSOLIDATED UTILITY FUNCTIONS
+// CONSOLIDATED UTILITY FUNCTIONS
 // ===================================================================
 
 // DateTime Utilities - Consolidated from multiple duplicate functions
@@ -5621,13 +5618,16 @@ function startAutoRefresh() {
                     }
                 }
                 
-                // Update fog risk based on humidity and temperature differential
+                // Update fog risk based on outdoor humidity (fog is primarily an outdoor high-humidity phenomenon)
                 const fogRiskElement = document.getElementById('fog-risk');
-                if (fogRiskElement && indoor.humidity != null && outdoor.humidity != null) {
-                    // Calculate fog risk based on humidity differential and temperature
-                    const humidityDiff = Math.abs(indoor.humidity - outdoor.humidity);
-                    const tempDiff = Math.abs(indoor.temp - outdoor.temp);
-                    const fogRisk = Math.min(100, humidityDiff * 2 + tempDiff * 1.5);
+                if (fogRiskElement && outdoor.humidity != null) {
+                    // Calculate fog risk: Fog typically forms when humidity is > 90%
+                    // Scale: 80% humidity = 0% risk, 100% humidity = 100% risk
+                    let fogRisk = 0;
+                    if (outdoor.humidity > 80) {
+                        fogRisk = (outdoor.humidity - 80) * 5; // (100-80)*5 = 100
+                    }
+                    fogRisk = Math.min(100, Math.max(0, fogRisk));
                     
                     fogRiskElement.textContent = `${Math.round(fogRisk)}%`;
                     
@@ -5741,10 +5741,11 @@ function startAutoRefresh() {
                 // Update pressure differentials
                 const indoorOutdoorElement = document.getElementById('indoor-outdoor-diff');
                 if (indoorOutdoorElement && buildingPerformance.indoorOutdoorDiff != null) {
-                    const diff = buildingPerformance.indoorOutdoorDiff.toFixed(2);
+                    const diffVal = Number(buildingPerformance.indoorOutdoorDiff);
+                    const diff = diffVal.toFixed(2);
                     indoorOutdoorElement.textContent = `${diff} hPa`;
                     // Color code based on pressure difference magnitude
-                    const absDiff = Math.abs(buildingPerformance.indoorOutdoorDiff);
+                    const absDiff = Math.abs(diffVal);
                     if (absDiff < 0.5) {
                         indoorOutdoorElement.style.color = '#4CAF50'; // Good - Green
                     } else if (absDiff < 1.0) {
@@ -5756,8 +5757,18 @@ function startAutoRefresh() {
                 
                 const garageOutdoorElement = document.getElementById('garage-outdoor-diff');
                 if (garageOutdoorElement && buildingPerformance.garageOutdoorDiff != null) {
-                    const diff = buildingPerformance.garageOutdoorDiff.toFixed(2);
+                    const diffVal = Number(buildingPerformance.garageOutdoorDiff);
+                    const diff = diffVal.toFixed(2);
                     garageOutdoorElement.textContent = `${diff} hPa`;
+                    // Color code based on pressure difference magnitude
+                    const absDiff = Math.abs(diffVal);
+                    if (absDiff < 0.5) {
+                        garageOutdoorElement.style.color = '#4CAF50'; // Good - Green
+                    } else if (absDiff < 1.0) {
+                        garageOutdoorElement.style.color = '#FF9800'; // Fair - Orange
+                    } else {
+                        garageOutdoorElement.style.color = '#F44336'; // Poor - Red
+                    }
                 }
                 
                 // Update HVAC status
@@ -5848,13 +5859,14 @@ function startAutoRefresh() {
                 // Update migraine risk
                 const migraineriskElement = document.getElementById('migraine-risk');
                 if (migraineriskElement && healthMonitoring.migraineRisk != null) {
-                    const risk = healthMonitoring.migraineRisk.toFixed(0);
+                    const riskVal = Number(healthMonitoring.migraineRisk);
+                    const risk = riskVal.toFixed(0);
                     migraineriskElement.textContent = `${risk}%`;
                     
                     // Color code migraine risk
-                    if (healthMonitoring.migraineRisk < 30) {
+                    if (riskVal < 30) {
                         migraineriskElement.style.color = '#4CAF50'; // Low - Green
-                    } else if (healthMonitoring.migraineRisk < 60) {
+                    } else if (riskVal < 60) {
                         migraineriskElement.style.color = '#FF9800'; // Moderate - Orange
                     } else {
                         migraineriskElement.style.color = '#F44336'; // High - Red
