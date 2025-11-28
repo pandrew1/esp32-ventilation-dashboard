@@ -1889,7 +1889,11 @@ function startAutoRefresh() {
                     loadYesterdayIncidentSummary();
                     
                     // ENHANCED: Load individual sensor data for accurate readings
-                    loadYesterdayIndividualSensorData();
+                    try {
+                        loadYesterdayIndividualSensorData();
+                    } catch (e) {
+                        console.error('Error loading individual sensor data:', e);
+                    }
                 })
                 .catch(error => {
                     console.error('DataManager: Error loading enhanced data for detailed content:', error);
