@@ -2370,7 +2370,14 @@ function startAutoRefresh() {
                     if (element) element.textContent = text;
                 };
                 
-                const errorText = 'Error';
+                // Show specific error if available
+                let errorText = 'Error';
+                if (error.message) {
+                    if (error.message.includes('401') || error.message.includes('403')) errorText = 'Auth Error';
+                    else if (error.message.includes('Failed to fetch')) errorText = 'Network Error';
+                    else if (error.message.length < 15) errorText = error.message;
+                }
+                
                 safeUpdate('yesterdayAvgTemp', errorText);
                 safeUpdate('yesterdayTempRange', 'Failed to load');
                 safeUpdate('yesterdayTempTrend', 'No data');
@@ -3057,15 +3064,8 @@ function startAutoRefresh() {
                     throw new Error(`API Error: ${response.status} ${response.statusText}`);
                 }
                 
-                const data = await response.json();
-                console.log('🔍 DEBUG: GetEnhancedDoorAnalytics data received:', data);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
                 const analyticsData = await response.json();
-                // console.log('🔍 DEBUG: Enhanced door analytics received - structure:', Object.keys(analyticsData));
+                console.log('🔍 DEBUG: GetEnhancedDoorAnalytics data received:', analyticsData);
 
                 // Process and display the enhanced data
                 updateDoorActivityDisplay(analyticsData);
