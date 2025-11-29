@@ -2953,7 +2953,7 @@ function startAutoRefresh() {
                 if (actionsEl && !document.getElementById('analyticsTimeRange')) {
                     const selectHtml = `
                         <select id="analyticsTimeRange" onchange="updateDoorCommandCenter(this.value)" style="margin-bottom:10px; padding:5px; width:100%; border-radius:4px; border:1px solid #ddd; background:white;">
-                            <option value="24" ${hours == 24 ? 'selected' : ''}>Last 24 Hours</option>
+                            <option value="24" ${hours == 24 ? 'selected' : ''}>Today</option>
                             <option value="48" ${hours == 48 ? 'selected' : ''}>Last 48 Hours</option>
                             <option value="168" ${hours == 168 ? 'selected' : ''}>Last 7 Days</option>
                             <option value="720" ${hours == 720 ? 'selected' : ''}>Last 30 Days</option>
@@ -3034,6 +3034,8 @@ function startAutoRefresh() {
                 });
             }
         }
+        // Expose to global scope for HTML event handlers
+        window.updateDoorCommandCenter = updateDoorCommandCenter;
 
         /**
          * Updates the enhanced door activity widget with current door status and activity
