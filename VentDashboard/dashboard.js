@@ -2489,7 +2489,10 @@ function startAutoRefresh() {
          * Updates the Door Command Center (6-panel grid) with detailed door status
          * @param {number} hours - Time range in hours
          */
-        async function updateDoorCommandCenter(hours = 24) {
+        async function updateDoorCommandCenter(hoursInput = 24) {
+            // Ensure hours is a number to prevent string coercion issues with cutoffTime
+            const hours = parseInt(hoursInput) || 24;
+
             // Check auth
             const headers = getAuthHeaders();
             const hasAuth = headers['Authorization'] || headers['X-API-Secret'];
