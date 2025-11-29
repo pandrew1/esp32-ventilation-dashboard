@@ -2765,8 +2765,10 @@ function startAutoRefresh() {
 
                             // Update Stats
                             // Filter based on checkboxes
-                            const filterReed = document.getElementById('filterListReed')?.checked ?? true;
+                            const filterReed = document.getElementById('filterListReed')?.checked ?? false;
                             const filterS7 = document.getElementById('filterListS7')?.checked ?? false;
+                            
+                            Logger.log(`[DoorFilter] Updating ${suffix}: Reed=${filterReed}, S7=${filterS7}, TotalEvents=${doorEvents[suffix]?.length || 0}`);
 
                             const allEvents = doorEvents[suffix];
                             const events = allEvents ? allEvents.filter(evt => {
@@ -2786,6 +2788,8 @@ function startAutoRefresh() {
                                 
                                 return pass;
                             }) : []; // Get events for this door
+                            
+                            Logger.log(`[DoorFilter] ${suffix}: Filtered count=${events.length}`);
                             
                             const firstEl = document.getElementById(`first-${suffix}`);
                             if (firstEl) {
