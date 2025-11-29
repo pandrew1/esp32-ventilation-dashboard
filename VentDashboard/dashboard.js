@@ -2761,7 +2761,13 @@ function startAutoRefresh() {
                             }
 
                             // Update Stats
-                            const events = doorEvents[suffix]; // Get events for this door
+                            // Filter for Reed Confirmed only (User Request)
+                            const allEvents = doorEvents[suffix];
+                            const events = allEvents ? allEvents.filter(evt => {
+                                const isReedMethod = (evt.method === 'reed-switch' || evt.method === 'reed');
+                                const hasReedMatch = (evt.reedMatchConfidence && evt.reedMatchConfidence !== 'NONE');
+                                return isReedMethod || hasReedMatch;
+                            }) : []; // Get events for this door
                             
                             const firstEl = document.getElementById(`first-${suffix}`);
                             if (firstEl) {
