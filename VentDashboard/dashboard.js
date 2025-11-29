@@ -1192,7 +1192,10 @@ function startAutoRefresh() {
                 // Update Door Command Center (6-panel grid)
                 try {
                     // This will now use the cached history data we just populated
-                    await updateDoorCommandCenter(24);
+                    // FIX: Use currently selected time range if available, otherwise default to 24
+                    const timeRangeEl = document.getElementById('analyticsTimeRange');
+                    const currentHours = timeRangeEl ? parseInt(timeRangeEl.value) : 24;
+                    await updateDoorCommandCenter(currentHours);
                 } catch (e) {
                     Logger.error('Error updating Door Command Center:', e);
                 }
