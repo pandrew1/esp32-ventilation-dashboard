@@ -2765,8 +2765,8 @@ function startAutoRefresh() {
 
                             // Update Stats
                             // Filter based on checkboxes
-                            const filterReed = document.getElementById('filterReedConfirmed')?.checked ?? true;
-                            const filterS7 = document.getElementById('filterS7Passed')?.checked ?? false;
+                            const filterReed = document.getElementById('filterListReed')?.checked ?? true;
+                            const filterS7 = document.getElementById('filterListS7')?.checked ?? false;
 
                             const allEvents = doorEvents[suffix];
                             const events = allEvents ? allEvents.filter(evt => {
