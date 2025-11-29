@@ -2761,12 +2761,27 @@ function startAutoRefresh() {
                             }
 
                             // Update Stats
-                            // Filter for Reed Confirmed only (User Request)
+                            // Filter based on checkboxes
+                            const filterReed = document.getElementById('filterReedConfirmed')?.checked ?? true;
+                            const filterS7 = document.getElementById('filterS7Passed')?.checked ?? false;
+
                             const allEvents = doorEvents[suffix];
                             const events = allEvents ? allEvents.filter(evt => {
-                                const isReedMethod = (evt.method === 'reed-switch' || evt.method === 'reed');
-                                const hasReedMatch = (evt.reedMatchConfidence && evt.reedMatchConfidence !== 'NONE');
-                                return isReedMethod || hasReedMatch;
+                                let pass = true;
+                                
+                                // Filter 1: Reed Confirmed
+                                if (filterReed) {
+                                    const isReedMethod = (evt.method === 'reed-switch' || evt.method === 'reed');
+                                    const hasReedMatch = (evt.reedMatchConfidence && evt.reedMatchConfidence !== 'NONE');
+                                    if (!isReedMethod && !hasReedMatch) pass = false;
+                                }
+                                
+                                // Filter 2: S7 Passed
+                                if (filterS7) {
+                                    if (evt.s7RejectReason !== 'PASS') pass = false;
+                                }
+                                
+                                return pass;
                             }) : []; // Get events for this door
                             
                             const firstEl = document.getElementById(`first-${suffix}`);
