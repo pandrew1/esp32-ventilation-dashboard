@@ -1252,6 +1252,13 @@ function startAutoRefresh() {
                     } else if (token) {
                         showApiFailureNotice('Status API returned 401 Unauthorized. Please check authentication or contact system administrator.', 'error');
                     }
+                } else if (error.message && error.message.toLowerCase().includes('failed to fetch')) {
+                    // Transient network blip or Azure Function cold start.
+                    // Auto-refresh runs every 15s, so don't show a scary
+                    // persistent banner for a single failed fetch. Just log
+                    // it and let the next tick recover. Status drops to
+                    // disconnected so the user sees something changed.
+                    Logger.log('refreshData: transient fetch failure; will retry on next auto-refresh tick.');
                 } else {
                     showApiFailureNotice(`Network error connecting to Status API: ${error.message}. Data is currently unavailable.`, 'error');
                 }
