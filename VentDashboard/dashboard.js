@@ -29,10 +29,7 @@ const AuthUtils = {
     getAuthHeaders() {
         const headers = { 'Content-Type': 'application/json' };
         
-        // Set up CONFIG to force X-API-Secret authentication
-        if (!window.CONFIG) {
-            window.CONFIG = { apiSecret: 'VentilationSystem2025SecretKey' };
-        }
+        // DO NOT STORE API SECRETS IN JS FILES, ITS PUBLICLY ACCESSIBLE ON THE INTERNET - MUST USE BEARER TOKENS OR URL PARAMETERS
         
         const token = localStorage.getItem('ventilation_auth_token');
         
@@ -265,18 +262,50 @@ const ChartUtils = {
 
 // ===================================================================
 
-// Helper function to get API key from URL parameter (must be defined first)
+// ===================================================================
+//                       AUTHENTICATION POLICY
+// ===================================================================
+// The ONLY supported authentication path is:
+//   login.html  ->  AuthenticateUser (email + verification code)
+//   ->  Bearer token stored in localStorage['ventilation_auth_token']
+//   ->  dashboard.html reads the token and sends it as Authorization header
+//
+// URL-parameter authentication (?apikey=... / ?key=...) is INTENTIONALLY
+// not supported. Secrets in URLs leak into:
+//   - browser history
+//   - referer headers sent to third-party CDNs/analytics
+//   - server access logs (Azure Front Door, App Service, gateway)
+//   - bookmarks and screen shares / screenshots
+//   - shoulder-surfing on the address bar
+// If the dashboard finds an apikey query parameter we WARN the user, strip
+// it from the URL with history.replaceState (so it does not persist or
+// leak further), and ignore it — the user must log in.
+// ===================================================================
+
 /**
- * Extracts API key from URL parameters
- * Looks for 'apikey' or 'key' parameters in the URL query string
- * @returns {string|null} The API key if found, null otherwise
+ * Detects a legacy ?apikey= / ?key= URL parameter, warns the user, and
+ * strips it from the visible URL. Always returns null — the value is NEVER
+ * used for authentication. See policy comment above.
+ * @returns {null}
  */
 function getApiKeyFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
-    // FALLBACK: Return default API key if not provided in URL
-    // This ensures dashboard works even without URL parameters
-    // NEVER ADD THE APIKEY TO THE JS FILE SINCE IT IS CHECKED INTO A PUBLIC GIT REPO
-    return urlParams.get('apikey') || urlParams.get('key');
+    const legacyKey = urlParams.get('apikey') || urlParams.get('key');
+    if (legacyKey) {
+        console.warn(
+            '[Auth] Ignoring ?apikey= / ?key= URL parameter. Dashboard ' +
+            'authentication requires logging in via login.html. Removing ' +
+            'the parameter from the URL to prevent leakage via referer ' +
+            'headers, browser history, and server logs.'
+        );
+        // Strip the secret from the visible URL without reloading the page.
+        urlParams.delete('apikey');
+        urlParams.delete('key');
+        const cleanQuery = urlParams.toString();
+        const cleanUrl = window.location.pathname + (cleanQuery ? ('?' + cleanQuery) : '') + window.location.hash;
+        try { window.history.replaceState({}, '', cleanUrl); } catch (_) { /* best effort */ }
+    }
+    return null;
 }
 
 // Configuration - Replace with your actual Azure Function URLs
@@ -293,16 +322,16 @@ const CONFIG = {
 
 // Initialize API secret from URL parameter
 /**
- * Initializes the API secret from URL parameters if not already set
- * Calls getApiKeyFromUrl() to extract the API key and stores it in CONFIG.apiSecret
- * @returns {string|null} The API secret if found, null otherwise
+ * No-op shim kept for backward compatibility with code paths that still
+ * call this function. URL-parameter authentication was removed (see policy
+ * comment above getApiKeyFromUrl). CONFIG.apiSecret stays null; the only
+ * supported credential is the Bearer token in localStorage from login.html.
+ * @returns {null}
  */
 function initializeApiSecret() {
-    if (!CONFIG.apiSecret) {
-        CONFIG.apiSecret = getApiKeyFromUrl();
-        Logger.log('🔍 DEBUG: API secret initialized from URL:', !!CONFIG.apiSecret);
-    }
-    return CONFIG.apiSecret;
+    // Trigger the warn+strip side effect if a legacy ?apikey= is present.
+    getApiKeyFromUrl();
+    return null;
 }
 
 // Global variables
@@ -1086,15 +1115,15 @@ function showApiFailureNotice(message, type = 'warning') {
 // Initialize dashboard
 // (Removed duplicate function - using the one with enhanced API calls below)
 
-// Authentication check - redirect to login if not authenticated
+// Authentication check - redirect to login if not authenticated.
+// URL-parameter auth was removed (see policy comment above getApiKeyFromUrl).
+// The only supported credential is the Bearer token saved by login.html.
 window.addEventListener('load', function() {
     const token = localStorage.getItem('ventilation_auth_token');
-    const apiKey = getApiKeyFromUrl();
-    
-    // If no token and no API key, show no data message (don't redirect)
-    // This allows users to see the dashboard structure before logging in
-    if (!token && !apiKey) {
-        // Show no data state without authentication
+    if (!token) {
+        // No token -> bounce to login. login.html will redirect back to
+        // dashboard.html on successful verification.
+        window.location.href = 'login.html';
         return;
     }
 });
