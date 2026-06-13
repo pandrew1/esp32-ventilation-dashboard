@@ -769,7 +769,13 @@ const DataManager = {
         try {
             // console.log('🔍 DEBUG: DataManager.getEnhancedData() - Making API call to:', CONFIG.enhancedApiUrl);
             
-            const url = `${CONFIG.enhancedApiUrl}?deviceId=${CONFIG.deviceId}`;
+            // Only request the cheap small-table sections the dashboard consumes
+            // (startup -> System Health widget, yesterday -> Yesterday's Report).
+            // The 'doors' section runs a 48h VentilationData scan (~57s) and is
+            // unused now that the Door Activity Center is removed; 'monthly'/'health'
+            // are also not consumed here. Restricting sections keeps this off the
+            // <10s critical path.
+            const url = `${CONFIG.enhancedApiUrl}?deviceId=${CONFIG.deviceId}&sections=startup,yesterday`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: DashboardUtils.getAuthHeaders()
@@ -1020,10 +1026,20 @@ const DataManager = {
         
         try {
             const url = `${CONFIG.snapshotApiUrl}?deviceId=${CONFIG.deviceId}&hours=24`;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: DashboardUtils.getAuthHeaders()
-            });
+            // Abort if the request stalls so the loading spinner can't hang forever
+            // on a flaky mobile connection.
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            let response;
+            try {
+                response = await fetch(url, {
+                    method: 'GET',
+                    headers: DashboardUtils.getAuthHeaders(),
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1050,6 +1066,14 @@ const DataManager = {
             }
             throw error;
         }
+    },
+
+    // Get the flat recent door-events list from the consolidated 24h snapshot.
+    // Feeds the "Door Status & Activity" 6-panel card instead of the slow
+    // GetEnhancedDoorAnalytics endpoint + full history fetch.
+    async getRecentDoorEvents(forceRefresh = false) {
+        const snapshot = await this.getDashboardSnapshot(forceRefresh);
+        return Array.isArray(snapshot.recentDoorEvents) ? snapshot.recentDoorEvents : [];
     }
 };
 
@@ -1426,7 +1450,6 @@ function startAutoRefresh() {
             // Load Enhanced API data sections (only the ones that work)
             // FIX: Await async functions to prevent race conditions
             await loadYesterdaySummaryMetrics();
-            await updateEnhancedDoorActivity();
             
             // Initialize Door Command Center (6-panel grid)
             try {
@@ -1980,31 +2003,8 @@ function startAutoRefresh() {
             // Load summary metrics from API
             loadYesterdaySummaryMetrics();
 
-            // Set up door activity timeline controls
-            console.log('=== SETUP: Setting up time filter buttons ===');
-            const timeFilters = document.querySelectorAll('.time-filter');
-            console.log('=== SETUP: Found', timeFilters.length, 'time filter buttons ===');
-            
-            timeFilters.forEach((filter, index) => {
-                console.log(`=== SETUP: Button ${index}: data-hours="${filter.dataset.hours}" ===`);
-                filter.addEventListener('click', function() {
-                    console.log(`=== TIMELINE BUTTON CLICKED: ${this.dataset.hours}h ===`);
-                    // Remove active class from all filters
-                    timeFilters.forEach(f => f.classList.remove('active'));
-                    // Add active class to clicked filter
-                    this.classList.add('active');
-                    // Update timeline
-                    updateDoorTimeline(this.dataset.hours);
-                });
-            });
-
-            // Load real data from API instead of using placeholders
-            updateEnhancedDoorActivity();
+            // Door Activity Center removed; only refresh the system health widget here.
             updateSystemHealthWidget();
-            
-            // Load initial activity timeline (24h by default)
-            console.log('=== SETUP: Loading initial 24h timeline ===');
-            updateDoorTimeline(24);
         }
 
         /**
@@ -2548,23 +2548,12 @@ function startAutoRefresh() {
             }
 
             try {
-                const cacheBuster = Date.now();
-                
-                // Fetch both Status (Analytics) and History data in parallel
-                // 1. Status Data (for current state and summary stats)
-                const analyticsPromise = fetch(`https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDoorAnalytics?analysis=detailed&timeRange=${hours}h&deviceId=${CONFIG.deviceId}&_t=${cacheBuster}`, {
-                    method: 'GET',
-                    headers: { ...headers }
-                }).then(r => {
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.json();
-                });
-                
-                // 2. History Data (for scrolling event lists and pie chart calculation)
-                const historyPromise = DataManager.getHistoryData(hours);
-                
-                const [analyticsData, historyData] = await Promise.all([analyticsPromise, historyPromise]);
-                
+                // Recent door events now come from the consolidated snapshot
+                // (snapshot.recentDoorEvents) instead of the slow
+                // GetEnhancedDoorAnalytics endpoint + full history fetch. This
+                // keeps the card off the critical-path network cost.
+                const recentEvents = await DataManager.getRecentDoorEvents();
+
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
                 const doorMap = {
@@ -2606,18 +2595,9 @@ function startAutoRefresh() {
                     cutoffTime = Date.now() - (hours * 60 * 60 * 1000);
                 }
 
-                // Handle both array response (from snapshot) and object response (legacy/wrapper)
-                let historyRecords = [];
-                if (Array.isArray(historyData)) {
-                    historyRecords = historyData;
-                } else if (historyData && Array.isArray(historyData.data)) {
-                    historyRecords = historyData.data;
-                }
-
-                if (historyRecords.length > 0) {
-                    historyRecords.forEach(record => {
-                        if (record.doorTransitions) {
-                            record.doorTransitions.forEach(t => {
+                // Iterate the flat recentDoorEvents list from the snapshot.
+                if (recentEvents.length > 0) {
+                    recentEvents.forEach(t => {
                                 // Filter: Show events within the requested time range (Rolling Window)
                                 const ts = t.timestamp > 10000000000 ? t.timestamp : t.timestamp * 1000;
                                 if (ts < cutoffTime) return;
@@ -2683,8 +2663,6 @@ function startAutoRefresh() {
                                         perfStats.detected++;
                                     }
                                 }
-                            });
-                        }
                     });
                 }
                 
@@ -2753,52 +2731,22 @@ function startAutoRefresh() {
                     if (historyEl) historyEl.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size:0.8em;">No activity</div>';
                 });
 
-                // Update panels based on doorActivity (preferred) or zoneActivity (fallback)
-                const activitySource = analyticsData.doorActivity || analyticsData.zoneActivity;
-                
-                if (activitySource) {
-                    Object.entries(activitySource).forEach(([name, stats]) => {
-                        // Determine which panel corresponds to this door/zone
-                        let suffix = null;
-                        const lowerName = name.toLowerCase();
-                        
-                        // Check for specific door names first (from doorActivity)
-                        if (lowerName.includes('d1') || lowerName.includes('main garage')) suffix = 'd1';
-                        else if (lowerName.includes('d2') || lowerName.includes('house door') || lowerName.includes('house hinge')) suffix = 'd2';
-                        else if (lowerName.includes('d3') || lowerName.includes('single roller')) suffix = 'd3';
-                        else if (lowerName.includes('d4') || lowerName.includes('double roller')) suffix = 'd4';
-                        else if (lowerName.includes('house-outside') || lowerName.includes('house outside')) suffix = 'house-outside';
-                        
-                        // Fallback for zone names (from zoneActivity)
-                        else if (lowerName === 'garage-outside') {
-                             // Map garage-outside to D1 as primary if no specific door data
-                             suffix = 'd1'; 
-                        }
-                        else if (lowerName === 'garage-house') suffix = 'd2';
-                        
-                        if (suffix) {
-                            // Update Status
+                // Update each door panel from its recent events. We iterate the
+                // fixed set of panels (instead of analytics keys) and derive the
+                // status badge from the most recent event's open/close state.
+                ['d1', 'd2', 'd3', 'd4', 'house-outside'].forEach(suffix => {
+                        {
+                            // Update Status from the latest (newest) event for this door
+                            const latestEvt = (doorEvents[suffix] && doorEvents[suffix][0]) || null;
                             const statusEl = document.getElementById(`status-${suffix}`);
                             if (statusEl) {
-                                // NEW LOGIC: Use currentState if available
-                                if (stats.currentState && stats.currentState !== 'UNKNOWN') {
-                                    statusEl.textContent = stats.currentState;
-                                    // Add specific classes for styling (open=danger/warning, closed=success/inactive)
-                                    const statusClass = stats.currentState === 'OPEN' ? 'active' : 'inactive';
-                                    statusEl.className = `status-badge ${statusClass}`; 
+                                if (latestEvt) {
+                                    const isOpen = latestEvt.action === 'OPEN';
+                                    statusEl.textContent = isOpen ? 'OPEN' : 'CLOSED';
+                                    statusEl.className = `status-badge ${isOpen ? 'active' : 'inactive'}`;
                                 } else {
-                                    // Fallback to existing logic
-                                    const lastTime = stats.lastActivity || 0;
-                                    const now = Date.now() / 1000;
-                                    const isRecent = (now - lastTime) < 900; // 15 mins
-                                    
-                                    if (isRecent) {
-                                        statusEl.textContent = 'ACTIVE';
-                                        statusEl.className = 'status-badge active';
-                                    } else {
-                                        statusEl.textContent = 'INACTIVE';
-                                        statusEl.className = 'status-badge inactive';
-                                    }
+                                    statusEl.textContent = 'INACTIVE';
+                                    statusEl.className = 'status-badge inactive';
                                 }
                             }
 
@@ -2869,7 +2817,8 @@ function startAutoRefresh() {
                             if (historyEl) {
                                 if (events && events.length > 0) {
                                     let html = '<ul style="list-style:none; padding:0; margin:0; font-size:0.85em;">';
-                                    events.forEach(evt => {
+                                    // Limit the visible list to the last 5 events per door.
+                                    events.slice(0, 5).forEach(evt => {
                                         // Handle timestamp (seconds or ms)
                                         const ts = evt.timestamp > 10000000000 ? evt.timestamp : evt.timestamp * 1000;
                                         const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -2980,13 +2929,10 @@ function startAutoRefresh() {
                             }
                         }
                     });
-                } else {
-                    Logger.warn('🚪 COMMAND CENTER: No doorActivity or zoneActivity data found in response');
-                }
                 
                 // Update Analytics Panel
-                // Calculate average confidence from history data if available
-                const avgConf = confidenceStats.total > 0 ? (confidenceStats.sum / confidenceStats.total) : (analyticsData.detectionAnalytics?.averageConfidence || 0);
+                // Average confidence is computed from the recent events above.
+                const avgConf = confidenceStats.total > 0 ? (confidenceStats.sum / confidenceStats.total) : 0;
                 
                 const confEl = document.getElementById('ml-confidence-avg');
                 if (confEl) confEl.textContent = `${(avgConf * 100).toFixed(1)}%`;
@@ -3052,16 +2998,6 @@ function startAutoRefresh() {
                             confidenceStats.medium,
                             confidenceStats.low,
                             confidenceStats.reed
-                        ];
-                        ctx.chartInstance.update();
-                    } else if (analyticsData.detectionAnalytics && analyticsData.detectionAnalytics.confidenceDistribution) {
-                        // Fallback to analytics data if history processing failed
-                        const dist = analyticsData.detectionAnalytics.confidenceDistribution;
-                        ctx.chartInstance.data.datasets[0].data = [
-                            dist.high || 0,
-                            dist.medium || 0,
-                            dist.low || 0,
-                            analyticsData.detectionAnalytics.reedSwitchEvents || 0
                         ];
                         ctx.chartInstance.update();
                     }
@@ -6329,11 +6265,6 @@ function startAutoRefresh() {
                 updateDoorStatus(data.doors, confirmationAnalytics);
             }
             
-            // GOAL 2: Update Recent Door Events List
-            if (data.doorTransitions && Array.isArray(data.doorTransitions)) {
-                updateRecentDoorEvents(data.doorTransitions);
-            }
-
             // Check for alerts
             checkAlerts(data);
 

@@ -107,6 +107,14 @@ export class DataManager {
         return data;
     }
 
+    // Get the flat recent door-events list from the consolidated 24h snapshot.
+    // Used by the "Door Status & Activity" card instead of the slow
+    // GetEnhancedDoorAnalytics endpoint + full history fetch.
+    async getRecentDoorEvents(forceRefresh = false) {
+        const snapshot = await this.getDashboardSnapshot(forceRefresh, 24);
+        return Array.isArray(snapshot.recentDoorEvents) ? snapshot.recentDoorEvents : [];
+    }
+
     async getEnhancedData(forceRefresh = false) {
         const cache = this.cache.enhancedData;
         
@@ -116,7 +124,11 @@ export class DataManager {
         }
         
         console.log('DataManager: Fetching fresh enhanced data');
-        const data = await this._deduplicatedFetch(this.config.enhancedApiUrl, 'enhanced');
+        // Only request the cheap small-table sections (startup, yesterday). The
+        // 'doors' section runs a ~57s VentilationData scan and is unused now that
+        // the Door Activity Center is removed.
+        const enhancedUrl = `${this.config.enhancedApiUrl}?deviceId=ESP32-Ventilation-01&sections=startup,yesterday`;
+        const data = await this._deduplicatedFetch(enhancedUrl, 'enhanced');
         
         cache.data = data;
         cache.timestamp = Date.now();
@@ -198,7 +210,7 @@ export class DataManager {
     }
 
     // Request deduplication to prevent multiple simultaneous calls
-    async _deduplicatedFetch(endpoint, requestKey) {
+    async _deduplicatedFetch(endpoint, requestKey, timeoutMs = 60000) {
         if (this.activeRequests.has(requestKey)) {
             console.log(`DataManager: Deduplicating request for ${requestKey}`);
             return this.activeRequests.get(requestKey);
@@ -206,10 +218,17 @@ export class DataManager {
 
         // Use the dashboard's authentication system
         const headers = DashboardUtils.getAuthHeaders();
-        
+
+        // Abort if the request stalls. Without this, a hung mobile connection
+        // never settles, so initializeDashboard() never resolves or rejects and
+        // the loading spinner stays up forever ("never loads" on phone).
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
         const request = fetch(endpoint, {
             method: 'GET',
-            headers: headers
+            headers: headers,
+            signal: controller.signal
         }).then(response => {
             // Check for authentication failures
             if (response.status === 401 || response.status === 403) {
@@ -237,9 +256,14 @@ export class DataManager {
             console.log(`DataManager: ${endpoint} fetched and cached successfully`);
             return result;
         } catch (error) {
+            if (error && error.name === 'AbortError') {
+                console.error(`DataManager: Request for ${requestKey} timed out after ${timeoutMs}ms`);
+                throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s: ${endpoint}`);
+            }
             console.error(`DataManager: Error fetching ${endpoint}:`, error);
             throw error;
         } finally {
+            clearTimeout(timeoutId);
             this.activeRequests.delete(requestKey);
         }
     }
