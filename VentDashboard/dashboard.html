@@ -2031,6 +2031,18 @@
                                 <div style="display:flex; justify-content:space-between; color:#e0a800;"><span>False Negatives:</span> <strong id="perf-fn">0</strong></div>
                             </div>
 
+                            <!-- EXPERIMENTAL pressure-only 3-way garage-house direction (from ESP32 gh3way telemetry) -->
+                            <div id="gh3wayPanel" style="padding: 10px; font-size: 0.9em; border-bottom: 1px solid #eee; margin-bottom: 10px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span>Garage↔House 3-Way <span style="font-size:0.75em; color:#888;">[EXP]</span>:</span>
+                                    <strong id="gh3way-label" style="color:#666;">—</strong>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8em; color:#888; margin-top:3px;">
+                                    <span id="gh3way-conf">conf: —</span>
+                                    <span id="gh3way-age">—</span>
+                                </div>
+                            </div>
+
                             <div class="analytics-chart-container">
                                 <canvas id="confidencePieChart"></canvas>
                             </div>

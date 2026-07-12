@@ -1036,6 +1036,14 @@ const DataManager = {
     async getRecentDoorEvents(forceRefresh = false) {
         const snapshot = await this.getDashboardSnapshot(forceRefresh);
         return Array.isArray(snapshot.recentDoorEvents) ? snapshot.recentDoorEvents : [];
+    },
+
+    // EXPERIMENTAL pressure-only 3-way garage-house classification (from the ESP32 gh3way
+    // telemetry object, surfaced by GetDashboardSnapshot). May be null if the device has not
+    // reported one yet. Always shown WITH confidence + [EXP] tag; never used for control.
+    async getGh3way(forceRefresh = false) {
+        const snapshot = await this.getDashboardSnapshot(forceRefresh);
+        return (snapshot && typeof snapshot.gh3way === 'object') ? snapshot.gh3way : null;
     }
 };
 
@@ -2515,6 +2523,40 @@ function startAutoRefresh() {
                 // GetEnhancedDoorAnalytics endpoint + full history fetch. This
                 // keeps the card off the critical-path network cost.
                 const recentEvents = await DataManager.getRecentDoorEvents();
+
+                // EXPERIMENTAL pressure-only 3-way garage-house direction. Rendered with its
+                // confidence + an [EXP] tag; null-safe (device may not have reported one yet).
+                try {
+                    const gh3 = await DataManager.getGh3way();
+                    const labelEl = document.getElementById('gh3way-label');
+                    const confEl = document.getElementById('gh3way-conf');
+                    const ageEl = document.getElementById('gh3way-age');
+                    if (labelEl) {
+                        if (gh3 && gh3.isDoor) {
+                            const pretty = {
+                                open_held: 'OPEN (held)',
+                                self_close: 'WALK-THROUGH',
+                                close: 'CLOSE'
+                            }[gh3.label] || String(gh3.label || '—');
+                            labelEl.textContent = pretty;
+                            labelEl.style.color = '#0069d9';
+                            if (confEl) confEl.textContent = `conf: ${(Number(gh3.conf) || 0).toFixed(2)}`;
+                            if (ageEl) ageEl.textContent = gh3.reedConfirm ? 'reed ✓' : 'pressure-only';
+                        } else if (gh3) {
+                            labelEl.textContent = 'wind / no door';
+                            labelEl.style.color = '#999';
+                            if (confEl) confEl.textContent = `cz: ${(Number(gh3.czNotch) || 0).toFixed(3)}`;
+                            if (ageEl) ageEl.textContent = '—';
+                        } else {
+                            labelEl.textContent = '—';
+                            labelEl.style.color = '#666';
+                            if (confEl) confEl.textContent = 'conf: —';
+                            if (ageEl) ageEl.textContent = 'no report';
+                        }
+                    }
+                } catch (e) {
+                    Logger.warn('gh3way render skipped:', e);
+                }
 
                 // Map door IDs to panel IDs
                 // D1: Main Garage, D2: House Door, D3: Single Roller, D4: Double Roller, House-Outside
