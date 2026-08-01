@@ -565,30 +565,34 @@ function getDoorOpenState(value) {
 
 function isMeaningfulDoorTransition(event) {
     const method = String(event?.detectionMethod || '').trim().toLowerCase();
-    if (method === 'reed-switch') return true;
-    return method === 'pressure-analysis' && String(event?.s7RejectReason || '').trim().toUpperCase() === 'PASS';
+    return method === 'reed-switch';
 }
 
 function describeDoorDetectionMethod(event) {
     const method = String(event?.detectionMethod || 'unknown').trim().toLowerCase();
-    if (method === 'reed-switch') return 'Reed switch';
-    if (method === 'pressure-analysis') return 'Pressure · PASS';
+    if (method === 'reed-switch') {
+        const pressureConfirmed = event?.pressureConfirmed === true ||
+            String(event?.s7RejectReason || '').trim().toUpperCase() === 'PASS';
+        return pressureConfirmed ? 'Reed + pressure' : 'Reed switch';
+    }
     return method === 'unknown' ? 'Method unknown' : method.replace(/(^|-)([a-z])/g, (_, sep, c) => `${sep ? ' ' : ''}${c.toUpperCase()}`);
 }
 
 /** Update the front-page compact summary; full door history remains on tab 3. */
-function updateGarageDoorSummary(liveDoors = [], recentEvents = []) {
+function updateGarageDoorSummary(liveDoors = [], confirmedEvents = [], durableHistoryAvailable = false) {
     const states = new Map();
+    const statuses = new Map();
     (Array.isArray(liveDoors) ? liveDoors : []).forEach(door => {
         const byName = identifyGarageDoorKey(door, false);
         const byId = GARAGE_DOOR_SUMMARY.find(item => item.statusId === Number(door?.id));
         const key = byName || byId?.key;
         const state = getDoorOpenState(door?.open);
         if (key && state !== null) states.set(key, state);
+        if (key) statuses.set(key, door);
     });
 
     const latest = new Map();
-    (Array.isArray(recentEvents) ? recentEvents : []).forEach(event => {
+    (Array.isArray(confirmedEvents) ? confirmedEvents : []).forEach(event => {
         if (!isMeaningfulDoorTransition(event)) return;
         const key = identifyGarageDoorKey(event);
         if (!key) return;
@@ -602,6 +606,7 @@ function updateGarageDoorSummary(liveDoors = [], recentEvents = []) {
         const actionEl = document.getElementById(`garageSummaryAction-${door.key}`);
         const methodEl = document.getElementById(`garageSummaryMethod-${door.key}`);
         const event = latest.get(door.key);
+        const status = statuses.get(door.key);
         const state = states.has(door.key) ? states.get(door.key) : null;
         const eventState = getDoorOpenState(event?.opened);
 
@@ -610,10 +615,19 @@ function updateGarageDoorSummary(liveDoors = [], recentEvents = []) {
             stateEl.classList.toggle('open', state === true);
             stateEl.classList.toggle('closed', state === false);
         }
-        if (actionEl) actionEl.textContent = event
-            ? `${eventState === null ? 'Transition' : (eventState ? 'Opened' : 'Closed')} · ${formatCompactDoorAge(event.timestamp)}`
-            : 'No transition';
-        if (methodEl) methodEl.textContent = event ? describeDoorDetectionMethod(event) : '—';
+        if (event) {
+            if (actionEl) actionEl.textContent =
+                `${eventState === null ? 'Transition' : (eventState ? 'Opened' : 'Closed')} · ${formatCompactDoorAge(event.timestamp)}`;
+            if (methodEl) methodEl.textContent = describeDoorDetectionMethod(event);
+        } else {
+            const openedToday = getDoorOpenState(status?.wasOpenedToday);
+            if (actionEl) actionEl.textContent = !durableHistoryAvailable
+                ? 'Confirmed history unavailable'
+                : (openedToday === false
+                    ? 'No transition today'
+                    : (openedToday === true ? 'Opened today · time unavailable' : 'No saved transition'));
+            if (methodEl) methodEl.textContent = durableHistoryAvailable ? 'Reed history' : 'Current state only';
+        }
     });
 }
 
@@ -1484,7 +1498,17 @@ function startAutoRefresh() {
                     }
                 }
 
-                updateGarageDoorSummary(snapshot.status?.doors, snapshot.recentDoorEvents);
+                const latestDoorTransitions = Array.isArray(snapshot.latestDoorTransitions)
+                    ? snapshot.latestDoorTransitions
+                    : [];
+                const recentReedTransitions = Array.isArray(snapshot.recentDoorEvents)
+                    ? snapshot.recentDoorEvents.filter(isMeaningfulDoorTransition)
+                    : [];
+                updateGarageDoorSummary(
+                    snapshot.status?.doors,
+                    [...latestDoorTransitions, ...recentReedTransitions],
+                    snapshot.latestDoorTransitionsAvailable === true
+                );
                 
                 // Update Door Command Center (6-panel grid)
                 try {
