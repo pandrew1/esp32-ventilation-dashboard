@@ -625,8 +625,10 @@ function updateGarageDoorSummary(liveDoors = [], confirmedEvents = [], durableHi
                 ? 'Confirmed history unavailable'
                 : (openedToday === false
                     ? 'No transition today'
-                    : (openedToday === true ? 'Opened today · time unavailable' : 'No saved transition'));
-            if (methodEl) methodEl.textContent = durableHistoryAvailable ? 'Reed history' : 'Current state only';
+                    : (openedToday === true ? 'Syncing latest transition…' : 'No saved transition'));
+            if (methodEl) methodEl.textContent = !durableHistoryAvailable
+                ? 'Current state only'
+                : (openedToday === true ? 'Reed telemetry pending' : 'Reed history');
         }
     });
 }
