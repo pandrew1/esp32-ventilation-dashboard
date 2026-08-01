@@ -13,7 +13,7 @@
     <title>ESP32 Ventilation Control Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="dashboard.js?v=20260801-pressure-outcomes-v4"></script>
+    <script src="dashboard.js?v=20260801-per-door-pressure-v5"></script>
     <style>
         * {
             margin: 0;
@@ -1604,6 +1604,13 @@
             color: #2c3e50;
             margin-bottom: 8px;
         }
+        .garage-door-summary-subtitle {
+            display: block;
+            margin-top: 2px;
+            color: #788896;
+            font-size: 0.82em;
+            font-weight: 500;
+        }
         .garage-door-summary-row {
             display: grid;
             grid-template-columns: minmax(105px, 0.8fr) minmax(70px, auto) minmax(150px, 1.5fr);
@@ -1630,40 +1637,35 @@
         .garage-door-last { min-width: 0; color: #586776; line-height: 1.25; }
         .garage-door-last strong { color: #2f3f4f; }
         .garage-door-method { color: #788896; font-size: 0.9em; }
-
-        .pressure-detector-summary {
-            margin-top: 12px;
-            padding: 10px 0 0;
-            border-top: 1px solid #dfe7ee;
-            font-size: 0.8em;
-        }
-        .pressure-detector-header,
-        .pressure-detector-row {
+        .door-pressure-outcomes {
+            grid-column: 1 / -1;
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 6px 9px;
             flex-wrap: wrap;
+            min-width: 0;
+            padding-top: 3px;
+            color: #637381;
+            font-size: 0.9em;
         }
-        .pressure-detector-header { justify-content: space-between; margin-bottom: 7px; }
-        .pressure-detector-title { font-weight: 800; color: #2c3e50; }
-        .pressure-pass-label { color: #637381; font-size: 0.88em; }
-        .pressure-outcome-count,
-        .pressure-latest-outcome {
+        .door-pressure-label { color: #465767; font-weight: 800; }
+        .door-pressure-stat {
             display: inline-flex;
             align-items: center;
             gap: 4px;
             border-radius: 999px;
             padding: 3px 7px;
-            font-weight: 800;
+            white-space: nowrap;
         }
-        .pressure-outcome-count.tp,
-        .pressure-latest-outcome.tp { background: #e9f8ef; color: #18794e; }
-        .pressure-outcome-count.fp,
-        .pressure-latest-outcome.fp { background: #fff0f0; color: #b42318; }
-        .pressure-outcome-group { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .pressure-outcome-last { color: #637381; }
-        .pressure-latest-text { color: #465767; min-width: 0; }
-        .pressure-detector-legend { margin-top: 5px; color: #788896; font-size: 0.88em; }
+        .door-pressure-stat.tp { background: #e9f8ef; color: #18794e; }
+        .door-pressure-stat.fp { background: #fff0f0; color: #b42318; }
+        .door-pressure-stat strong { font-weight: 900; }
+        .door-pressure-last { color: #637381; }
+
+        @media (max-width: 480px) {
+            .door-pressure-outcomes { gap: 4px 6px; font-size: 0.82em; }
+            .door-pressure-stat { padding: 2px 5px; }
+        }
 
         /* Responsive grid layout */
         @media (max-width: 1200px) {
@@ -1914,41 +1916,34 @@
                         </div>
 
                         <div class="garage-door-summary" id="garageDoorSummary" aria-label="Latest reed-confirmed door activity">
-                            <div class="garage-door-summary-title">Latest Confirmed Door Activity</div>
+                            <div class="garage-door-summary-title">
+                                Latest Confirmed Door Activity
+                                <span class="garage-door-summary-subtitle" id="pressureDetectorLegend">Pressure: TP = reed-confirmed · FP* = no reed, detector-predicted door</span>
+                            </div>
                             <div class="garage-door-summary-row" data-door-summary="d1">
                                 <span class="garage-door-name">D1 Side</span>
                                 <span class="garage-door-state" id="garageSummaryState-d1">UNKNOWN</span>
                                 <span class="garage-door-last"><strong id="garageSummaryAction-d1">Checking history…</strong><br><span class="garage-door-method" id="garageSummaryMethod-d1">Reed history</span></span>
+                                <div class="door-pressure-outcomes"><span class="door-pressure-label">Pressure</span><span class="door-pressure-stat tp">TP <strong id="pressureTp-d1">—</strong></span><span class="door-pressure-last" id="pressureTpLast-d1">last —</span><span class="door-pressure-stat fp">FP* <strong id="pressureFp-d1">—</strong></span><span class="door-pressure-last" id="pressureFpLast-d1">last —</span></div>
                             </div>
                             <div class="garage-door-summary-row" data-door-summary="d2">
                                 <span class="garage-door-name">D2 House</span>
                                 <span class="garage-door-state" id="garageSummaryState-d2">UNKNOWN</span>
                                 <span class="garage-door-last"><strong id="garageSummaryAction-d2">Checking history…</strong><br><span class="garage-door-method" id="garageSummaryMethod-d2">Reed history</span></span>
+                                <div class="door-pressure-outcomes"><span class="door-pressure-label">Pressure</span><span class="door-pressure-stat tp">TP <strong id="pressureTp-d2">—</strong></span><span class="door-pressure-last" id="pressureTpLast-d2">last —</span><span class="door-pressure-stat fp">FP* <strong id="pressureFp-d2">—</strong></span><span class="door-pressure-last" id="pressureFpLast-d2">last —</span></div>
                             </div>
                             <div class="garage-door-summary-row" data-door-summary="d3">
                                 <span class="garage-door-name">D3 Single</span>
                                 <span class="garage-door-state" id="garageSummaryState-d3">UNKNOWN</span>
                                 <span class="garage-door-last"><strong id="garageSummaryAction-d3">Checking history…</strong><br><span class="garage-door-method" id="garageSummaryMethod-d3">Reed history</span></span>
+                                <div class="door-pressure-outcomes"><span class="door-pressure-label">Pressure</span><span class="door-pressure-stat tp">TP <strong id="pressureTp-d3">—</strong></span><span class="door-pressure-last" id="pressureTpLast-d3">last —</span><span class="door-pressure-stat fp">FP* <strong id="pressureFp-d3">—</strong></span><span class="door-pressure-last" id="pressureFpLast-d3">last —</span></div>
                             </div>
                             <div class="garage-door-summary-row" data-door-summary="d4">
                                 <span class="garage-door-name">D4 Double</span>
                                 <span class="garage-door-state" id="garageSummaryState-d4">UNKNOWN</span>
                                 <span class="garage-door-last"><strong id="garageSummaryAction-d4">Checking history…</strong><br><span class="garage-door-method" id="garageSummaryMethod-d4">Reed history</span></span>
+                                <div class="door-pressure-outcomes"><span class="door-pressure-label">Pressure</span><span class="door-pressure-stat tp">TP <strong id="pressureTp-d4">—</strong></span><span class="door-pressure-last" id="pressureTpLast-d4">last —</span><span class="door-pressure-stat fp">FP* <strong id="pressureFp-d4">—</strong></span><span class="door-pressure-last" id="pressureFpLast-d4">last —</span></div>
                             </div>
-                        </div>
-
-                        <div class="pressure-detector-summary" id="pressureDetectorSummary" aria-label="Pressure detector operational outcomes today">
-                            <div class="pressure-detector-header">
-                                <span class="pressure-detector-title">Pressure Detector · Today</span>
-                                <span class="pressure-pass-label">Production PASS outcomes</span>
-                            </div>
-                            <div class="pressure-detector-row">
-                                <span class="pressure-outcome-group"><span class="pressure-outcome-count tp">TP <strong id="pressureTpCount">—</strong></span><span class="pressure-outcome-last" id="pressureTpLast">last —</span></span>
-                                <span class="pressure-outcome-group"><span class="pressure-outcome-count fp">FP <strong id="pressureFpCount">—</strong></span><span class="pressure-outcome-last" id="pressureFpLast">last —</span></span>
-                                <span class="pressure-latest-outcome" id="pressureLatestOutcome">—</span>
-                                <span class="pressure-latest-text" id="pressureLatestText">Loading detector summary…</span>
-                            </div>
-                            <div class="pressure-detector-legend" id="pressureDetectorLegend">TP = reed matched · FP = no reed match within 20s</div>
                         </div>
                     </div>
 
@@ -2700,7 +2695,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2026.08.01-pressure-outcomes-v4</span>
+        Build: <span id="buildInfo">2026.08.01-per-door-pressure-v5</span>
     </div>
 </body>
 </html>
