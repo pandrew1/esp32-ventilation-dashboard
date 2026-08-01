@@ -13,7 +13,7 @@
     <title>ESP32 Ventilation Control Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="dashboard.js"></script>
+    <script src="dashboard.js?v=20260801-garage-summary-v1"></script>
     <style>
         * {
             margin: 0;
@@ -1593,6 +1593,44 @@
         .ventilation-control-card .control-status.success { color: #18794e; }
         .ventilation-control-card .control-status.error { color: #b42318; }
 
+        .garage-door-summary {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid #dfe7ee;
+        }
+        .garage-door-summary-title {
+            font-size: 0.86em;
+            font-weight: 800;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .garage-door-summary-row {
+            display: grid;
+            grid-template-columns: minmax(105px, 0.8fr) minmax(70px, auto) minmax(150px, 1.5fr);
+            gap: 8px;
+            align-items: center;
+            padding: 8px 0;
+            border-top: 1px solid #edf1f4;
+            font-size: 0.82em;
+        }
+        .garage-door-summary-row:first-of-type { border-top: 0; }
+        .garage-door-name { font-weight: 750; color: #34495e; }
+        .garage-door-state {
+            display: inline-flex;
+            justify-content: center;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: #eef2f5;
+            color: #5d6d7e;
+            font-weight: 800;
+            font-size: 0.9em;
+        }
+        .garage-door-state.open { background: #fff0e6; color: #b54708; }
+        .garage-door-state.closed { background: #e9f8ef; color: #18794e; }
+        .garage-door-last { min-width: 0; color: #586776; line-height: 1.25; }
+        .garage-door-last strong { color: #2f3f4f; }
+        .garage-door-method { color: #788896; font-size: 0.9em; }
+
         /* Responsive grid layout */
         @media (max-width: 1200px) {
             .grid {
@@ -1611,6 +1649,7 @@
             .dashboard-tab-nav { grid-template-columns: 1fr; position: static; }
             .dashboard-tab-grid { grid-template-columns: 1fr; }
             #dashboardOverviewGrid { grid-template-columns: 1fr; }
+            .garage-door-summary-row { grid-template-columns: minmax(70px, 0.8fr) minmax(58px, auto) minmax(0, 1.4fr); }
             .card {
                 min-width: auto;
             }
@@ -1837,6 +1876,30 @@
                             <div class="sensor-reading">
                                 <span>Pressure</span>
                                 <span class="sensor-value pressure" id="garagePressure">- inHg</span>
+                            </div>
+                        </div>
+
+                        <div class="garage-door-summary" id="garageDoorSummary" aria-label="Latest monitored door activity">
+                            <div class="garage-door-summary-title">Latest Door Activity</div>
+                            <div class="garage-door-summary-row" data-door-summary="d1">
+                                <span class="garage-door-name">D1 Side</span>
+                                <span class="garage-door-state" id="garageSummaryState-d1">UNKNOWN</span>
+                                <span class="garage-door-last"><strong id="garageSummaryAction-d1">No transition</strong><br><span class="garage-door-method" id="garageSummaryMethod-d1">—</span></span>
+                            </div>
+                            <div class="garage-door-summary-row" data-door-summary="d2">
+                                <span class="garage-door-name">D2 House</span>
+                                <span class="garage-door-state" id="garageSummaryState-d2">UNKNOWN</span>
+                                <span class="garage-door-last"><strong id="garageSummaryAction-d2">No transition</strong><br><span class="garage-door-method" id="garageSummaryMethod-d2">—</span></span>
+                            </div>
+                            <div class="garage-door-summary-row" data-door-summary="d3">
+                                <span class="garage-door-name">D3 Single</span>
+                                <span class="garage-door-state" id="garageSummaryState-d3">UNKNOWN</span>
+                                <span class="garage-door-last"><strong id="garageSummaryAction-d3">No transition</strong><br><span class="garage-door-method" id="garageSummaryMethod-d3">—</span></span>
+                            </div>
+                            <div class="garage-door-summary-row" data-door-summary="d4">
+                                <span class="garage-door-name">D4 Double</span>
+                                <span class="garage-door-state" id="garageSummaryState-d4">UNKNOWN</span>
+                                <span class="garage-door-last"><strong id="garageSummaryAction-d4">No transition</strong><br><span class="garage-door-method" id="garageSummaryMethod-d4">—</span></span>
                             </div>
                         </div>
                     </div>
@@ -2589,7 +2652,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2026.08.01-three-tabs-v1</span>
+        Build: <span id="buildInfo">2026.08.01-garage-summary-v1</span>
     </div>
 </body>
 </html>

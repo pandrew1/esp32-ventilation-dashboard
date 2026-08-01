@@ -369,15 +369,18 @@ function initializeDashboardTabs() {
     // Tab 1: current indoor/outdoor/weather data, new controls, and only the five fan details.
     const environment = document.getElementById('environmentColumn');
     const controlColumn = document.getElementById('overviewControlColumn');
+    const overviewStatusCard = document.getElementById('systemStatusOverviewCard');
     if (environment && overviewGrid) overviewGrid.insertBefore(environment, controlColumn || overviewGrid.firstChild);
     moveDashboardWidget('systemStatusSummary', statusSlot);
+    const garageCard = document.getElementById('garageEnvironmentCard');
+    if (garageCard && controlColumn) controlColumn.insertBefore(garageCard, overviewStatusCard);
 
     // Tab 2: the two historical charts plus System Incidents, exactly as requested.
     ['historicalDataCard', 'pressureStormCard', 'systemIncidentsCard']
         .forEach(id => moveDashboardWidget(id, historyFlow));
 
     // Tab 3: analytical/status widgets. Inner layouts are not changed.
-    ['comfortSection', 'garageEnvironmentCard', 'systemStatusCard']
+    ['comfortSection', 'systemStatusCard']
         .forEach(id => moveDashboardWidget(id, analysisGrid));
     ['doorSection', 'yesterdayReport', 'ventilationEffectivenessCard', 'advancedAnalyticsCard', 'alertSection']
         .forEach(id => moveDashboardWidget(id, analysisFlow));
@@ -517,6 +520,101 @@ function setFanTempStart() {
 function addVentilationMinutes(minutes = 20) {
     queueVentilationCommand('add_minutes', minutes, 'addVentilationButton', 'manualVentilationStatus',
         `Queued +${minutes} minutes; fan should start after the device's next command poll`);
+}
+
+const GARAGE_DOOR_SUMMARY = [
+    { key: 'd1', statusId: 1, patterns: ['d1', 'garage side hinge'] },
+    { key: 'd2', statusId: 2, patterns: ['d2', 'house hinge'] },
+    { key: 'd3', statusId: 3, patterns: ['d3', 'single roller'] },
+    { key: 'd4', statusId: 4, patterns: ['d4', 'double roller'] }
+];
+
+function identifyGarageDoorKey(item, allowNumericFallback = true) {
+    const name = String(item?.doorName || item?.name || item?.reedDoorName || '').toLowerCase();
+    const match = GARAGE_DOOR_SUMMARY.find(door => door.patterns.some(pattern => name.includes(pattern)));
+    if (match) return match.key;
+    if (!allowNumericFallback) return null;
+    const id = Number(item?.doorId);
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? `d${id + 1}` : null;
+}
+
+function getDoorEventTime(timestamp) {
+    if (timestamp === null || timestamp === undefined || timestamp === '') return 0;
+    const numeric = Number(timestamp);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric > 1e12 ? numeric : numeric * 1000;
+    const parsed = Date.parse(String(timestamp));
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCompactDoorAge(timestamp) {
+    const eventTime = getDoorEventTime(timestamp);
+    if (!eventTime) return 'time unknown';
+    const ageMs = Math.max(0, Date.now() - eventTime);
+    if (ageMs < 60000) return 'just now';
+    if (ageMs < 3600000) return `${Math.floor(ageMs / 60000)}m ago`;
+    if (ageMs < 86400000) return `${Math.floor(ageMs / 3600000)}h ago`;
+    if (ageMs < 604800000) return `${Math.floor(ageMs / 86400000)}d ago`;
+    return new Date(eventTime).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function getDoorOpenState(value) {
+    if (value === true || value === 1 || String(value).toLowerCase() === 'true') return true;
+    if (value === false || value === 0 || String(value).toLowerCase() === 'false') return false;
+    return null;
+}
+
+function isMeaningfulDoorTransition(event) {
+    const method = String(event?.detectionMethod || '').trim().toLowerCase();
+    if (method === 'reed-switch') return true;
+    return method === 'pressure-analysis' && String(event?.s7RejectReason || '').trim().toUpperCase() === 'PASS';
+}
+
+function describeDoorDetectionMethod(event) {
+    const method = String(event?.detectionMethod || 'unknown').trim().toLowerCase();
+    if (method === 'reed-switch') return 'Reed switch';
+    if (method === 'pressure-analysis') return 'Pressure · PASS';
+    return method === 'unknown' ? 'Method unknown' : method.replace(/(^|-)([a-z])/g, (_, sep, c) => `${sep ? ' ' : ''}${c.toUpperCase()}`);
+}
+
+/** Update the front-page compact summary; full door history remains on tab 3. */
+function updateGarageDoorSummary(liveDoors = [], recentEvents = []) {
+    const states = new Map();
+    (Array.isArray(liveDoors) ? liveDoors : []).forEach(door => {
+        const byName = identifyGarageDoorKey(door, false);
+        const byId = GARAGE_DOOR_SUMMARY.find(item => item.statusId === Number(door?.id));
+        const key = byName || byId?.key;
+        const state = getDoorOpenState(door?.open);
+        if (key && state !== null) states.set(key, state);
+    });
+
+    const latest = new Map();
+    (Array.isArray(recentEvents) ? recentEvents : []).forEach(event => {
+        if (!isMeaningfulDoorTransition(event)) return;
+        const key = identifyGarageDoorKey(event);
+        if (!key) return;
+        const timestamp = getDoorEventTime(event?.timestamp);
+        if (!timestamp) return;
+        if (!latest.has(key) || timestamp > getDoorEventTime(latest.get(key)?.timestamp)) latest.set(key, event);
+    });
+
+    GARAGE_DOOR_SUMMARY.forEach(door => {
+        const stateEl = document.getElementById(`garageSummaryState-${door.key}`);
+        const actionEl = document.getElementById(`garageSummaryAction-${door.key}`);
+        const methodEl = document.getElementById(`garageSummaryMethod-${door.key}`);
+        const event = latest.get(door.key);
+        const state = states.has(door.key) ? states.get(door.key) : null;
+        const eventState = getDoorOpenState(event?.opened);
+
+        if (stateEl) {
+            stateEl.textContent = state === null ? 'UNKNOWN' : (state ? 'OPEN' : 'CLOSED');
+            stateEl.classList.toggle('open', state === true);
+            stateEl.classList.toggle('closed', state === false);
+        }
+        if (actionEl) actionEl.textContent = event
+            ? `${eventState === null ? 'Transition' : (eventState ? 'Opened' : 'Closed')} · ${formatCompactDoorAge(event.timestamp)}`
+            : 'No transition';
+        if (methodEl) methodEl.textContent = event ? describeDoorDetectionMethod(event) : '—';
+    });
 }
 
 // === UTILITY FUNCTIONS SECTION (STAGE 1 OPTIMIZATION) ===
@@ -1385,6 +1483,8 @@ function startAutoRefresh() {
                         GlobalEventSystem.emit('data:updated', { type: 'status', snapshot: true });
                     }
                 }
+
+                updateGarageDoorSummary(snapshot.status?.doors, snapshot.recentDoorEvents);
                 
                 // Update Door Command Center (6-panel grid)
                 try {
