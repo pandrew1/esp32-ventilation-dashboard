@@ -317,7 +317,8 @@ const CONFIG = {
     apiSecret: null, // Will be set dynamically, DO NOT STORE SECRETS IN THE JS/HTML FILES
     enhancedApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetEnhancedDashboardData',
     snapshotApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetDashboardSnapshot',
-    historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory'
+    historyApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/GetVentilationHistory',
+    commandApiUrl: 'https://esp32-ventilation-api.azurewebsites.net/api/VentilationCommand'
 };
 
 // Initialize API secret from URL parameter
@@ -344,6 +345,179 @@ let currentPressureChartHours = 6; // Track the currently displayed pressure cha
 let latestChartDataTimestamp = null; // Track the latest data point timestamp to avoid unnecessary chart refreshes
 let latestPressureDataTimestamp = null; // Track pressure chart data freshness
 let originalIncidentsData = []; // Global variable to store original incidents data for filtering
+
+function moveDashboardWidget(id, destination) {
+    const node = document.getElementById(id);
+    if (node && destination) destination.appendChild(node);
+    return node;
+}
+
+/**
+ * Moves existing widgets intact into the three requested tab panels. Element IDs and widget
+ * internals are preserved, so all existing update functions and chart controls continue to work.
+ */
+function initializeDashboardTabs() {
+    const content = document.getElementById('dashboardContent');
+    if (!content || content.dataset.tabsOrganized === 'true') return;
+
+    const overviewGrid = document.getElementById('dashboardOverviewGrid');
+    const historyFlow = document.getElementById('dashboardHistoryFlow');
+    const analysisGrid = document.getElementById('dashboardAnalysisGrid');
+    const analysisFlow = document.getElementById('dashboardAnalysisFlow');
+    const statusSlot = document.getElementById('systemStatusOverviewSlot');
+
+    // Tab 1: current indoor/outdoor/weather data, new controls, and only the five fan details.
+    const environment = document.getElementById('environmentColumn');
+    const controlColumn = document.getElementById('overviewControlColumn');
+    if (environment && overviewGrid) overviewGrid.insertBefore(environment, controlColumn || overviewGrid.firstChild);
+    moveDashboardWidget('systemStatusSummary', statusSlot);
+
+    // Tab 2: the two historical charts plus System Incidents, exactly as requested.
+    ['historicalDataCard', 'pressureStormCard', 'systemIncidentsCard']
+        .forEach(id => moveDashboardWidget(id, historyFlow));
+
+    // Tab 3: analytical/status widgets. Inner layouts are not changed.
+    ['comfortSection', 'garageEnvironmentCard', 'systemStatusCard']
+        .forEach(id => moveDashboardWidget(id, analysisGrid));
+    ['doorSection', 'yesterdayReport', 'ventilationEffectivenessCard', 'advancedAnalyticsCard', 'alertSection']
+        .forEach(id => moveDashboardWidget(id, analysisFlow));
+
+    const oldGrid = document.getElementById('currentStatusGrid');
+    if (oldGrid) oldGrid.style.display = 'none';
+    content.dataset.tabsOrganized = 'true';
+
+    document.querySelectorAll('.dashboard-tab-button').forEach((button, index, buttons) => {
+        button.addEventListener('keydown', event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            let next = index;
+            if (event.key === 'ArrowLeft') next = (index - 1 + buttons.length) % buttons.length;
+            if (event.key === 'ArrowRight') next = (index + 1) % buttons.length;
+            if (event.key === 'Home') next = 0;
+            if (event.key === 'End') next = buttons.length - 1;
+            buttons[next].focus();
+            buttons[next].click();
+        });
+    });
+
+    const saved = localStorage.getItem('ventilation_dashboard_tab');
+    showDashboardTab(['overview', 'history', 'analysis'].includes(saved) ? saved : 'overview');
+}
+
+function showDashboardTab(tabName) {
+    const validTabs = ['overview', 'history', 'analysis'];
+    if (!validTabs.includes(tabName)) tabName = 'overview';
+    validTabs.forEach(name => {
+        const panel = document.getElementById(`dashboardTab-${name}`);
+        const button = document.getElementById(`dashboardTabBtn-${name}`);
+        const active = name === tabName;
+        if (panel) {
+            panel.classList.toggle('active', active);
+            panel.setAttribute('aria-hidden', String(!active));
+        }
+        if (button) {
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', String(active));
+            button.tabIndex = active ? 0 : -1;
+        }
+    });
+    localStorage.setItem('ventilation_dashboard_tab', tabName);
+
+    // Chart.js may initialize while its tab is hidden; resize after the panel becomes visible.
+    if (tabName === 'history' || tabName === 'analysis') {
+        requestAnimationFrame(() => {
+            [temperatureChart, pressureChart, incidentTrendsChart].forEach(chart => {
+                if (chart && typeof chart.resize === 'function') chart.resize();
+            });
+            window.dispatchEvent(new Event('resize'));
+        });
+    }
+}
+
+let ventilationControlState = null;
+
+function setControlStatus(id, message, type = '') {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.textContent = message;
+    element.classList.remove('success', 'error');
+    if (type) element.classList.add(type);
+}
+
+function renderVentilationControlState(payload) {
+    if (!payload || !payload.state) return;
+    ventilationControlState = payload;
+    const input = document.getElementById('fanTempStartInput');
+    if (input && document.activeElement !== input) input.value = Number(payload.state.fanStartTempF || 70).toFixed(1);
+
+    const pendingText = payload.pendingCount ? ` · ${payload.pendingCount} command${payload.pendingCount === 1 ? '' : 's'} pending` : '';
+    setControlStatus('fanTempStartStatus', `Current setting: ${Number(payload.state.fanStartTempF || 70).toFixed(1)}°F${pendingText}`);
+
+    let remaining = Number(payload.state.manualVentRemainingSec || 0);
+    if (remaining > 0 && payload.state.updatedAt) {
+        const elapsed = Math.max(0, (Date.now() - Date.parse(payload.state.updatedAt)) / 1000);
+        remaining = Math.max(0, remaining - elapsed);
+    }
+    const minutes = Math.ceil(remaining / 60);
+    setControlStatus('manualVentilationStatus',
+        minutes > 0 ? `Manual ventilation: about ${minutes} minute${minutes === 1 ? '' : 's'} remaining${pendingText}` : `No manual ventilation time active${pendingText}`,
+        minutes > 0 ? 'success' : '');
+}
+
+async function loadVentilationControlState() {
+    const token = localStorage.getItem('ventilation_auth_token');
+    if (!token && !CONFIG.apiSecret) return;
+    try {
+        const url = `${CONFIG.commandApiUrl}?deviceId=${encodeURIComponent(CONFIG.deviceId)}`;
+        const response = await fetch(url, { method: 'GET', headers: DashboardUtils.getAuthHeaders(), cache: 'no-store' });
+        if (!response.ok) throw new Error(`Command status HTTP ${response.status}`);
+        renderVentilationControlState(await response.json());
+    } catch (error) {
+        Logger.warn('Ventilation command status unavailable:', error);
+        setControlStatus('fanTempStartStatus', 'Control status temporarily unavailable', 'error');
+        setControlStatus('manualVentilationStatus', 'Control status temporarily unavailable', 'error');
+    }
+}
+
+async function queueVentilationCommand(command, value, buttonId, statusId, queuedMessage) {
+    const button = document.getElementById(buttonId);
+    if (button) button.disabled = true;
+    setControlStatus(statusId, 'Sending command…');
+    try {
+        const response = await fetch(`${CONFIG.commandApiUrl}?deviceId=${encodeURIComponent(CONFIG.deviceId)}`, {
+            method: 'POST',
+            headers: DashboardUtils.getAuthHeaders(),
+            body: JSON.stringify({ deviceId: CONFIG.deviceId, command, value })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Command HTTP ${response.status}`);
+        setControlStatus(statusId, queuedMessage, 'success');
+        // Device polls every 30 seconds. Refresh twice so ACK/state appears without a page reload.
+        setTimeout(loadVentilationControlState, 5000);
+        setTimeout(loadVentilationControlState, 35000);
+    } catch (error) {
+        Logger.error('Ventilation command failed:', error);
+        setControlStatus(statusId, `Command failed: ${error.message}`, 'error');
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+function setFanTempStart() {
+    const input = document.getElementById('fanTempStartInput');
+    const value = input ? Number(input.value) : NaN;
+    if (!Number.isFinite(value) || value < 55 || value > 90) {
+        setControlStatus('fanTempStartStatus', 'Enter a temperature from 55°F to 90°F', 'error');
+        return;
+    }
+    queueVentilationCommand('set_fan_start_temp', value, 'fanTempStartButton', 'fanTempStartStatus',
+        `Queued ${value.toFixed(1)}°F setting; device acknowledgment usually takes under 30 seconds`);
+}
+
+function addVentilationMinutes(minutes = 20) {
+    queueVentilationCommand('add_minutes', minutes, 'addVentilationButton', 'manualVentilationStatus',
+        `Queued +${minutes} minutes; fan should start after the device's next command poll`);
+}
 
 // === UTILITY FUNCTIONS SECTION (STAGE 1 OPTIMIZATION) ===
 const DashboardUtils = {
@@ -1223,6 +1397,8 @@ function startAutoRefresh() {
                     Logger.error('Error updating Door Command Center:', e);
                 }
 
+                await loadVentilationControlState();
+
                 updateConnectionStatus('connected');
 
                 // Refresh chart data if chart is currently displayed
@@ -1274,6 +1450,7 @@ function startAutoRefresh() {
 
         // Add logout button to header
         document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboardTabs();
             const header = document.querySelector('.header');
             const userEmail = localStorage.getItem('ventilation_user_email') || 'User';
             

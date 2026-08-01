@@ -1516,12 +1516,91 @@
             color: #dc3545;
         }
 
+        /* Top-level dashboard organization. Existing widgets are moved into these panels intact
+           by initializeDashboardTabs(); their internal control layouts remain unchanged. */
+        .dashboard-tab-nav {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 22px;
+            padding: 6px;
+            border-radius: 14px;
+            background: rgba(44, 62, 80, 0.08);
+            position: sticky;
+            top: 8px;
+            z-index: 900;
+            backdrop-filter: blur(10px);
+        }
+
+        .dashboard-tab-button {
+            border: 0;
+            border-radius: 10px;
+            padding: 12px 14px;
+            background: transparent;
+            color: #435466;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .dashboard-tab-button:hover { transform: translateY(-1px); background: rgba(255,255,255,0.7); }
+        .dashboard-tab-button.active { background: #2c3e50; color: white; box-shadow: 0 4px 12px rgba(44,62,80,0.22); }
+        .dashboard-tab-button:focus-visible { outline: 3px solid rgba(52,152,219,0.45); outline-offset: 2px; }
+        .dashboard-tab-panel { display: none; }
+        .dashboard-tab-panel.active { display: block; animation: tabFade 0.18s ease-out; }
+        @keyframes tabFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+        .dashboard-tab-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+        #dashboardOverviewGrid { grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); }
+
+        .dashboard-tab-flow > * { margin-bottom: 20px; }
+
+        .ventilation-control-card .control-group {
+            padding: 14px;
+            border-radius: 10px;
+            background: #f7fafc;
+            border: 1px solid #dfe7ee;
+            margin-top: 12px;
+        }
+
+        .ventilation-control-card .control-label { display: block; font-weight: 700; color: #2c3e50; margin-bottom: 7px; }
+        .ventilation-control-card .control-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .ventilation-control-card input[type="number"] {
+            width: 92px;
+            padding: 9px 10px;
+            border: 1px solid #aebdca;
+            border-radius: 7px;
+            font: inherit;
+        }
+        .ventilation-control-card .control-button {
+            border: 0;
+            border-radius: 7px;
+            padding: 10px 14px;
+            background: #2574a9;
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .ventilation-control-card .control-button.co2 { width: 100%; background: #1f8a70; font-size: 1em; }
+        .ventilation-control-card .control-button:disabled { opacity: 0.55; cursor: wait; }
+        .ventilation-control-card .control-help { margin-top: 7px; color: #637381; font-size: 0.82em; line-height: 1.35; }
+        .ventilation-control-card .control-status { margin-top: 8px; min-height: 1.2em; font-size: 0.84em; font-weight: 600; color: #506070; }
+        .ventilation-control-card .control-status.success { color: #18794e; }
+        .ventilation-control-card .control-status.error { color: #b42318; }
+
         /* Responsive grid layout */
         @media (max-width: 1200px) {
             .grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 20px;
             }
+            .dashboard-tab-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            #dashboardOverviewGrid { grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr); }
         }
 
         @media (max-width: 768px) {
@@ -1529,6 +1608,9 @@
                 grid-template-columns: 1fr;
                 gap: 20px;
             }
+            .dashboard-tab-nav { grid-template-columns: 1fr; position: static; }
+            .dashboard-tab-grid { grid-template-columns: 1fr; }
+            #dashboardOverviewGrid { grid-template-columns: 1fr; }
             .card {
                 min-width: auto;
             }
@@ -1579,10 +1661,57 @@
             </div>
 
             <div id="dashboardContent" style="display: none;">
+                <nav class="dashboard-tab-nav" role="tablist" aria-label="Dashboard sections">
+                    <button id="dashboardTabBtn-overview" class="dashboard-tab-button active" type="button" role="tab" aria-selected="true" aria-controls="dashboardTab-overview" onclick="showDashboardTab('overview')">🌡️ Current &amp; Control</button>
+                    <button id="dashboardTabBtn-history" class="dashboard-tab-button" type="button" role="tab" aria-selected="false" aria-controls="dashboardTab-history" onclick="showDashboardTab('history')">📈 Historical Data</button>
+                    <button id="dashboardTabBtn-analysis" class="dashboard-tab-button" type="button" role="tab" aria-selected="false" aria-controls="dashboardTab-analysis" onclick="showDashboardTab('analysis')">🧭 Insights &amp; Reports</button>
+                </nav>
+
+                <section id="dashboardTab-overview" class="dashboard-tab-panel active" role="tabpanel" aria-labelledby="dashboardTabBtn-overview">
+                    <div id="dashboardOverviewGrid" class="dashboard-tab-grid">
+                        <div id="overviewControlColumn" style="display: flex; flex-direction: column; gap: 20px;">
+                        <div class="card ventilation-control-card" id="ventilationControlsCard">
+                            <h3>🌀 Fan &amp; Fresh-Air Controls</h3>
+                            <div class="control-group">
+                                <label class="control-label" for="fanTempStartInput">Fan Temp Start</label>
+                                <div class="control-row">
+                                    <input id="fanTempStartInput" type="number" min="55" max="90" step="0.5" value="70" inputmode="decimal" aria-describedby="fanTempStartHelp fanTempStartStatus">
+                                    <span aria-hidden="true">°F</span>
+                                    <button id="fanTempStartButton" class="control-button" type="button" onclick="setFanTempStart()">Set</button>
+                                </div>
+                                <div id="fanTempStartHelp" class="control-help">Minimum indoor temperature for automatic cooling starts. The existing requirement that outdoors be at least 5°F cooler remains in effect.</div>
+                                <div id="fanTempStartStatus" class="control-status" aria-live="polite">Loading current setting…</div>
+                            </div>
+
+                            <div class="control-group">
+                                <span class="control-label">Overnight CO₂ Flush</span>
+                                <button id="addVentilationButton" class="control-button co2" type="button" onclick="addVentilationMinutes(20)">＋ Add 20 Minutes of Ventilation</button>
+                                <div class="control-help">Starts immediately and adds 20 minutes to any manual time already remaining (maximum two hours).</div>
+                                <div id="manualVentilationStatus" class="control-status" aria-live="polite">Ready</div>
+                            </div>
+                        </div>
+
+                        <div class="card" id="systemStatusOverviewCard">
+                            <h3>⚙️ System Status &amp; Health</h3>
+                            <div id="systemStatusOverviewSlot"></div>
+                        </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="dashboardTab-history" class="dashboard-tab-panel" role="tabpanel" aria-labelledby="dashboardTabBtn-history">
+                    <div id="dashboardHistoryFlow" class="dashboard-tab-flow"></div>
+                </section>
+
+                <section id="dashboardTab-analysis" class="dashboard-tab-panel" role="tabpanel" aria-labelledby="dashboardTabBtn-analysis">
+                    <div id="dashboardAnalysisGrid" class="dashboard-tab-grid"></div>
+                    <div id="dashboardAnalysisFlow" class="dashboard-tab-flow"></div>
+                </section>
+
                 <!-- Current Status Grid -->
-                <div class="grid">
+                <div class="grid" id="currentStatusGrid">
                     <!-- Combined Indoor/Outdoor Environment Column -->
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div id="environmentColumn" style="display: flex; flex-direction: column; gap: 15px;">
                         <!-- Indoor Sensors -->
                         <div class="card">
                             <h3>🏠 Indoor Environment</h3>
@@ -1666,7 +1795,7 @@
                         </div>
                     </div>    
                         <!-- PHASE 2: Pacific NW Comfort Intelligence Panel -->
-                        <div class="comfort-section" style="margin: 15px 0 0 0; padding: 15px; border: 2px solid #4CAF50; border-radius: 8px; background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);">
+                        <div class="comfort-section" id="comfortSection" style="margin: 15px 0 0 0; padding: 15px; border: 2px solid #4CAF50; border-radius: 8px; background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);">
                             <h4 style="margin: 0 0 10px 0; color: #2e7d32;">🌡️ Pacific NW Comfort Intelligence</h4>
                             
                             <div class="sensor-reading" style="margin: 8px 0;">
@@ -1692,7 +1821,7 @@
                     </div>
 
                     <!-- Enhanced Garage Environment & Door Activity -->
-                    <div class="card enhanced-garage-card">
+                    <div class="card enhanced-garage-card" id="garageEnvironmentCard">
                         <h3>🏠 Garage Environment & Door Activity</h3>
                         
                         <!-- Environmental Sensors - Vertical layout for better fit -->
@@ -1713,14 +1842,14 @@
                     </div>
 
                     <!-- Enhanced System Status & Health Monitor -->
-                    <div class="card enhanced-system-card">
+                    <div class="card enhanced-system-card" id="systemStatusCard">
                         <h3 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                             <span>⚙️ System Status & Health</span>
                             <button type="button" onclick="exportReliabilityDoc()" title="Export to Word" style="background:#17a2b8; border:none; color:#fff; padding:6px 10px; border-radius:5px; cursor:pointer; font-size:12px; line-height:1;">Export</button>
                         </h3>
                         
                         <!-- Current System Status -->
-                        <div class="system-status">
+                        <div class="system-status" id="systemStatusSummary">
                             <div class="fan-status" id="fanStatus">🌀</div>
                             <div><strong id="fanStatusText">System Status</strong></div>
                             <div style="margin-top: 15px;">
@@ -1737,7 +1866,7 @@
                         <!-- System Health Monitoring (removed duplicate UX that showed bad data) -->
                         
                         <!-- PHASE 3: Building Performance Analysis Panel -->
-                        <div class="building-performance-section" style="margin: 20px 0; padding: 15px; border: 2px solid #2196F3; border-radius: 8px; background: linear-gradient(135deg, #f0f8ff 0%, #e3f2fd 100%);">
+                        <div class="building-performance-section" id="buildingPerformanceSection" style="margin: 20px 0; padding: 15px; border: 2px solid #2196F3; border-radius: 8px; background: linear-gradient(135deg, #f0f8ff 0%, #e3f2fd 100%);">
                             <h4 style="margin: 0 0 12px 0; color: #1976d2;">🏠 Building Performance Intelligence</h4>
                             
                             <div class="performance-metrics" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0;">
@@ -1767,7 +1896,7 @@
                         </div>
                         
                         <!-- PHASE 4: Health Monitoring Panel -->
-                        <div class="health-monitoring-section" style="margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border-radius: 8px; border-left: 4px solid #4CAF50;">
+                        <div class="health-monitoring-section" id="barometricHealthSection" style="margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border-radius: 8px; border-left: 4px solid #4CAF50;">
                             <h4 style="margin: 0 0 12px 0; color: #2e7d32;">💊 Barometric Health Monitoring</h4>
                             <div style="font-size: 11px; color: #666; margin-bottom: 10px; font-style: italic;">INFORMATIONAL ONLY - Consult healthcare providers for medical decisions</div>
                             
@@ -1799,7 +1928,7 @@
                         </div>
                         
                         <!-- System Reliability & Startup Info -->
-                        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef;">
+                        <div id="systemReliabilitySection" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef;">
                             <div style="font-weight: bold; color: #2c3e50; margin-bottom: 8px;">🛡️ System Reliability:</div>
                             <div style="font-size: 0.85em; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                 <div>Uptime: <strong id="reliabilityUptime">-</strong></div>
@@ -2168,7 +2297,7 @@
                 </div>
 
                 <!-- Historical Charts -->
-                <div class="card">
+                <div class="card" id="historicalDataCard">
                     <h3>📈 Historical Data</h3>
                     <div class="time-controls">
                         <button class="time-btn active" onclick="createTemperatureChart(6)">6 Hours</button>
@@ -2189,7 +2318,7 @@
                 </div>
 
                 <!-- Pressure & Storm Risk Chart -->
-                <div class="card">
+                <div class="card" id="pressureStormCard">
                     <h3>🌪️ Pressure & Storm Risk Analysis</h3>
                     <div class="time-controls">
                         <button class="time-btn active" onclick="createPressureChart(6)">6 Hours</button>
@@ -2233,7 +2362,7 @@
                 </div>
 
                 <!-- Ventilation Effectiveness Summary -->
-                <div class="card">
+                <div class="card" id="ventilationEffectivenessCard">
                     <h3>🎯 Ventilation Effectiveness Analysis</h3>
                     <div id="effectivenessAnalysis" style="display: none;">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
@@ -2280,7 +2409,7 @@
                 </div>
 
                 <!-- PHASE 5: Enhanced Almanac with Climate Intelligence -->
-                <div class="card">
+                <div class="card" id="advancedAnalyticsCard">
                     <h3>📊 Advanced Analytics & Climate Intelligence</h3>
                     
                     <!-- Tab Navigation for Enhanced Almanac -->
@@ -2404,7 +2533,7 @@
                 </div>
 
                     <!-- System Incidents -->
-                <div class="card">
+                <div class="card" id="systemIncidentsCard">
                     <h3>🔧 System Incidents</h3>
                     
                     <!-- Time Period Filter -->
@@ -2460,7 +2589,7 @@
 
     <!-- Discrete Build Info Footer -->
     <div style="position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #555; font-family: monospace; z-index: 1000; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 3px;">
-        Build: <span id="buildInfo">2025.11.28-2009-v3.1</span>
+        Build: <span id="buildInfo">2026.08.01-three-tabs-v1</span>
     </div>
 </body>
 </html>
