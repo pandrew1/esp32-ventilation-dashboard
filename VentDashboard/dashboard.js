@@ -631,6 +631,72 @@ function updateGarageDoorSummary(liveDoors = [], confirmedEvents = [], durableHi
     });
 }
 
+function describePressureZone(zone) {
+    const normalized = String(zone || '').trim().toLowerCase();
+    if (normalized === 'garage-house') return 'Garage↔House';
+    if (normalized === 'garage-outside') return 'Garage↔Outside';
+    return 'Unknown zone';
+}
+
+/** Render only compact operational outcomes; this is not a model-quality trend metric. */
+function updatePressureDetectorSummary(summary) {
+    const tpEl = document.getElementById('pressureTpCount');
+    const fpEl = document.getElementById('pressureFpCount');
+    const tpLastEl = document.getElementById('pressureTpLast');
+    const fpLastEl = document.getElementById('pressureFpLast');
+    const outcomeEl = document.getElementById('pressureLatestOutcome');
+    const textEl = document.getElementById('pressureLatestText');
+    const legendEl = document.getElementById('pressureDetectorLegend');
+    if (!tpEl || !fpEl || !outcomeEl || !textEl) return;
+
+    outcomeEl.classList.remove('tp', 'fp');
+    if (!summary?.available) {
+        tpEl.textContent = '—';
+        fpEl.textContent = '—';
+        if (tpLastEl) tpLastEl.textContent = 'last —';
+        if (fpLastEl) fpLastEl.textContent = 'last —';
+        outcomeEl.textContent = '—';
+        textEl.textContent = 'Detector outcome summary unavailable';
+        return;
+    }
+
+    tpEl.textContent = Number(summary.truePositives || 0).toLocaleString();
+    fpEl.textContent = Number(summary.falsePositives || 0).toLocaleString();
+    if (tpLastEl) tpLastEl.textContent = Number(summary.latestTruePositiveAt || 0) > 0
+        ? `last ${formatCompactDoorAge(summary.latestTruePositiveAt)}`
+        : 'last —';
+    if (fpLastEl) fpLastEl.textContent = Number(summary.latestFalsePositiveAt || 0) > 0
+        ? `last ${formatCompactDoorAge(summary.latestFalsePositiveAt)}`
+        : 'last —';
+    if (legendEl) {
+        const windowSeconds = Number(summary.matchWindowSeconds || 20);
+        legendEl.textContent = `TP = reed matched · FP = no reed match within ${windowSeconds}s`;
+    }
+
+    const latest = summary.latest;
+    if (!latest || !['TP', 'FP'].includes(latest.outcome)) {
+        outcomeEl.textContent = '—';
+        textEl.textContent = Number(summary.pending || 0) > 0
+            ? 'Waiting for reed-match window…'
+            : 'No finalized production PASS today';
+        return;
+    }
+
+    const isTp = latest.outcome === 'TP';
+    outcomeEl.textContent = latest.outcome;
+    outcomeEl.classList.add(isTp ? 'tp' : 'fp');
+    const doorId = Number(latest.doorId);
+    const location = isTp && Number.isInteger(doorId) && doorId >= 0 && doorId <= 3
+        ? `D${doorId + 1}`
+        : describePressureZone(latest.zone);
+    const action = getDoorOpenState(latest.opened) === true ? 'open' : 'close';
+    const probability = Number(latest.mlProbability);
+    const score = Number.isFinite(probability) && probability >= 0
+        ? ` · ML ${(probability * 100).toFixed(0)}%`
+        : '';
+    textEl.textContent = `${location} ${action} · ${formatCompactDoorAge(latest.timestamp)}${score}`;
+}
+
 // === UTILITY FUNCTIONS SECTION (STAGE 1 OPTIMIZATION) ===
 const DashboardUtils = {
     // Consolidated authentication
@@ -1509,6 +1575,7 @@ function startAutoRefresh() {
                     [...latestDoorTransitions, ...recentReedTransitions],
                     snapshot.latestDoorTransitionsAvailable === true
                 );
+                updatePressureDetectorSummary(snapshot.pressureDetectionSummary);
                 
                 // Update Door Command Center (6-panel grid)
                 try {
